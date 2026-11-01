@@ -1,7 +1,7 @@
 #!/bin/sh
 # Regenerates packaging/Portero.icns from docs/logo.svg using only system tools
-# (qlmanage, sips, iconutil). Run manually only when the logo changes; it is not
-# part of the build. qlmanage needs a GUI session.
+# (swift from the Command Line Tools, sips, iconutil). Run manually only when the logo changes; it is not
+# part of the build. Needs a GUI-capable session (AppKit).
 set -eu
 cd "$(dirname "$0")/.."
 TMP=$(mktemp -d)
@@ -14,11 +14,18 @@ trap 'rm -rf "$TMP"' EXIT
 	printf '\n</svg>\n'
 } > "$TMP/padded.svg"
 
-qlmanage -t -s 1024 -o "$TMP" "$TMP/padded.svg" >/dev/null 2>&1 || true
-if [ ! -f "$TMP/padded.svg.png" ]; then
-	echo "make-icon: qlmanage produced no PNG (it needs a GUI session)" >&2
-	exit 1
-fi
+MASTER="$TMP/master.png"
+swift scripts/render-icon.swift "$TMP/padded.svg" "$MASTER" 1024
+
+# The corner outside the rounded tile must be fully transparent.
+cat > "$TMP/check.swift" <<'SW'
+import AppKit
+let rep = NSBitmapImageRep(data: try! Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])))!
+let a = rep.colorAt(x: 0, y: 0)!.alphaComponent
+let c = rep.colorAt(x: 512, y: 512)!.alphaComponent
+if rep.pixelsWide != 1024 || a != 0 || c < 0.99 { print("bad alpha: corner \(a) centre \(c)"); exit(1) }
+SW
+swift "$TMP/check.swift" "$MASTER" || { echo "make-icon: master PNG is not transparent outside the tile" >&2; exit 1; }
 
 SET="$TMP/Portero.iconset"
 mkdir "$SET"
@@ -27,8 +34,10 @@ for spec in 16:icon_16x16 32:icon_16x16@2x 32:icon_32x32 64:icon_32x32@2x \
 	512:icon_512x512 1024:icon_512x512@2x; do
 	n=${spec%%:*}
 	name=${spec#*:}
-	sips -z "$n" "$n" "$TMP/padded.svg.png" --out "$SET/$name.png" >/dev/null
+	sips -z "$n" "$n" "$MASTER" --out "$SET/$name.png" >/dev/null
 done
 
 iconutil -c icns "$SET" -o packaging/Portero.icns
+/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' packaging/Info.plist | grep -qx 13.0 \
+	|| { echo "make-icon: LSMinimumSystemVersion is not 13.0" >&2; exit 1; }
 echo "packaging/Portero.icns"
