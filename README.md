@@ -44,13 +44,16 @@ A companion browser extension that hands such clicks to Portero is on the list f
 ## Install (from source, macOS)
 
 ```sh
-make install              # builds build/Portero.app, copies it to ~/Applications, links ~/.local/bin/portero
+make install              # rebuilds build/Portero.app, copies it to ~/Applications, links ~/.local/bin/portero
 portero rules init        # writes the example rules to ~/.config/portero/rules.yaml; edit it
 portero browsers          # the browsers and profile names Portero sees on this Mac
 portero open https://example.com/ --dry-run
 portero default set       # macOS asks to confirm Portero as the default browser
 portero sync icloud       # optional: keep rules.yaml in iCloud Drive, shared between your Macs
 ```
+
+`portero default set` is safe to run again: it prints `already set` for each scheme Portero already handles and
+exits 0. A scheme that macOS still does not hand over to Portero is reported as an error.
 
 `make build` gives a bare CLI in `bin/portero` (no link handling), `make test` runs vet and tests.
 
