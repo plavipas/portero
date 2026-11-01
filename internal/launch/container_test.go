@@ -59,11 +59,11 @@ func TestContainerURLExact(t *testing.T) {
 
 func TestFirefoxLinkSkipsOtherSchemes(t *testing.T) {
 	u, _ := url.Parse("file:///tmp/a.html")
-	link, notes := firefoxLink(browsersZen(), u, "", "Work")
+	link, _, notes := firefoxLink(browsersZen(), u, "", "Work")
 	if link != "file:///tmp/a.html" || len(notes) != 1 || notes[0] != "container skipped: file links cannot be opened by the extension" {
 		t.Errorf("link %q notes %v", link, notes)
 	}
-	if link, notes := firefoxLink(browsersZen(), u, "", ""); link != u.String() || notes != nil {
+	if link, _, notes := firefoxLink(browsersZen(), u, "", ""); link != u.String() || notes != nil {
 		t.Errorf("no container: %q %v", link, notes)
 	}
 }
@@ -187,7 +187,7 @@ func TestFirefoxLinkExtensionStates(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			firefoxHome(t, tc.ini, tc.files)
-			link, notes := firefoxLink(browsersZen(), u, tc.profile, "Work")
+			link, _, notes := firefoxLink(browsersZen(), u, tc.profile, "Work")
 			if link != tc.link {
 				t.Errorf("link %q, want %q", link, tc.link)
 			}
@@ -219,7 +219,7 @@ func TestResolveTargetContainerNames(t *testing.T) {
 				t.Errorf("got %q %q %v", container, note, err)
 			}
 			u, _ := url.Parse("https://example.com/")
-			link, notes := firefoxLink(browsersZen(), u, "", container)
+			link, _, notes := firefoxLink(browsersZen(), u, "", container)
 			if link != ContainerURL(tc.want, u) || len(notes) != 0 {
 				t.Errorf("link %q notes %q", link, notes)
 			}

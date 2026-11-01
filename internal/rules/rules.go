@@ -128,12 +128,16 @@ func (r *Rules) Validate() error {
 	return nil
 }
 
-// checkControl rejects tabs and line breaks in the fields that reach the log and the command line.
+// checkControl rejects tabs, line breaks and surrounding spaces in the fields that reach the log and the
+// command line: the container extension matches names exactly, so " Work" would create a second container.
 func checkControl(where string, t Target) error {
 	for _, f := range []struct{ field, v string }{{"browser", t.Browser}, {"profile", t.Profile}, {"container", t.Container}} {
 		field, v := f.field, f.v
 		if strings.ContainsAny(v, "\t\n\r") {
 			return fmt.Errorf("rules: %s: %s contains a control character", where, field)
+		}
+		if v != strings.TrimSpace(v) {
+			return fmt.Errorf("rules: %s: %s has leading or trailing spaces", where, field)
 		}
 	}
 	return nil

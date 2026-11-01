@@ -37,9 +37,9 @@ func open(u *url.URL, t rules.Target, dry bool) (Plan, error) {
 		if profile != "" {
 			args = append(args, "-n", "--args", "-P", profile)
 		}
-		link, notes := firefoxLink(b, u, t.Profile, container)
+		link, withContainer, notes := firefoxLink(b, u, t.Profile, container)
 		plan.Steps = append(plan.Steps, notes...)
-		if link == u.String() {
+		if !withContainer {
 			plan.Container = ""
 		}
 		return runOpen(plan, dry, append(args, link))

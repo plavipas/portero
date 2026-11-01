@@ -136,6 +136,17 @@ func TestTargetContainer(t *testing.T) {
 	}
 }
 
+func TestSurroundingSpaces(t *testing.T) {
+	for name, text := range map[string]string{
+		"container": "version: 1\ndefault: {browser: Zen}\nrules:\n  - name: x\n    match: {host: example.com}\n    open: {browser: Zen, container: \" Work\"}\n",
+		"profile":   "version: 1\ndefault: {browser: Zen, profile: \"Default \"}\n",
+	} {
+		if _, err := Parse([]byte(text)); err == nil || !strings.Contains(err.Error(), name+" has leading or trailing spaces") {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+}
+
 func TestControlCharacters(t *testing.T) {
 	for name, text := range map[string]string{
 		"container":         "version: 1\ndefault: {browser: Zen}\nrules:\n  - name: x\n    match: {host: example.com}\n    open: {browser: Zen, container: \"a\\tb\"}\n",
