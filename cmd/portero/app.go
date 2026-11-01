@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/plavipas/portero/internal/config"
 	"github.com/plavipas/portero/internal/decisionlog"
@@ -66,6 +68,85 @@ func routeLink(link, opener string) error {
 	return err
 }
 
+// schemeState is the handler of one URL scheme and whether it was already Portero before `default set`.
+type schemeState struct {
+	Scheme  string
+	Handler string
+	Already bool
+}
+
+// ensureDefault makes app the handler of every scheme in handler.Schemes.
+//
+// macOS shows one dialog that sets http and https together, so the call for the second scheme can fail with
+// "The file couldn't be opened" although the scheme is already ours. The error of set is therefore not
+// informative: only the actual handler, read after each call, is trusted.
+//
+// After set the handler is polled every `every` for up to `within`, because Launch Services can lag behind the dialog.
+func ensureDefault(app string, current func(scheme string) string, set func(app, scheme string) error, every, within time.Duration) ([]schemeState, error) {
+	// Snapshot first: a scheme that the dialog for an earlier one flips to ours is "set now", not "already set".
+	before := map[string]string{}
+	for _, s := range handler.Schemes {
+		before[s] = current(s)
+	}
+	var states []schemeState
+	for _, s := range handler.Schemes {
+		already := before[s] == BundleID
+		now := current(s)
+		if now != BundleID {
+			fmt.Printf("asking macOS to make Portero the handler of %s (confirm the dialog if one appears)\n", s)
+			setErr := set(app, s)
+			now = waitHandler(current, s, every, within)
+			if now != BundleID {
+				who := fmt.Sprintf("handled by %q", now)
+				if now == "" {
+					who = "without a handler"
+				}
+				if setErr != nil {
+					return states, fmt.Errorf("%s: still %s: %w", s, who, setErr)
+				}
+				return states, fmt.Errorf("%s: still %s", s, who)
+			}
+		}
+		states = append(states, schemeState{Scheme: s, Handler: now, Already: already})
+	}
+	return states, nil
+}
+
+// waitHandler reads the handler of scheme until it is ours or the deadline passes; it always reads at least once.
+func waitHandler(current func(string) string, scheme string, every, within time.Duration) string {
+	deadline := time.Now().Add(within)
+	for {
+		now := current(scheme)
+		if now == BundleID || !time.Now().Before(deadline) {
+			return now
+		}
+		time.Sleep(every)
+	}
+}
+
+// printDefaultStatus prints one line per scheme and the app path; note, when not nil, adds a trailing remark.
+func printDefaultStatus(w io.Writer, note func(scheme string) string) {
+	for _, s := range handler.Schemes {
+		cur := handler.DefaultHandler(s)
+		mark := " "
+		if cur == BundleID {
+			mark = "*"
+		}
+		line := fmt.Sprintf("%s %-6s %s", mark, s, cur)
+		if note != nil {
+			if n := note(s); n != "" {
+				line += "  " + n
+			}
+		}
+		fmt.Fprintln(w, line)
+	}
+	if app := appBundle(); app != "" {
+		fmt.Fprintln(w, "app:", app)
+	} else {
+		fmt.Fprintln(w, "app: not running from Portero.app (use `make install`)")
+	}
+}
+
 func defaultCmd(args []string) error {
 	sub := "status"
 	if len(args) > 0 {
@@ -73,31 +154,25 @@ func defaultCmd(args []string) error {
 	}
 	switch sub {
 	case "status":
-		for _, s := range handler.Schemes {
-			cur := handler.DefaultHandler(s)
-			mark := " "
-			if cur == BundleID {
-				mark = "*"
-			}
-			fmt.Printf("%s %-6s %s\n", mark, s, cur)
-		}
-		if app := appBundle(); app != "" {
-			fmt.Println("app:", app)
-		} else {
-			fmt.Println("app: not running from Portero.app (use `make install`)")
-		}
+		printDefaultStatus(os.Stdout, nil)
 	case "set":
 		app := appBundle()
 		if app == "" {
 			return fmt.Errorf("run this from the installed app: ~/Applications/Portero.app/Contents/MacOS/portero default set")
 		}
-		for _, s := range handler.Schemes {
-			if err := handler.SetDefaultHandler(app, s); err != nil {
-				return fmt.Errorf("%s: %w", s, err)
+		states, err := ensureDefault(app, handler.DefaultHandler, handler.SetDefaultHandler, 100*time.Millisecond, 1500*time.Millisecond)
+		notes := map[string]string{}
+		for _, st := range states {
+			if st.Already {
+				notes[st.Scheme] = "already set"
+			} else {
+				notes[st.Scheme] = "set now"
 			}
 		}
-		fmt.Println("asked macOS to make Portero the default browser; confirm the dialog if one appeared")
-		return defaultCmd(nil)
+		printDefaultStatus(os.Stdout, func(s string) string { return notes[s] })
+		if err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("unknown default command %q", sub)
 	}
