@@ -3,12 +3,12 @@ package main
 import (
 	"bytes"
 	"errors"
-	"github.com/plavipas/portero/internal/rules"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/plavipas/portero/internal/handler"
+	"github.com/plavipas/portero/internal/rules"
 )
 
 type fakeHandlers struct {
