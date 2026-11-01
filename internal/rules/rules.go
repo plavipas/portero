@@ -62,9 +62,36 @@ type Match struct {
 	Path Strings `yaml:"path,omitempty"`
 	// Bundle ids of the app that opened the link.
 	Opener Strings `yaml:"opener,omitempty"`
+	// Directory prefixes (absolute or `~/...`) of the working directory of the process that ran
+	// `portero open`; `/a/b` matches `/a/b` and `/a/b/c`, not `/a/bc`. Never matches links from the handler app.
+	Cwd Strings `yaml:"cwd,omitempty"`
 }
 
-func (m Match) empty() bool { return len(m.Host) == 0 && len(m.Path) == 0 && len(m.Opener) == 0 }
+func (m Match) empty() bool {
+	return len(m.Host) == 0 && len(m.Path) == 0 && len(m.Opener) == 0 && len(m.Cwd) == 0
+}
+
+func checkCwd(rule string, prefixes []string) error {
+	for _, p := range prefixes {
+		if p == "" || strings.ContainsAny(p, "\t\n\r") {
+			return fmt.Errorf("rules: rule %s: cwd %q is empty or has a control character", rule, p)
+		}
+		if !strings.HasPrefix(p, "/") && p != "~" && !strings.HasPrefix(p, "~/") {
+			return fmt.Errorf("rules: rule %s: cwd %q must be an absolute path or start with ~/", rule, p)
+		}
+	}
+	return nil
+}
+
+// UsesCwd reports whether any rule has a cwd condition.
+func (r *Rules) UsesCwd() bool {
+	for _, rule := range r.Rules {
+		if len(rule.Match.Cwd) > 0 {
+			return true
+		}
+	}
+	return false
+}
 
 // Rule is one line of the table: conditions and the target.
 type Rule struct {
@@ -119,7 +146,10 @@ func (r *Rules) Validate() error {
 			return err
 		}
 		if rule.Match.empty() {
-			return fmt.Errorf("rules: rule %s has no match conditions (host, path or opener)", label(i, rule.Name))
+			return fmt.Errorf("rules: rule %s has no match conditions (host, path, opener or cwd)", label(i, rule.Name))
+		}
+		if err := checkCwd(label(i, rule.Name), rule.Match.Cwd); err != nil {
+			return err
 		}
 		if rule.Open.Browser == "" {
 			return fmt.Errorf("rules: rule %s has an empty browser", label(i, rule.Name))

@@ -1,5 +1,5 @@
 # Portero rules. Copy to ~/.config/portero/rules.yaml and edit.
-# First matching rule wins; every key under `match` must match (host AND path AND opener).
+# First matching rule wins; every key under `match` must match (host AND path AND opener AND cwd).
 # Keep your real hostnames in your local file only.
 version: 1
 
@@ -35,3 +35,10 @@ rules:
     match:
       host: "docs-*.example.org"                    # plain glob, "*" anywhere
     open: { browser: Safari }
+
+  # Links opened from a shell by gh/gcloud/etc. with BROWSER="portero open"; the handler app has no cwd,
+  # so this never matches links from other apps.
+  - name: CLI logins from work repositories
+    match:
+      cwd: ~/Documents/projects/work                # this directory and everything below it
+    open: { browser: Google Chrome, profile: Work }

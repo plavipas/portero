@@ -21,11 +21,14 @@ import (
 const usage = `portero - default-browser router
 
 Usage:
-  portero open <url> [--opener <bundle id>] [--dry-run]   Route a link; --dry-run prints the decision only
+  portero open <url> [--opener <bundle id>] [--cwd <dir>] [--dry-run]
+                                                          Route a link; --dry-run prints the decision only
   portero rules [path]                                    Print the rules file in use
   portero rules check                                     Parse and validate the rules file; warns about missing
                                                           browsers, containers and the container extension
-  portero rules match <url> [--opener <bundle id>]        Show which rule a link would hit
+  portero rules match <url> [--opener <bundle id>] [--cwd <dir>]
+                                                          Show which rule a link would hit
+                                                          (cwd = current directory unless --cwd)
   portero rules init                                      Write the example rules file if none exists
   portero browsers                                        Installed browsers Portero knows, with their profiles
   portero default [status|set]                            Show or set Portero as the default browser
@@ -76,32 +79,70 @@ func main() {
 	}
 }
 
-func parseLink(fs *flag.FlagSet, args []string) (*url.URL, string, bool, error) {
+// linkArgs is the parsed command line of `open` and `rules match`.
+type linkArgs struct {
+	url    *url.URL
+	opener string
+	cwd    string // --cwd value, "" when not given
+	dry    bool
+}
+
+func parseLink(fs *flag.FlagSet, args []string) (linkArgs, error) {
 	opener := fs.String("opener", "", "bundle id of the app that opened the link")
+	cwd := fs.String("cwd", "", "directory to match cwd rules against (default: the current directory)")
 	dry := fs.Bool("dry-run", false, "print the decision only")
 	// Accept flags after the URL as well.
 	var rest []string
 	for i, a := range args {
 		if len(a) > 0 && a[0] == '-' {
 			if err := fs.Parse(args[i:]); err != nil {
-				return nil, "", false, err
+				return linkArgs{}, err
 			}
 			break
 		}
 		rest = append(rest, a)
 	}
 	if len(rest) != 1 {
-		return nil, "", false, fmt.Errorf("expected one URL")
+		return linkArgs{}, fmt.Errorf("expected one URL")
 	}
 	u, err := url.Parse(rest[0])
 	if err != nil || u.Host == "" {
-		return nil, "", false, fmt.Errorf("not a URL: %q", rest[0])
+		return linkArgs{}, fmt.Errorf("not a URL: %q", rest[0])
 	}
-	return u, *opener, *dry, nil
+	return linkArgs{url: u, opener: *opener, cwd: *cwd, dry: *dry}, nil
+}
+
+// linkCwd returns the physical directory cwd rules are matched against: the --cwd value when given, else the
+// current directory. dir is "" and note says why when it cannot be determined.
+func linkCwd(flagValue string) (dir, note string) {
+	from := flagValue
+	if from == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Sprintf("unknown (%v)", err)
+		}
+		from = wd
+	}
+	dir, err := rules.ResolveDir(from)
+	if err != nil {
+		return "", fmt.Sprintf("unknown (%v)", err)
+	}
+	return dir, ""
+}
+
+// cwdLine is the "cwd:" line printed before the decision, or "" when the output stays as it was.
+func cwdLine(r *rules.Rules, a linkArgs, dir, note string) string {
+	if !r.UsesCwd() && a.cwd == "" {
+		return ""
+	}
+	if note != "" {
+		return "cwd: " + note + "; cwd rules skipped"
+	}
+	return "cwd: " + dir
 }
 
 func open(args []string) error {
-	u, opener, dry, err := parseLink(flag.NewFlagSet("open", flag.ContinueOnError), args)
+	a, err := parseLink(flag.NewFlagSet("open", flag.ContinueOnError), args)
 	if err != nil {
 		return err
 	}
@@ -109,10 +150,19 @@ func open(args []string) error {
 	if err != nil {
 		return err
 	}
-	req := rules.Request{URL: u, Opener: opener}
+	cwd, note := linkCwd(a.cwd)
+	if a.dry {
+		if line := cwdLine(r, a, cwd, note); line != "" {
+			fmt.Println(line)
+		}
+	} else if note != "" {
+		fmt.Fprintf(os.Stderr, "portero: cwd: %s; cwd rules skipped\n", note)
+	}
+	u := a.url
+	req := rules.Request{URL: u, Opener: a.opener, Cwd: cwd}
 	d := r.Route(req)
 	fmt.Println(d)
-	if dry {
+	if a.dry {
 		plan, err := launch.DryRun(u, d.Target)
 		if err != nil {
 			return err
@@ -175,12 +225,13 @@ func rulesCmd(args []string) error {
 		if err != nil {
 			return err
 		}
+		warnings = append(warnings, checkCwd(r, realCheckEnv())...)
 		for _, w := range warnings {
 			fmt.Println(w)
 		}
 		fmt.Printf("%s: %d rule(s), default %s\n", p, len(r.Rules), r.Default)
 	case "match":
-		u, opener, _, err := parseLink(flag.NewFlagSet("match", flag.ContinueOnError), args)
+		a, err := parseLink(flag.NewFlagSet("match", flag.ContinueOnError), args)
 		if err != nil {
 			return err
 		}
@@ -188,7 +239,11 @@ func rulesCmd(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(r.Route(rules.Request{URL: u, Opener: opener}))
+		cwd, note := linkCwd(a.cwd)
+		if line := cwdLine(r, a, cwd, note); line != "" {
+			fmt.Println(line)
+		}
+		fmt.Println(r.Route(rules.Request{URL: a.url, Opener: a.opener, Cwd: cwd}))
 	default:
 		return fmt.Errorf("unknown rules command %q", sub)
 	}

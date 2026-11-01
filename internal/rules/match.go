@@ -5,8 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 )
+
+// foldCwd: the default APFS volume is case-insensitive, so directories compare without case on macOS.
+var foldCwd = runtime.GOOS == "darwin"
 
 func bytesReader(b []byte) io.Reader { return bytes.NewReader(b) }
 
@@ -14,6 +20,7 @@ func bytesReader(b []byte) io.Reader { return bytes.NewReader(b) }
 type Request struct {
 	URL    *url.URL
 	Opener string // bundle id of the app that opened the link, or ""
+	Cwd    string // physical absolute working directory (see ResolveDir), or "" when unknown
 }
 
 // Decision is the result of routing one link.
@@ -67,7 +74,56 @@ func (m Match) matches(req Request) bool {
 			return false
 		}
 	}
+	if len(m.Cwd) > 0 {
+		if req.Cwd == "" || !anyMatch(m.Cwd, func(p string) bool { return CwdMatches(ExpandCwd(p), req.Cwd, foldCwd) }) {
+			return false
+		}
+	}
 	return true
+}
+
+// ResolveDir returns the absolute, symlink-free form of dir. A directory that does not exist is returned
+// cleaned and absolute, without an error.
+func ResolveDir(dir string) (string, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		return real, nil
+	}
+	return filepath.Clean(abs), nil
+}
+
+// ExpandCwd turns a cwd prefix from the rules file into a physical absolute path: `~` is the home directory,
+// symlinks are resolved when the path exists. If the home directory is unknown the `~` stays and never matches.
+func ExpandCwd(p string) string {
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return p
+		}
+		p = home + p[1:]
+	}
+	p = filepath.Clean(p)
+	if real, err := filepath.EvalSymlinks(p); err == nil {
+		p = real
+	}
+	if p != "/" {
+		p = strings.TrimSuffix(p, "/")
+	}
+	return p
+}
+
+// CwdMatches is a prefix on path segments: `/a/b` matches `/a/b` and `/a/b/c`, not `/a/bc`; `/` matches all.
+func CwdMatches(prefix, dir string, fold bool) bool {
+	if fold {
+		prefix, dir = strings.ToLower(prefix), strings.ToLower(dir)
+	}
+	if prefix == "/" {
+		return true
+	}
+	return dir == prefix || strings.HasPrefix(dir, prefix+"/")
 }
 
 func anyMatch(patterns []string, f func(string) bool) bool {
