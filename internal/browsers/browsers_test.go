@@ -190,3 +190,32 @@ func TestDefaultProfileInstallSection(t *testing.T) {
 		})
 	}
 }
+
+// An [Install...] Default= that does not name a profile exactly never picks a third profile: it falls back to
+// Default=1. Surrounding whitespace is trimmed like every other profiles.ini line.
+func TestDefaultProfileInstallPathVariants(t *testing.T) {
+	b := Browser{Name: "Zen", Kind: Firefox}
+	base := "[Profile1]\nName=Work\nPath=Profiles/b\n\n[Profile0]\nName=Main\nPath=Profiles/a\nDefault=1\n\n"
+	tests := []struct{ name, install, want string }{
+		{"trailing whitespace", "Profiles/b  ", "Work"},
+		{"trailing slash falls back", "Profiles/b/", "Main"},
+		{"dot prefix falls back", "./Profiles/b", "Main"},
+		{"backslash falls back", `Profiles\b`, "Main"},
+		{"empty value falls back", "", "Main"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ini := filepath.Join(t.TempDir(), "profiles.ini")
+			if err := os.WriteFile(ini, []byte(base+"[Install1]\nDefault="+tc.install+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			profiles, err := FirefoxProfiles(ini)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if d, ok := b.DefaultProfile(profiles); !ok || d.Name != tc.want {
+				t.Errorf("Default=%q: got %+v %v, want %s", tc.install, d, ok, tc.want)
+			}
+		})
+	}
+}
