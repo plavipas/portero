@@ -25,7 +25,8 @@ Usage:
                                                           Route a link; --dry-run prints the decision only
   portero rules [path]                                    Print the rules file in use
   portero rules check                                     Parse and validate the rules file; warns about missing
-                                                          browsers, containers and the container extension
+                                                          browsers, containers, the container extension and
+                                                          cwd directories that do not exist on this Mac
   portero rules match <url> [--opener <bundle id>] [--cwd <dir>]
                                                           Show which rule a link would hit
                                                           (cwd = current directory unless --cwd)
@@ -116,6 +117,9 @@ func parseLink(fs *flag.FlagSet, args []string) (linkArgs, error) {
 // current directory. dir is "" and note says why when it cannot be determined.
 func linkCwd(flagValue string) (dir, note string) {
 	from := flagValue
+	if from == "~" || strings.HasPrefix(from, "~/") {
+		from = rules.ExpandCwd(from) // --cwd=~/x is not expanded by the shell
+	}
 	if from == "" {
 		wd, err := os.Getwd()
 		if err != nil {
