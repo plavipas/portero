@@ -21,12 +21,14 @@ scripts, `$BROWSER`) in the browser and profile that a rule picks. One link, one
 
 | Browser | How it is launched | Profile selection |
 |---|---|---|
-| Dia, Arc | AppleScript | profile |
-| Chrome, Chromium, Brave, Edge, Vivaldi, Comet | `open` with `--profile-directory` | profile |
-| Firefox, Zen | `open` with `-P` | profile |
-| Safari, Orion | `open` | - |
+| Dia | AppleScript: new tab in the named profile of window 1; launches the app first when no window is open | profile name |
+| Arc | AppleScript: new tab in the named space (written from the dictionary, not yet verified live) | space title |
+| Chrome, Chromium, Brave, Edge, Vivaldi, Opera, Comet | `open -b <bundle> -n --args --profile-directory=<dir>`; the directory is looked up by the profile's display name in Local State | profile name or directory |
+| Firefox, Firefox Developer Edition, Zen | `open -a <app> -n --args -P <name>`; names from profiles.ini | profile name |
+| Safari, Orion | `open -a` | - |
 
-The table grows as browsers are added; a browser that is not listed gets the plain `open -a` fallback.
+A browser that is not in the table gets a plain `open -a <name>` (or `open -b` for a bundle id).
+`portero browsers` lists the installed ones with the profile names it found.
 
 ## Rules
 
