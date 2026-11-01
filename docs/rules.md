@@ -28,6 +28,11 @@ rules:
 - Host matching is case-insensitive; path matching is case-sensitive.
 - `profile` means whatever the browser calls it: profile (Dia, Arc, Chrome), container or space. Name them the way you split your life, e.g. Personal and Work.
 
+## Local files
+
+Portero also opens HTML documents handed to it by macOS (Open With, drag onto the icon). A `file://` URL has
+no host and no opener, so rules are not consulted: it opens in `default`, logged with the rule name `file`.
+
 ## Log
 
 Every routed link appends one tab-separated line to `~/.config/portero/decisions.log`:

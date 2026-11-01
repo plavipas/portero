@@ -45,6 +45,7 @@ func AppendError(path, link, opener string, cause error) error {
 	if opener == "" {
 		opener = "-"
 	}
-	_, err = fmt.Fprintf(f, "%s\t%s\tERROR\t%s\t%s\n", time.Now().UTC().Format(time.RFC3339), opener, cause, link)
+	// %q: a link that failed to parse may carry tabs or newlines and must not forge log lines.
+	_, err = fmt.Fprintf(f, "%s\t%s\tERROR\t%q\t%q\n", time.Now().UTC().Format(time.RFC3339), opener, cause.Error(), link)
 	return err
 }
