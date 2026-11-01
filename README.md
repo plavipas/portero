@@ -54,6 +54,13 @@ portero sync icloud       # optional: keep rules.yaml in iCloud Drive, shared be
 
 `make build` gives a bare CLI in `bin/portero` (no link handling), `make test` runs vet and tests.
 
+## Roadmap
+
+- A companion browser extension, so links clicked inside a browser are routed too.
+- A local UI: an interactive diagram of where links go, upload and edit of the rules file, settings.
+- More sync backends for the rules file (a private git repository, Google Drive).
+- Other operating systems.
+
 ## Status
 
 Early development; not released yet.

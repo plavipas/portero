@@ -1,0 +1,39 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 1
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request of Portero (read CLAUDE.md, README.md, docs/rules.md and docs/adr/). Answer in English, short.
+            Portero is the macOS default browser: every link from any app passes through it and is handed to another browser
+            through `open` or AppleScript. Focus on:
+            - Argument injection into `open` / `osascript` from URLs, profile and browser names; AppleScript must take data only via argv
+            - Links lost or sent to the wrong browser/profile: fallback paths, opener detection, the handler's exit timer, concurrency
+            - Rules parsing and matching edge cases (hosts, paths, openers, defaults); config and log file handling, permissions
+            - Anything personal leaked into the repository (hostnames, profile names, bundle ids of private tools)
+            - Build/install scripts and workflow supply chain (pinned actions)
+            - Missing or weak tests
+            Use `gh pr comment` with your Bash tool to leave your review as one comment on the PR.
+          claude_args: '--allowed-tools "Read,Glob,Grep,Bash(cat:*),Bash(head:*),Bash(ls:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
