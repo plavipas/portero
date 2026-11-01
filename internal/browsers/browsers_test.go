@@ -3,6 +3,7 @@ package browsers
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -153,5 +154,39 @@ func TestContainersFromProfileDir(t *testing.T) {
 	}
 	if ok, err := b.ContainerExtension(p); err != nil || !ok {
 		t.Errorf("extension: %v %v", ok, err)
+	}
+}
+
+func TestDefaultProfileInstallSection(t *testing.T) {
+	b := Browser{Name: "Zen", Kind: Firefox, ConfigDir: "zen"}
+	profs := "[Profile1]\nName=Work\nPath=Profiles/b\n\n[Profile0]\nName=Main\nPath=Profiles/a\nDefault=1\n\n"
+	noLegacy := "[Profile1]\nName=Work\nPath=Profiles/b\n\n[Profile0]\nName=Main\nPath=Profiles/a\n\n"
+	tests := []struct {
+		name, ini, want string
+	}{
+		{"install beats Default=1", profs + "[Install1]\nDefault=Profiles/b\nLocked=1\n", "Work"},
+		{"install only", noLegacy + "[Install1]\nDefault=Profiles/a\n", "Main"},
+		{"neither", noLegacy, "Work"},
+		{"install path missing falls back to Default=1", profs + "[Install1]\nDefault=Profiles/zzz\n", "Main"},
+		{"first install section match wins", profs + "[InstallA]\nDefault=Profiles/zzz\n[InstallB]\nDefault=Profiles/b\n", "Work"},
+		{"absolute install path", noLegacy + "[Install1]\nDefault=ABSDIR/Profiles/a\n", "Main"},
+		{"case sensitive", profs + "[Install1]\nDefault=profiles/b\n", "Main"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			ini := filepath.Join(dir, "profiles.ini")
+			content := strings.ReplaceAll(tc.ini, "ABSDIR", dir)
+			if err := os.WriteFile(ini, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			profiles, err := FirefoxProfiles(ini)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if d, ok := b.DefaultProfile(profiles); !ok || d.Name != tc.want {
+				t.Errorf("got %+v %v, want %s", d, ok, tc.want)
+			}
+		})
 	}
 }
