@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"github.com/plavipas/portero/internal/rules"
 	"strings"
 	"testing"
 	"time"
@@ -138,5 +139,26 @@ func TestEnsureDefaultPollsStaleReads(t *testing.T) {
 	}
 	if d := time.Since(start); d > time.Second {
 		t.Errorf("polling took %v, want it bounded", d)
+	}
+}
+
+func TestDecideFileURLsUseDefault(t *testing.T) {
+	r := &rules.Rules{Version: 1, Default: rules.Target{Browser: "Dia", Profile: "Personal"},
+		Rules: []rules.Rule{{Name: "work", Match: rules.Match{Path: rules.Strings{"/Users"}}, Open: rules.Target{Browser: "Zen"}}}}
+	u, err := parseLink2("file:///Users/someone/page.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := decide(r, rules.Request{URL: u})
+	if d.Rule != "file" || d.Target != r.Default {
+		t.Errorf("file URL: %+v", d)
+	}
+	for _, bad := range []string{"file://", "notaurl", "https://", "mailto:a@b.c"} {
+		if _, err := parseLink2(bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+	if u, err := parseLink2("https://example.com/x"); err != nil || u.Host != "example.com" {
+		t.Errorf("https: %v %v", u, err)
 	}
 }

@@ -48,9 +48,9 @@ func runApp() {
 }
 
 func routeLink(link, opener string) error {
-	u, err := url.Parse(link)
-	if err != nil || u.Host == "" {
-		return fmt.Errorf("not a URL: %q", link)
+	u, err := parseLink2(link)
+	if err != nil {
+		return err
 	}
 	req := rules.Request{URL: u, Opener: opener}
 	r, err := rules.Load(config.RulesFile())
@@ -60,7 +60,7 @@ func routeLink(link, opener string) error {
 		_, openErr := launch.Open(u, fallback)
 		return openErr
 	}
-	d := r.Route(req)
+	d := decide(r, req)
 	if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}
@@ -145,6 +145,29 @@ func printDefaultStatus(w io.Writer, note func(scheme string) string) {
 	} else {
 		fmt.Fprintln(w, "app: not running from Portero.app (use `make install`)")
 	}
+}
+
+// parseLink2 accepts http(s) links with a host and local documents (file:// URLs from Open With).
+func parseLink2(link string) (*url.URL, error) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return nil, fmt.Errorf("not a URL: %q", link)
+	}
+	if u.Scheme == "file" && u.Path != "" {
+		return u, nil
+	}
+	if u.Host == "" {
+		return nil, fmt.Errorf("not a URL: %q", link)
+	}
+	return u, nil
+}
+
+// decide applies the rules; a local document has no host to match, so it opens in the default target.
+func decide(r *rules.Rules, req rules.Request) rules.Decision {
+	if req.URL.Scheme == "file" {
+		return rules.Decision{Target: r.Default, Rule: "file"}
+	}
+	return r.Route(req)
 }
 
 func defaultCmd(args []string) error {
