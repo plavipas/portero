@@ -2,7 +2,9 @@
 package launch
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"strings"
 
@@ -48,18 +50,27 @@ func resolveTarget(b browsers.Browser, t rules.Target) (profile, container, note
 	if p, ok := firefoxProfile(b, t.Profile); ok {
 		if list, err := b.Containers(p); err == nil {
 			// The extension compares names case-sensitively: an exact match wins over a case-insensitive one.
+			found := false
+			var have []string
 			for _, c := range list {
+				have = append(have, c.Name)
 				if c.Name == t.Container {
 					container = c.Name
+					found = true
 					break
 				}
-				if strings.EqualFold(c.Name, t.Container) && container == t.Container {
+				if strings.EqualFold(c.Name, t.Container) && !found {
 					container = c.Name
+					found = true
 				}
+			}
+			if !found {
+				note = fmt.Sprintf("container %q not found in profile %q of %s (have: %s); the extension creates it on first use",
+					t.Container, p.Name, b.Name, strings.Join(have, ", "))
 			}
 		}
 	}
-	return profile, container, "", nil
+	return profile, container, note, nil
 }
 
 // firefoxProfile finds the named profile of a Firefox-family browser, else its default one.
@@ -75,7 +86,9 @@ func firefoxProfile(b browsers.Browser, name string) (browsers.Profile, bool) {
 }
 
 // firefoxLink returns the URL to hand to Firefox and the notes for the plan. With a container it is the
-// ext+container: form, unless the scheme cannot be opened by the extension or the extension is known to be off.
+// ext+container: form only when the scheme is http(s) and the container extension is confirmed active in the
+// resolved profile; in every other case (extension off, state unreadable, default profile unknown) the plain
+// link is returned with a note, so a link is never handed to a browser that may not understand ext+container.
 func firefoxLink(b browsers.Browser, u *url.URL, profileName, container string) (string, []string) {
 	link := u.String()
 	if container == "" {
@@ -84,10 +97,23 @@ func firefoxLink(b browsers.Browser, u *url.URL, profileName, container string) 
 	if s := strings.ToLower(u.Scheme); s != "http" && s != "https" {
 		return link, []string{fmt.Sprintf("container skipped: %s links cannot be opened by the extension", u.Scheme)}
 	}
-	if p, ok := firefoxProfile(b, profileName); ok {
-		if active, err := b.ContainerExtension(p); err == nil && !active {
-			return link, []string{fmt.Sprintf("container extension not active in profile %q of %s: opening without container", p.Name, b.Name)}
+	p, ok := firefoxProfile(b, profileName)
+	if !ok {
+		if profileName == "" {
+			return link, []string{fmt.Sprintf("default profile of %s is unknown (several Install sections): opening without container", b.Name)}
 		}
+		return link, []string{fmt.Sprintf("profile %q of %s not found: opening without container", profileName, b.Name)}
+	}
+	active, err := b.ContainerExtension(p)
+	switch {
+	case err != nil:
+		reason := "extensions.json unreadable"
+		if errors.Is(err, fs.ErrNotExist) {
+			reason = "extensions.json not found"
+		}
+		return link, []string{fmt.Sprintf("container extension state unknown in profile %q of %s (%s): opening without container", p.Name, b.Name, reason)}
+	case !active:
+		return link, []string{fmt.Sprintf("container extension not active in profile %q of %s: opening without container", p.Name, b.Name)}
 	}
 	return ContainerURL(container, u), nil
 }

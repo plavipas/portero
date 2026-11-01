@@ -201,8 +201,8 @@ func TestDefaultProfileInstallPathVariants(t *testing.T) {
 	base := "[Profile1]\nName=Work\nPath=Profiles/b\n\n[Profile0]\nName=Main\nPath=Profiles/a\nDefault=1\n\n"
 	tests := []struct{ name, install, want string }{
 		{"trailing whitespace", "Profiles/b  ", "Work"},
-		{"trailing slash falls back", "Profiles/b/", "Main"},
-		{"dot prefix falls back", "./Profiles/b", "Main"},
+		{"trailing slash matches", "Profiles/b/", "Work"},
+		{"dot prefix matches", "./Profiles/b", "Work"},
 		{"backslash falls back", `Profiles\b`, "Main"},
 		{"empty value falls back", "", "Main"},
 	}
