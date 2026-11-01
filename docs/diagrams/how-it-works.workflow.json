@@ -1,0 +1,235 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Portero: how a link is routed",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "backend": {
+          "label": "Portero code"
+        },
+        "database": {
+          "label": "Files"
+        },
+        "frontend": {
+          "label": "CLI / browser"
+        },
+        "security": {
+          "label": "Fallback"
+        },
+        "cloud": {
+          "label": "macOS"
+        },
+        "external": {
+          "label": "Other app"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "outside",
+      "label": "Apps, macOS, browsers"
+    },
+    {
+      "id": "portero",
+      "label": "Portero"
+    },
+    {
+      "id": "fallback",
+      "label": "Fallback",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "app",
+    "ls",
+    "handler",
+    "rules",
+    "launcher",
+    "browser"
+  ],
+  "nodes": [
+    {
+      "id": "app",
+      "lane": "outside",
+      "col": 0,
+      "type": "external",
+      "label": "Another app",
+      "sublabel": "chat, mail, terminal",
+      "width": 140
+    },
+    {
+      "id": "cli",
+      "lane": "outside",
+      "col": 2,
+      "type": "frontend",
+      "label": "portero open",
+      "sublabel": "CLI, $BROWSER",
+      "width": 140
+    },
+    {
+      "id": "ls",
+      "lane": "outside",
+      "col": 1,
+      "type": "cloud",
+      "label": "Launch Services",
+      "sublabel": "default for http/https",
+      "width": 150
+    },
+    {
+      "id": "handler",
+      "lane": "portero",
+      "col": 2,
+      "type": "backend",
+      "label": "Portero.app",
+      "sublabel": "Apple event GetURL",
+      "tag": "opener from sender pid",
+      "width": 150
+    },
+    {
+      "id": "rules",
+      "lane": "portero",
+      "col": 3,
+      "type": "database",
+      "label": "Rules file",
+      "sublabel": "host, path, opener",
+      "tag": "first match wins",
+      "width": 140
+    },
+    {
+      "id": "launcher",
+      "lane": "portero",
+      "col": 4,
+      "type": "backend",
+      "label": "Launcher",
+      "sublabel": "AppleScript or open",
+      "width": 140
+    },
+    {
+      "id": "log",
+      "lane": "portero",
+      "col": 5,
+      "type": "database",
+      "label": "decisions.log",
+      "sublabel": "one line per link",
+      "width": 140
+    },
+    {
+      "id": "browser",
+      "lane": "outside",
+      "col": 5,
+      "type": "frontend",
+      "label": "Browser + profile",
+      "sublabel": "Personal / Work",
+      "width": 150
+    },
+    {
+      "id": "safari",
+      "lane": "fallback",
+      "col": 4,
+      "type": "security",
+      "label": "Safari fallback",
+      "sublabel": "rules unreadable",
+      "tag": "opens the link anyway",
+      "width": 150
+    }
+  ],
+  "edges": [
+    {
+      "id": "click",
+      "from": "app",
+      "to": "ls",
+      "label": "click",
+      "variant": "emphasis"
+    },
+    {
+      "id": "geturl",
+      "from": "ls",
+      "to": "handler",
+      "label": "GetURL",
+      "variant": "emphasis"
+    },
+    {
+      "id": "match",
+      "from": "handler",
+      "to": "rules",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cli-match",
+      "from": "cli",
+      "to": "rules",
+      "label": "--opener",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "target",
+      "from": "rules",
+      "to": "launcher",
+      "label": "target",
+      "variant": "emphasis"
+    },
+    {
+      "id": "open",
+      "from": "launcher",
+      "to": "browser",
+      "variant": "emphasis"
+    },
+    {
+      "id": "record",
+      "from": "rules",
+      "to": "log",
+      "variant": "dashed",
+      "role": "async"
+    },
+    {
+      "id": "unreadable",
+      "from": "rules",
+      "to": "safari",
+      "label": "unreadable",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "error-line",
+      "from": "safari",
+      "to": "log",
+      "label": "ERROR",
+      "variant": "dashed",
+      "role": "async"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Rules",
+      "items": [
+        "$PORTERO_RULES, else rules: in config.yaml, else ~/.config/portero/rules.yaml",
+        "Match host (wildcards), path prefix, opener bundle id",
+        "First matching rule wins, otherwise default"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Launchers",
+      "items": [
+        "Dia, Arc: AppleScript via osascript, URL and profile only as argv",
+        "Chrome family: open -b <bundle> -n --args --profile-directory=<dir>",
+        "Firefox family: open -a <app> -n --args -P <name>; others: open -a"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Known limit",
+      "items": [
+        "Links clicked inside a browser stay in that browser",
+        "Only links handed over by macOS or the CLI are routed",
+        "The Safari fallback applies to the app; the CLI reports the error"
+      ]
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+<p align="left"><img src="docs/logo.svg" width="64" height="64" alt="Portero logo"></p>
+
 # Portero
 
 Portero is a default-browser router for macOS. It registers itself as the handler for `http` and
@@ -18,6 +20,18 @@ scripts, `$BROWSER`) in the browser and profile that a rule picks. One link, one
 - Logs every routing decision. A missing or broken rules file never swallows a link: it opens in Safari and the
   error is logged.
 - Ships a CLI: `portero open <url>`, `portero rules`, `portero sync`, usable as `$BROWSER`.
+
+## How it works
+
+macOS hands every `http`/`https` link from another app to Portero.app as an Apple event, together with the
+sender's process, from which Portero reads the opener's bundle id. The first rule that matches the host, path and
+opener picks the browser and profile; a launcher opens the link there and the decision goes to
+`~/.config/portero/decisions.log`. When the rules file cannot be read, the link opens in Safari and an `ERROR`
+line is logged.
+
+![How Portero works](docs/diagrams/how-it-works.png)
+
+[Interactive version](docs/diagrams/how-it-works.html)
 
 ## Browser support
 
@@ -55,6 +69,9 @@ portero sync icloud       # optional: keep rules.yaml in iCloud Drive, shared be
 
 `portero default set` is safe to run again: it prints `already set` for each scheme Portero already handles and
 exits 0. A scheme that macOS still does not hand over to Portero is reported as an error.
+
+The app icon comes from `packaging/Portero.icns`; `make icon` (`scripts/make-icon.sh`) regenerates it from
+`docs/logo.svg` when the logo changes.
 
 `make build` gives a bare CLI in `bin/portero` (no link handling), `make test` runs vet and tests.
 
