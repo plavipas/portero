@@ -145,7 +145,7 @@ func TestEnsureDefaultPollsStaleReads(t *testing.T) {
 func TestDecideFileURLsUseDefault(t *testing.T) {
 	r := &rules.Rules{Version: 1, Default: rules.Target{Browser: "Dia", Profile: "Personal"},
 		Rules: []rules.Rule{{Name: "work", Match: rules.Match{Path: rules.Strings{"/Users"}}, Open: rules.Target{Browser: "Zen"}}}}
-	u, err := parseLink2("file:///Users/someone/page.html")
+	u, err := parseRoutable("file:///Users/someone/page.html")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,12 +153,17 @@ func TestDecideFileURLsUseDefault(t *testing.T) {
 	if d.Rule != "file" || d.Target != r.Default {
 		t.Errorf("file URL: %+v", d)
 	}
-	for _, bad := range []string{"file://", "notaurl", "https://", "mailto:a@b.c"} {
-		if _, err := parseLink2(bad); err == nil {
+	for _, ok := range []string{"file:///Users/someone/my%20page.html?x=1#top", "file://localhost/tmp/a.html"} {
+		if u, err := parseRoutable(ok); err != nil || u.Scheme != "file" {
+			t.Errorf("%q rejected: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"file://", "file://otherhost/tmp/a.html", "notaurl", "https://", "mailto:a@b.c"} {
+		if _, err := parseRoutable(bad); err == nil {
 			t.Errorf("%q accepted", bad)
 		}
 	}
-	if u, err := parseLink2("https://example.com/x"); err != nil || u.Host != "example.com" {
+	if u, err := parseRoutable("https://example.com/x"); err != nil || u.Host != "example.com" {
 		t.Errorf("https: %v %v", u, err)
 	}
 }
