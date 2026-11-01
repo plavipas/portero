@@ -130,7 +130,8 @@ func (r *Rules) Validate() error {
 
 // checkControl rejects tabs and line breaks in the fields that reach the log and the command line.
 func checkControl(where string, t Target) error {
-	for field, v := range map[string]string{"profile": t.Profile, "container": t.Container} {
+	for _, f := range []struct{ field, v string }{{"browser", t.Browser}, {"profile", t.Profile}, {"container", t.Container}} {
+		field, v := f.field, f.v
 		if strings.ContainsAny(v, "\t\n\r") {
 			return fmt.Errorf("rules: %s: %s contains a control character", where, field)
 		}

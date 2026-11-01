@@ -141,6 +141,7 @@ func TestControlCharacters(t *testing.T) {
 		"container":         "version: 1\ndefault: {browser: Zen}\nrules:\n  - name: x\n    match: {host: example.com}\n    open: {browser: Zen, container: \"a\\tb\"}\n",
 		"profile":           "version: 1\ndefault: {browser: Zen}\nrules:\n  - name: x\n    match: {host: example.com}\n    open: {browser: Zen, profile: \"a\\nb\"}\n",
 		"default/container": "version: 1\ndefault: {browser: Zen, container: \"a\\rb\"}\n",
+		"default/browser":   "version: 1\ndefault: {browser: \"Zen\\tX\"}\n",
 	} {
 		_, err := Parse([]byte(text))
 		if err == nil || !strings.Contains(err.Error(), strings.TrimPrefix(name, "default/")+" contains a control character") {
