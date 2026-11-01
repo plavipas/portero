@@ -2,16 +2,20 @@
 package main
 
 import (
+	_ "embed"
 	"flag"
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/plavipas/portero/internal/browsers"
 	"github.com/plavipas/portero/internal/config"
 	"github.com/plavipas/portero/internal/decisionlog"
 	"github.com/plavipas/portero/internal/launch"
 	"github.com/plavipas/portero/internal/rules"
+	"github.com/plavipas/portero/internal/sync"
 )
 
 const usage = `portero - default-browser router
@@ -21,19 +25,36 @@ Usage:
   portero rules [path]                                    Print the rules file in use
   portero rules check                                     Parse and validate the rules file
   portero rules match <url> [--opener <bundle id>]        Show which rule a link would hit
+  portero rules init                                      Write the example rules file if none exists
   portero browsers                                        Installed browsers Portero knows, with their profiles
+  portero default [status|set]                            Show or set Portero as the default browser
+  portero sync [status|icloud|off]                        Keep the rules file in iCloud Drive
+  portero app                                             Run the link handler (what macOS starts)
   portero version
 `
 
 var version = "dev"
 
+//go:embed rules.example.yaml
+var exampleRules []byte
+
 func main() {
 	if len(os.Args) < 2 {
+		if appBundle() != "" { // started by macOS (Launch Services) to handle a link
+			runApp()
+			return
+		}
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
 	}
 	var err error
 	switch os.Args[1] {
+	case "app":
+		runApp()
+	case "default":
+		err = defaultCmd(os.Args[2:])
+	case "sync":
+		err = syncCmd(os.Args[2:])
 	case "open":
 		err = open(os.Args[2:])
 	case "rules":
@@ -127,6 +148,19 @@ func rulesCmd(args []string) error {
 	switch sub {
 	case "path":
 		fmt.Println(config.RulesFile())
+	case "init":
+		p := config.RulesFile()
+		if _, err := os.Stat(p); err == nil {
+			fmt.Println("exists:", p)
+			return nil
+		}
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(p, exampleRules, 0o600); err != nil {
+			return err
+		}
+		fmt.Println("written:", p)
 	case "check":
 		p := config.RulesFile()
 		r, err := rules.Load(p)
@@ -146,6 +180,37 @@ func rulesCmd(args []string) error {
 		fmt.Println(r.Route(rules.Request{URL: u, Opener: opener}))
 	default:
 		return fmt.Errorf("unknown rules command %q", sub)
+	}
+	return nil
+}
+
+func syncCmd(args []string) error {
+	sub := "status"
+	if len(args) > 0 {
+		sub = args[0]
+	}
+	switch sub {
+	case "status":
+		p := config.RulesFile()
+		where := "local"
+		if strings.HasPrefix(p, sync.ICloudDir()) {
+			where = "iCloud Drive"
+		}
+		fmt.Printf("rules: %s (%s)\n", p, where)
+	case "icloud":
+		p, err := sync.EnableICloud()
+		if err != nil {
+			return err
+		}
+		fmt.Println("rules now in iCloud Drive:", p)
+	case "off":
+		p, err := sync.Disable()
+		if err != nil {
+			return err
+		}
+		fmt.Println("rules back to the local file:", p)
+	default:
+		return fmt.Errorf("unknown sync command %q", sub)
 	}
 	return nil
 }

@@ -31,3 +31,20 @@ func Append(path string, d rules.Decision, req rules.Request) error {
 		time.Now().UTC().Format(time.RFC3339), opener, rule, d.Target, req.URL)
 	return err
 }
+
+// AppendError records a link that could not be routed or opened.
+func AppendError(path, link, opener string, cause error) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if opener == "" {
+		opener = "-"
+	}
+	_, err = fmt.Fprintf(f, "%s\t%s\tERROR\t%s\t%s\n", time.Now().UTC().Format(time.RFC3339), opener, cause, link)
+	return err
+}

@@ -14,7 +14,8 @@ scripts, `$BROWSER`) in the browser and profile that a rule picks. One link, one
   AppleScript dictionary, so a profile can still be chosen.
 - Keeps the rules in one plain file on the Mac; the file can live in iCloud Drive to be shared between
   Macs.
-- Logs every routing decision.
+- Logs every routing decision. A missing or broken rules file never swallows a link: it opens in Safari and the
+  error is logged.
 - Ships a CLI: `portero open <url>`, `portero rules`, `portero sync`, usable as `$BROWSER`.
 
 ## Browser support
@@ -38,13 +39,20 @@ placeholder hosts only. See `examples/` once the format lands.
 ## Known limit
 
 Links clicked **inside** a browser stay in that browser. Only links coming from other apps are routed.
+A companion browser extension that hands such clicks to Portero is on the list for a later version.
 
-## Build
+## Install (from source, macOS)
 
 ```sh
-make build        # bin/portero
-make test
+make install              # builds build/Portero.app, copies it to ~/Applications, links ~/.local/bin/portero
+portero rules init        # writes the example rules to ~/.config/portero/rules.yaml; edit it
+portero browsers          # the browsers and profile names Portero sees on this Mac
+portero open https://example.com/ --dry-run
+portero default set       # macOS asks to confirm Portero as the default browser
+portero sync icloud       # optional: keep rules.yaml in iCloud Drive, shared between your Macs
 ```
+
+`make build` gives a bare CLI in `bin/portero` (no link handling), `make test` runs vet and tests.
 
 ## Status
 
