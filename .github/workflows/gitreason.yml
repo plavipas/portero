@@ -16,16 +16,18 @@ concurrency:
 jobs:
   comment:
     runs-on: ubuntu-latest
-    # The consuming repository's token cannot download releases of the private plavipas/gitreason
-    # ("release not found"); until gitreason supports a GITREASON_TOKEN, a failure here must not block the PR.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
       - name: Fetch the notes
         run: git fetch origin refs/notes/gitreason:refs/notes/gitreason || echo "no notes on the remote"
+      # The consuming repository's token cannot download releases of the private plavipas/gitreason
+      # ("release not found"); until gitreason supports a GITREASON_TOKEN (gitreason DEV-29) a failed download
+      # only skips the comment with a warning instead of failing the PR.
       - name: Install gitreason
+        id: install
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -36,9 +38,14 @@ jobs:
           # instead, replace the next line with:  echo "<sha256>  $archive" | sha256sum -c -
           sha256sum -c --ignore-missing checksums.txt
           tar -xzf "$archive" gitreason && sudo install gitreason /usr/local/bin/gitreason
+      - name: Warn when gitreason could not be installed
+        if: steps.install.outcome != 'success'
+        run: echo "::warning::gitreason release download failed; no agent notes comment on this PR (see gitreason DEV-29)"
       - name: Build the comment
+        if: steps.install.outcome == 'success'
         run: gitreason pr-comment "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > comment.md
       - name: Create or update the PR comment
+        if: steps.install.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
