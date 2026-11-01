@@ -91,12 +91,17 @@ func defaultCmd(args []string) error {
 		if app == "" {
 			return fmt.Errorf("run this from the installed app: ~/Applications/Portero.app/Contents/MacOS/portero default set")
 		}
+		// macOS sets http and https together from one dialog; asking again for a scheme that is already
+		// ours fails with "The file couldn't be opened", so check before each call.
 		for _, s := range handler.Schemes {
-			if err := handler.SetDefaultHandler(app, s); err != nil {
+			if handler.DefaultHandler(s) == BundleID {
+				continue
+			}
+			if err := handler.SetDefaultHandler(app, s); err != nil && handler.DefaultHandler(s) != BundleID {
 				return fmt.Errorf("%s: %w", s, err)
 			}
 		}
-		fmt.Println("asked macOS to make Portero the default browser; confirm the dialog if one appeared")
+		fmt.Println("Portero is the default browser (confirm the macOS dialog if it is still open)")
 		return defaultCmd(nil)
 	default:
 		return fmt.Errorf("unknown default command %q", sub)
