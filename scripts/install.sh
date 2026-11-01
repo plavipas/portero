@@ -3,7 +3,7 @@
 # the app with Launch Services. Does NOT change the default browser: run `portero default set`.
 set -eu
 cd "$(dirname "$0")/.."
-[ -d build/Portero.app ] || sh scripts/build-app.sh
+sh scripts/build-app.sh
 DEST="$HOME/Applications/Portero.app"
 mkdir -p "$HOME/Applications" "$HOME/.local/bin"
 rm -rf "$DEST"
