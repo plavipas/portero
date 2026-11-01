@@ -25,6 +25,20 @@
 			</array>
 		</dict>
 	</array>
+	<!-- System Settings lists an app under "Default web browser" only when it also opens HTML documents. -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key> <string>HTML document</string>
+			<key>CFBundleTypeRole</key> <string>Viewer</string>
+			<key>LSHandlerRank</key>    <string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.html</string>
+				<string>public.xhtml</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSUserActivityTypes</key>
 	<array><string>NSUserActivityTypeBrowsingWeb</string></array>
 </dict>
