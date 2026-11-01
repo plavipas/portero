@@ -1,0 +1,30 @@
+# Portero rules. Copy to ~/.config/portero/rules.yaml and edit.
+# First matching rule wins; every key under `match` must match (host AND path AND opener).
+# Keep real client hostnames in your local file only.
+version: 1
+
+default:
+  browser: Dia          # app name as in /Applications, or a bundle id
+  profile: Personal     # optional: profile / space / container name
+
+rules:
+  - name: company forge and tools
+    match:
+      host: [gitlab.example.com, "*.example.net"]   # "*.x" also matches the bare "x"
+    open: { browser: Zen }
+
+  - name: client A on GitHub
+    match:
+      host: github.com
+      path: /client-a                               # /client-a and /client-a/..., not /client-ab
+    open: { browser: Dia, profile: Client A }
+
+  - name: links clicked in the work Slack
+    match:
+      opener: com.tinyspeck.slackmacgap             # bundle id of the app that opened the link
+    open: { browser: Dia, profile: Work }
+
+  - name: docs mirrors
+    match:
+      host: "docs-*.example.org"                    # plain glob, "*" anywhere
+    open: { browser: Safari }
