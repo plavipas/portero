@@ -1,6 +1,68 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(*/.claude/hooks/flow-mark *)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git rebase:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh release list:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(gofmt:*)",
+      "Bash(make build:*)",
+      "Bash(make test:*)",
+      "Bash(make app:*)",
+      "Bash(*/.claude/skills/claude-pr-review/fetch.sh *)",
+      "Bash(sh */.claude/skills/cross-review/orca-run.sh *)"
+    ]
+  },
   "hooks": {
-    "SessionStart": [{ "hooks": [{ "type": "command", "command": "command -v gitreason >/dev/null 2>&1 && gitreason hook start || exit 0" }] }],
-    "SessionEnd":   [{ "hooks": [{ "type": "command", "command": "command -v gitreason >/dev/null 2>&1 && gitreason hook end || exit 0" }] }]
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task|Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/flow-guard.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$HOME/.claude/skills/cross-review/guard.py\" ] && exec python3 \"$HOME/.claude/skills/cross-review/guard.py\"; exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v gitreason >/dev/null 2>&1 && gitreason hook start || exit 0"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v gitreason >/dev/null 2>&1 && gitreason hook end || exit 0"
+          }
+        ]
+      }
+    ]
   }
 }
