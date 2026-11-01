@@ -2,6 +2,8 @@ package rules
 
 import (
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -158,5 +160,145 @@ func TestControlCharacters(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), strings.TrimPrefix(name, "default/")+" contains a control character") {
 			t.Errorf("%s: err = %v", name, err)
 		}
+	}
+}
+
+func cwdRules(t *testing.T, cwd ...string) *Rules {
+	t.Helper()
+	list := "["
+	for i, c := range cwd {
+		if i > 0 {
+			list += ", "
+		}
+		list += `"` + c + `"`
+	}
+	list += "]"
+	r, err := Parse([]byte("version: 1\ndefault: {browser: Safari}\nrules:\n  - name: cli\n    match: {cwd: " + list + "}\n    open: {browser: Dia, profile: Work}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func TestCwdRoute(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	realHome, err := filepath.EvalSymlinks(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	work := filepath.Join(realHome, "work")
+	if err := os.MkdirAll(filepath.Join(work, "repo"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(work, link); err != nil {
+		t.Fatal(err)
+	}
+	u, _ := url.Parse("https://example.com/x")
+	tests := []struct {
+		name     string
+		prefixes []string
+		cwd      string
+		want     bool
+	}{
+		{"exact", []string{"/a/b"}, "/a/b", true},
+		{"below", []string{"/a/b"}, "/a/b/c", true},
+		{"sibling with common prefix", []string{"/a/b"}, "/a/bc", false},
+		{"parent", []string{"/a/b"}, "/a", false},
+		{"trailing slash", []string{"/a/b/"}, "/a/b/c", true},
+		{"root prefix", []string{"/"}, "/anything/at/all", true},
+		{"tilde", []string{"~/work"}, work + "/repo", true},
+		{"tilde alone", []string{"~"}, work, true},
+		{"tilde other dir", []string{"~/work"}, realHome + "/other", false},
+		{"symlinked prefix", []string{link}, work + "/repo", true},
+		{"temp dir symlinks", []string{home + "/work"}, work, true},
+		{"non-existent prefix", []string{"/no/such/dir"}, "/no/such/dir/sub", true},
+		{"unknown cwd", []string{"/"}, "", false},
+		{"second prefix", []string{"/x", "/a/b"}, "/a/b/c", true},
+		{"no prefix matches", []string{"/x", "/y"}, "/a/b", false},
+	}
+	for _, tc := range tests {
+		d := cwdRules(t, tc.prefixes...).Route(Request{URL: u, Cwd: tc.cwd})
+		if got := d.Rule == "cli"; got != tc.want {
+			t.Errorf("%s: matched = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestCwdWithHost(t *testing.T) {
+	r, err := Parse([]byte("version: 1\ndefault: {browser: Safari}\nrules:\n  - name: both\n    match: {host: example.com, cwd: /a}\n    open: {browser: Zen}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, _ := url.Parse("https://example.com/")
+	other, _ := url.Parse("https://example.org/")
+	for _, tc := range []struct {
+		u    *url.URL
+		cwd  string
+		want string
+	}{{ok, "/a/b", "both"}, {ok, "/z", ""}, {other, "/a", ""}, {ok, "", ""}} {
+		if got := r.Route(Request{URL: tc.u, Cwd: tc.cwd}).Rule; got != tc.want {
+			t.Errorf("%v %q: rule %q, want %q", tc.u, tc.cwd, got, tc.want)
+		}
+	}
+}
+
+func TestCwdValidation(t *testing.T) {
+	for name, cwd := range map[string]string{
+		"relative": `"work/repo"`, "dot": `"./work"`, "other user": `"~bob/x"`, "empty": `""`, "control": `"/a\tb"`,
+	} {
+		text := "version: 1\ndefault: {browser: Safari}\nrules:\n  - name: x\n    match: {cwd: [" + cwd + "]}\n    open: {browser: Zen}\n"
+		if _, err := Parse([]byte(text)); err == nil || !strings.Contains(err.Error(), `rule "x": cwd`) {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+	if _, err := Parse([]byte("version: 1\ndefault: {browser: Safari}\nrules:\n  - name: x\n    match: {}\n    open: {browser: Zen}\n")); err == nil ||
+		!strings.Contains(err.Error(), "(host, path, opener or cwd)") {
+		t.Errorf("empty match: %v", err)
+	}
+	if _, err := Parse([]byte("version: 1\ndefault: {browser: Safari}\nrules:\n  - name: x\n    match: {cwd: [\"~\", \"~/a\", \"/\"]}\n    open: {browser: Zen}\n")); err != nil {
+		t.Errorf("valid: %v", err)
+	}
+}
+
+func TestUsesCwd(t *testing.T) {
+	if !cwdRules(t, "/a").UsesCwd() {
+		t.Error("cwd rule: UsesCwd false")
+	}
+	r, _ := Parse([]byte(sample))
+	if r.UsesCwd() {
+		t.Error("sample: UsesCwd true")
+	}
+}
+
+func TestCwdMatchesFold(t *testing.T) {
+	for _, tc := range []struct {
+		prefix, dir string
+		fold, want  bool
+	}{
+		{"/A/b", "/a/B/c", true, true},
+		{"/A/b", "/a/B/c", false, false},
+		{"/a/b", "/a/b", false, true},
+		{"/a/b", "/a/bc", true, false},
+	} {
+		if got := CwdMatches(tc.prefix, tc.dir, tc.fold); got != tc.want {
+			t.Errorf("CwdMatches(%q, %q, %v) = %v", tc.prefix, tc.dir, tc.fold, got)
+		}
+	}
+}
+
+func TestResolveDir(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "l")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	want, _ := filepath.EvalSymlinks(real)
+	if got, err := ResolveDir(link); err != nil || got != want {
+		t.Errorf("symlink: %q, %v; want %q", got, err, want)
+	}
+	if got, err := ResolveDir("/no/such/../dir/"); err != nil || got != "/no/dir" {
+		t.Errorf("missing: %q, %v", got, err)
 	}
 }

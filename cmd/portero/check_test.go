@@ -77,3 +77,35 @@ func TestCheckTargetsDefaultAndUnnamed(t *testing.T) {
 		t.Errorf("unnamed: %q", w)
 	}
 }
+
+func TestCheckCwd(t *testing.T) {
+	head := "version: 1\ndefault: {browser: Safari}\nrules:\n  - name: x\n    match: {cwd: "
+	tail := "}\n    open: {browser: Zen}\n  - match: {host: example.com}\n    open: {browser: Zen}\n"
+	exists := func(have ...string) checkEnv {
+		return checkEnv{dirExists: func(p string) bool {
+			for _, h := range have {
+				if p == h {
+					return true
+				}
+			}
+			return false
+		}}
+	}
+	tests := []struct {
+		name string
+		cwd  string
+		env  checkEnv
+		want []string
+	}{
+		{"none exists", "[~/Documents/projects/work, /opt/other]", exists(),
+			[]string{`warning: rule "x": none of its cwd directories exist on this Mac (~/Documents/projects/work, /opt/other)`}},
+		{"one exists", "[~/Documents/projects/work, /opt/other]", exists("/opt/other"), nil},
+		{"single exists", "/opt/other", exists("/opt/other"), nil},
+	}
+	for _, tc := range tests {
+		got := checkCwd(parse(t, head+tc.cwd+tail), tc.env)
+		if strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
+			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}

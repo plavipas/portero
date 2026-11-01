@@ -52,6 +52,7 @@ func routeLink(link, opener string) error {
 	if err != nil {
 		return err
 	}
+	// The handler has no meaningful cwd (Launch Services starts the app in /), so cwd rules never match here.
 	req := rules.Request{URL: u, Opener: opener}
 	r, err := rules.Load(config.RulesFile())
 	if err != nil {

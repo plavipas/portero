@@ -95,7 +95,7 @@
       "col": 3,
       "type": "database",
       "label": "Rules file",
-      "sublabel": "host, path, opener",
+      "sublabel": "host, path, opener, cwd",
       "tag": "first match wins",
       "width": 140
     },
@@ -162,7 +162,7 @@
       "id": "cli-match",
       "from": "cli",
       "to": "rules",
-      "label": "--opener",
+      "label": "--opener, --cwd",
       "variant": "dashed",
       "role": "branch"
     },
@@ -209,7 +209,7 @@
       "title": "Rules",
       "items": [
         "$PORTERO_RULES, else rules: in config.yaml, else ~/.config/portero/rules.yaml",
-        "Match host (wildcards), path prefix, opener bundle id",
+        "Match host (wildcards), path prefix, opener bundle id, cwd (CLI only)",
         "First matching rule wins, otherwise default"
       ]
     },
