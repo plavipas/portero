@@ -89,20 +89,20 @@ func firefoxProfile(b browsers.Browser, name string) (browsers.Profile, bool) {
 // ext+container: form only when the scheme is http(s) and the container extension is confirmed active in the
 // resolved profile; in every other case (extension off, state unreadable, default profile unknown) the plain
 // link is returned with a note, so a link is never handed to a browser that may not understand ext+container.
-func firefoxLink(b browsers.Browser, u *url.URL, profileName, container string) (string, []string) {
-	link := u.String()
+func firefoxLink(b browsers.Browser, u *url.URL, profileName, container string) (link string, withContainer bool, notes []string) {
+	link = u.String()
 	if container == "" {
-		return link, nil
+		return link, false, nil
 	}
 	if s := strings.ToLower(u.Scheme); s != "http" && s != "https" {
-		return link, []string{fmt.Sprintf("container skipped: %s links cannot be opened by the extension", u.Scheme)}
+		return link, false, []string{fmt.Sprintf("container skipped: %s links cannot be opened by the extension", u.Scheme)}
 	}
 	p, ok := firefoxProfile(b, profileName)
 	if !ok {
 		if profileName == "" {
-			return link, []string{fmt.Sprintf("default profile of %s is unknown (no profiles, or several Install sections disagree): opening without container", b.Name)}
+			return link, false, []string{fmt.Sprintf("default profile of %s is unknown (no profiles, or several Install sections disagree): opening without container", b.Name)}
 		}
-		return link, []string{fmt.Sprintf("profile %q of %s not found: opening without container", profileName, b.Name)}
+		return link, false, []string{fmt.Sprintf("profile %q of %s not found: opening without container", profileName, b.Name)}
 	}
 	active, err := b.ContainerExtension(p)
 	switch {
@@ -111,11 +111,11 @@ func firefoxLink(b browsers.Browser, u *url.URL, profileName, container string) 
 		if errors.Is(err, fs.ErrNotExist) {
 			reason = "extensions.json not found"
 		}
-		return link, []string{fmt.Sprintf("container extension state unknown in profile %q of %s (%s): opening without container", p.Name, b.Name, reason)}
+		return link, false, []string{fmt.Sprintf("container extension state unknown in profile %q of %s (%s): opening without container", p.Name, b.Name, reason)}
 	case !active:
-		return link, []string{fmt.Sprintf("container extension not active in profile %q of %s: opening without container", p.Name, b.Name)}
+		return link, false, []string{fmt.Sprintf("container extension not active in profile %q of %s: opening without container", p.Name, b.Name)}
 	}
-	return ContainerURL(container, u), nil
+	return ContainerURL(container, u), true, nil
 }
 
 func resolveProfile(b browsers.Browser, want string) (string, error) {
