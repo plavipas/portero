@@ -17,7 +17,8 @@ import (
 	"unsafe"
 )
 
-// Handler is called for every link the app receives; it runs on its own goroutine.
+// Handler is called for every link the app receives; it runs on its own goroutine. The app quits
+// two seconds after the last link has been handled, never while one is still being routed.
 type Handler func(url, opener string)
 
 var handle Handler
@@ -26,10 +27,10 @@ var handle Handler
 func porteroHandleURL(url, opener *C.char) {
 	u, o := C.GoString(url), C.GoString(opener)
 	go func() {
+		defer C.porteroDone() // always: the app must not stay alive because routing failed
 		if handle != nil {
 			handle(u, o)
 		}
-		C.porteroExitAfter(2000)
 	}()
 }
 

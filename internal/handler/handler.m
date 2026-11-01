@@ -3,7 +3,15 @@
 
 extern void porteroHandleURL(char *url, char *opener);
 
+// generation invalidates older exit timers; inflight counts links still being routed, so a fast link can
+// never terminate the app while a slower one (a browser still starting) is in progress.
 static int generation = 0;
+static int inflight = 0;
+
+static void porteroArrived(void) {
+    generation++;
+    inflight++;
+}
 
 @interface PorteroDelegate : NSObject <NSApplicationDelegate>
 @end
@@ -19,8 +27,17 @@ static int generation = 0;
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
-    // Launched with no link (double-click): leave quietly.
-    porteroExitAfter(3000);
+    // Launched with no link (double-click): leave quietly. A document opened at launch arrives through
+    // openURLs: BEFORE this callback, so the timer must not start when a link is already in flight.
+    if (inflight == 0 && generation == 0) porteroExitAfter(3000);
+}
+
+// Documents (Open With, drag onto the icon): HTML files declared in Info.plist arrive here as file:// URLs.
+- (void)application:(NSApplication *)app openURLs:(NSArray<NSURL *> *)urls {
+    for (NSURL *u in urls) {
+        porteroArrived();
+        porteroHandleURL((char *)u.absoluteString.UTF8String, (char *)"");
+    }
 }
 
 - (void)handleGetURL:(NSAppleEventDescriptor *)event withReply:(NSAppleEventDescriptor *)reply {
@@ -31,7 +48,7 @@ static int generation = 0;
         NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         opener = app.bundleIdentifier ?: @"";
     }
-    generation++;
+    porteroArrived();
     porteroHandleURL((char *)url.UTF8String, (char *)opener.UTF8String);
 }
 
@@ -47,11 +64,19 @@ void porteroRunApp(void) {
     }
 }
 
-// Quit after ms milliseconds unless another link arrives in the meantime.
+// Quit after ms milliseconds unless another link arrives or one is still being routed.
 void porteroExitAfter(int ms) {
     int mine = generation;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)ms * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-        if (mine == generation) [NSApp terminate:nil];
+        if (mine == generation && inflight == 0) [NSApp terminate:nil];
+    });
+}
+
+// Called from Go when one link has been routed (or failed); the app quits 2 s after the last one.
+void porteroDone(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (inflight > 0) inflight--;
+        if (inflight == 0) porteroExitAfter(2000);
     });
 }
 
