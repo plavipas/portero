@@ -14,6 +14,8 @@ import (
 type Profile struct {
 	Name string
 	Dir  string
+	// Default is true for the Firefox profile marked Default=1 in profiles.ini.
+	Default bool
 }
 
 // ChromiumProfiles reads `<localState>` (the Local State JSON) and returns name -> directory.
@@ -65,6 +67,8 @@ func FirefoxProfiles(profilesIni string) ([]Profile, error) {
 					cur.Name = v
 				case "Path":
 					cur.Dir = v
+				case "Default":
+					cur.Default = v == "1"
 				}
 			}
 		}
@@ -111,4 +115,41 @@ func (b Browser) Profiles() ([]Profile, error) {
 		return FirefoxProfiles(filepath.Join(b.SupportDir(), "profiles.ini"))
 	}
 	return nil, nil
+}
+
+// ProfileDir is the absolute directory of a Firefox profile: Path= as is when absolute, else under SupportDir.
+func (b Browser) ProfileDir(p Profile) string {
+	if filepath.IsAbs(p.Dir) {
+		return p.Dir
+	}
+	return filepath.Join(b.SupportDir(), p.Dir)
+}
+
+// DefaultProfile returns the profile marked Default=1, else the first one.
+func (b Browser) DefaultProfile(profiles []Profile) (Profile, bool) {
+	for _, p := range profiles {
+		if p.Default {
+			return p, true
+		}
+	}
+	if len(profiles) > 0 {
+		return profiles[0], true
+	}
+	return Profile{}, false
+}
+
+// Containers lists the containers of a Firefox profile; other browsers have none.
+func (b Browser) Containers(p Profile) ([]Container, error) {
+	if b.Kind != Firefox {
+		return nil, nil
+	}
+	return FirefoxContainers(filepath.Join(b.ProfileDir(p), "containers.json"))
+}
+
+// ContainerExtension reports whether the "Open external links in a container" add-on is active in the profile.
+func (b Browser) ContainerExtension(p Profile) (bool, error) {
+	if b.Kind != Firefox {
+		return false, nil
+	}
+	return FirefoxExtensionActive(filepath.Join(b.ProfileDir(p), "extensions.json"), ContainerExtensionID)
 }
