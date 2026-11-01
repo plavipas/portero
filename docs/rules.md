@@ -26,7 +26,7 @@ rules:
 - Rules are tried top to bottom; the first match wins; `default` applies when none does.
 - Every key present under `match` must match; a rule needs at least one key.
 - Host matching is case-insensitive; path matching is case-sensitive.
-- `profile` means whatever the browser calls it: profile (Dia, Arc, Chrome), container or space.
+- `profile` means whatever the browser calls it: profile (Dia, Arc, Chrome), container or space. Name them the way you split your life, e.g. Personal and Work.
 
 ## Log
 

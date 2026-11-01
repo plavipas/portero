@@ -16,11 +16,11 @@ rules:
     match:
       host: [gitlab.example.com, "*.example.net"]
     open: { browser: Zen }
-  - name: client A on GitHub
+  - name: work org on GitHub
     match:
       host: github.com
-      path: /client-a
-    open: { browser: Dia, profile: Client A }
+      path: /my-org
+    open: { browser: Dia, profile: Work }
   - name: work Slack links
     match:
       opener: com.tinyspeck.slackmacgap
@@ -71,9 +71,9 @@ func TestRoute(t *testing.T) {
 		{"https://example.net/", "", Target{Browser: "Zen"}, "company forge"},
 		{"https://GITLAB.EXAMPLE.COM/", "", Target{Browser: "Zen"}, "company forge"},
 		{"https://notexample.net/", "", Target{Browser: "Dia", Profile: "Personal"}, ""},
-		{"https://github.com/client-a/repo", "", Target{Browser: "Dia", Profile: "Client A"}, "client A on GitHub"},
-		{"https://github.com/client-a", "", Target{Browser: "Dia", Profile: "Client A"}, "client A on GitHub"},
-		{"https://github.com/client-ab/repo", "", Target{Browser: "Dia", Profile: "Personal"}, ""},
+		{"https://github.com/my-org/repo", "", Target{Browser: "Dia", Profile: "Work"}, "work org on GitHub"},
+		{"https://github.com/my-org", "", Target{Browser: "Dia", Profile: "Work"}, "work org on GitHub"},
+		{"https://github.com/my-org-2/repo", "", Target{Browser: "Dia", Profile: "Personal"}, ""},
 		{"https://anything.io/", "com.tinyspeck.slackmacgap", Target{Browser: "Dia", Profile: "Work"}, "work Slack links"},
 		{"https://anything.io/", "com.apple.mail", Target{Browser: "Dia", Profile: "Personal"}, ""},
 		{"https://docs-v2.example.org/", "", Target{Browser: "Safari"}, "wildcard host"},

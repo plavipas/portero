@@ -2,7 +2,7 @@
 
 Read README.md first. Everything in the repository in English: code, comments, docs, commits, PR texts.
 
-- Portero is a general tool: no personal or client hostnames, workspace names, profile names or
+- Portero is a general tool: no personal hostnames, workspace names, profile names or
   bundle ids of private tools anywhere in the repository; only placeholders.
 - Single-instance browsers (Dia, Arc) are driven through AppleScript
   (`/Applications/Dia.app/Contents/Resources/Dia.sdef`): profiles are addressed through a window;
