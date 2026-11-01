@@ -6,6 +6,7 @@ VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo de
 APP=build/Portero.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp packaging/Portero.icns "$APP/Contents/Resources/Portero.icns"
 CGO_ENABLED=1 go build -ldflags "-X main.version=$VERSION" -o "$APP/Contents/MacOS/portero" ./cmd/portero
 sed "s/VERSION/$VERSION/g" packaging/Info.plist > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
