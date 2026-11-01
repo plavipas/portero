@@ -92,16 +92,18 @@ func parseLink(fs *flag.FlagSet, args []string) (linkArgs, error) {
 	opener := fs.String("opener", "", "bundle id of the app that opened the link")
 	cwd := fs.String("cwd", "", "directory to match cwd rules against (default: the current directory)")
 	dry := fs.Bool("dry-run", false, "print the decision only")
-	// Accept flags after the URL as well.
+	// Flags may come before, after or around the URL ($BROWSER="portero open" appends the URL last).
 	var rest []string
-	for i, a := range args {
-		if len(a) > 0 && a[0] == '-' {
-			if err := fs.Parse(args[i:]); err != nil {
+	for remaining := args; len(remaining) > 0; {
+		if a := remaining[0]; len(a) > 1 && a[0] == '-' {
+			if err := fs.Parse(remaining); err != nil {
 				return linkArgs{}, err
 			}
-			break
+			remaining = fs.Args()
+			continue
 		}
-		rest = append(rest, a)
+		rest = append(rest, remaining[0])
+		remaining = remaining[1:]
 	}
 	if len(rest) != 1 {
 		return linkArgs{}, fmt.Errorf("expected one URL")
