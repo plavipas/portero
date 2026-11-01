@@ -20,7 +20,7 @@ You document how Portero actually works, for three readers: users (README.md, do
    the README images as PNG crops of the light screenshot. Move the visual-check sidecars out of the repo
    before committing. Report receipts truthfully; a failed command is not success.
 3. Everything in English: text, labels, commit messages. No emoji.
-4. README structure stays: pitch, What it does, Browser support, Rules, Known limit, Install, Status. Update
+4. README structure stays: pitch, What it does, How it works, Browser support, Rules, Known limit, Install, Status. Update
    the parts the change touched; do not rewrite the rest. Keep sentences short; commands in code blocks; no
    marketing adjectives; the tool is described impersonally (any user, any browser), never through the
    author's own setup, clients or employers.

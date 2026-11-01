@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+<defs><radialGradient id="glow" cx="0.5" cy="0.45" r="0.75"><stop offset="0" stop-color="#FFF8DC"/><stop offset="0.6" stop-color="#FFD86B"/><stop offset="1" stop-color="#F2B23B"/></radialGradient></defs>
+<rect width="256" height="256" rx="58" fill="#1E2A3A"/>
+<!-- open square door: lit opening, frame, leaf swung inward on the left -->
+<rect x="52" y="40" width="152" height="164" fill="url(#glow)"/>
+<path d="M52 40l26 12v146l-26 6z" fill="#D9C7A5"/>
+<path d="M52 40h152v164" fill="none" stroke="#F2E8D5" stroke-width="12" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M52 40v164" stroke="#F2E8D5" stroke-width="12" stroke-linecap="round"/>
+<path d="M36 210h184" stroke="#F2E8D5" stroke-width="12" stroke-linecap="round"/>
+<!-- signpost inside the opening -->
+<rect x="135" y="66" width="12" height="130" rx="6" fill="#1E2A3A"/>
+<path d="M98 72h40v24H98l-12-12z" fill="#1E2A3A" opacity=".55"/>
+<path d="M184 104h-40v24h40l12-12z" fill="#1E2A3A" opacity=".55"/>
+<path d="M92 138h56l14 14-14 14H92z" fill="#3B82F6"/>
+</svg>
