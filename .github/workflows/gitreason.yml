@@ -1,0 +1,50 @@
+name: gitreason
+# Shows the agent notes (refs/notes/gitreason) of the PR commits as one comment on the PR;
+# the comment is rewritten on every push to the branch.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: write
+env:
+  # The release the workflow installs. Bump it on purpose after reading the release notes.
+  GITREASON_VERSION: v0.0.2-alpha
+concurrency:
+  group: gitreason-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+      - name: Fetch the notes
+        run: git fetch origin refs/notes/gitreason:refs/notes/gitreason || echo "no notes on the remote"
+      - name: Install gitreason
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          archive="gitreason_${GITREASON_VERSION#v}_linux_amd64.tar.gz"
+          gh release download "$GITREASON_VERSION" --repo plavipas/gitreason --pattern "$archive" --pattern checksums.txt
+          # Verify the archive against checksums.txt of the same release. To pin the archive hash itself
+          # instead, replace the next line with:  echo "<sha256>  $archive" | sha256sum -c -
+          sha256sum -c --ignore-missing checksums.txt
+          tar -xzf "$archive" gitreason && sudo install gitreason /usr/local/bin/gitreason
+      - name: Build the comment
+        run: gitreason pr-comment "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" > comment.md
+      - name: Create or update the PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          [ -s comment.md ] || { echo "no agent notes in this PR"; exit 0; }
+          id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
+                 --jq '.[] | select(.body | startswith("<!-- gitreason -->")) | .id' | head -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@comment.md >/dev/null
+          else
+            gh api "repos/${{ github.repository }}/issues/$PR/comments" -F body=@comment.md >/dev/null
+          fi

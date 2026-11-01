@@ -1,0 +1,6 @@
+{
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "command -v gitreason >/dev/null 2>&1 && gitreason hook start || exit 0" }] }],
+    "SessionEnd":   [{ "hooks": [{ "type": "command", "command": "command -v gitreason >/dev/null 2>&1 && gitreason hook end || exit 0" }] }]
+  }
+}
