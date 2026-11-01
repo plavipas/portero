@@ -13,10 +13,10 @@ rules:
       host: [git.example.com, "*.example.net"]      # "*.x" also matches the bare "x"
     open: { browser: Zen }
 
-  - name: work org on GitHub
+  - name: work repositories on GitHub
     match:
       host: github.com
-      path: /my-org                                 # /my-org and /my-org/..., not /my-org-2
+      path: /work-projects                          # /work-projects and /work-projects/..., not /work-projects-2
     open: { browser: Dia, profile: Work }
 
   - name: links clicked in Slack
