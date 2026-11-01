@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>            <string>Portero</string>
+	<key>CFBundleDisplayName</key>     <string>Portero</string>
+	<key>CFBundleIdentifier</key>      <string>dev.plavipas.portero</string>
+	<key>CFBundleExecutable</key>      <string>portero</string>
+	<key>CFBundlePackageType</key>     <string>APPL</string>
+	<key>CFBundleVersion</key>         <string>VERSION</string>
+	<key>CFBundleShortVersionString</key> <string>VERSION</string>
+	<key>CFBundleInfoDictionaryVersion</key> <string>6.0</string>
+	<key>LSMinimumSystemVersion</key>  <string>13.0</string>
+	<key>LSUIElement</key>             <true/>
+	<key>NSHighResolutionCapable</key> <true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key> <string>Viewer</string>
+			<key>CFBundleURLName</key>  <string>Web site URL</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>http</string>
+				<string>https</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSUserActivityTypes</key>
+	<array><string>NSUserActivityTypeBrowsingWeb</string></array>
+</dict>
+</plist>
