@@ -179,7 +179,7 @@ func TestFirefoxLinkExtensionStates(t *testing.T) {
 			`container extension state unknown in profile "Personal" of Zen (extensions.json unreadable): opening without container`},
 		{"install sections disagree", testIni + "[InstallA]\nDefault=Profiles/a\n[InstallB]\nDefault=Profiles/b\n",
 			map[string]string{"Profiles/a/extensions.json": extOn, "Profiles/b/extensions.json": extOn}, "", plain,
-			"default profile of Zen is unknown (several Install sections): opening without container"},
+			"default profile of Zen is unknown (no profiles, or several Install sections disagree): opening without container"},
 		{"disagreeing installs, named profile", testIni + "[InstallA]\nDefault=Profiles/a\n[InstallB]\nDefault=Profiles/b\n",
 			map[string]string{"Profiles/b/extensions.json": extOn}, "Work", withContainer, ""},
 		{"unknown named profile", testIni, nil, "Nope", plain, `profile "Nope" of Zen not found: opening without container`},

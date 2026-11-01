@@ -100,7 +100,7 @@ func firefoxLink(b browsers.Browser, u *url.URL, profileName, container string) 
 	p, ok := firefoxProfile(b, profileName)
 	if !ok {
 		if profileName == "" {
-			return link, []string{fmt.Sprintf("default profile of %s is unknown (several Install sections): opening without container", b.Name)}
+			return link, []string{fmt.Sprintf("default profile of %s is unknown (no profiles, or several Install sections disagree): opening without container", b.Name)}
 		}
 		return link, []string{fmt.Sprintf("profile %q of %s not found: opening without container", profileName, b.Name)}
 	}

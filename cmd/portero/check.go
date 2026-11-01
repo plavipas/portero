@@ -107,7 +107,12 @@ func checkTargets(r *rules.Rules, env checkEnv) (warnings []string, err error) {
 					it.where, name, b.Name, it.t.Container, strings.Join(have, ", ")))
 			}
 		}
-		if name, active, err := env.extension(b, it.t.Profile); err == nil && !active {
+		name, active, err := env.extension(b, it.t.Profile)
+		switch {
+		case err != nil:
+			warnings = append(warnings, fmt.Sprintf("warning: %s: the state of the %q extension in %s is unknown (profile not found or extensions.json unreadable); links open without a container",
+				it.where, browsers.ContainerExtensionName, b.Name))
+		case !active:
 			warnings = append(warnings, fmt.Sprintf("warning: %s: profile %q of %s has no active %q extension; links open without a container",
 				it.where, name, b.Name, browsers.ContainerExtensionName))
 		}
