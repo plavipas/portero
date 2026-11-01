@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/plavipas/portero/internal/browsers"
@@ -15,6 +16,8 @@ type checkEnv struct {
 	containers func(b browsers.Browser, profile string) (string, []browsers.Container, error)
 	// extension returns the same profile name and whether the container extension is active in it.
 	extension func(b browsers.Browser, profile string) (string, bool, error)
+	// dirExists reports whether a cwd prefix from the rules file is an existing directory on this Mac.
+	dirExists func(prefix string) bool
 }
 
 func realCheckEnv() checkEnv {
@@ -37,6 +40,10 @@ func realCheckEnv() checkEnv {
 	}
 	return checkEnv{
 		installed: func(b browsers.Browser) bool { return b.Installed() },
+		dirExists: func(p string) bool {
+			fi, err := os.Stat(rules.ExpandCwd(p))
+			return err == nil && fi.IsDir()
+		},
 		containers: func(b browsers.Browser, name string) (string, []browsers.Container, error) {
 			p, err := find(b, name)
 			if err != nil {
@@ -118,6 +125,27 @@ func checkTargets(r *rules.Rules, env checkEnv) (warnings []string, err error) {
 		}
 	}
 	return warnings, nil
+}
+
+// checkCwd warns about rules whose cwd directories all do not exist on this Mac.
+func checkCwd(r *rules.Rules, env checkEnv) (warnings []string) {
+	for i, rule := range r.Rules {
+		if len(rule.Match.Cwd) == 0 {
+			continue
+		}
+		found := false
+		for _, p := range rule.Match.Cwd {
+			if env.dirExists(p) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			warnings = append(warnings, fmt.Sprintf("warning: rule %s: none of its cwd directories exist on this Mac (%s)",
+				ruleLabel(i, rule.Name), strings.Join(rule.Match.Cwd, ", ")))
+		}
+	}
+	return warnings
 }
 
 func ruleLabel(i int, name string) string {

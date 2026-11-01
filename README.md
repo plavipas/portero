@@ -8,7 +8,8 @@ scripts, `$BROWSER`) in the browser and profile that a rule picks. One link, one
 
 ## What it does
 
-- Routes by host (wildcards), by path prefix and by the app that opened the link (bundle id).
+- Routes by host (wildcards), by path prefix and by the app that opened the link (bundle id). Links opened
+  from a shell through `portero open` can also be routed by the working directory.
 - Targets any installed browser and, where the browser has them, a specific profile, space or
   container.
 - Supports the new generation of browsers as well as the classic ones. Browsers that run as a single
@@ -58,8 +59,12 @@ placeholder hosts only: [docs/rules.md](docs/rules.md) and [examples/rules.yaml]
   open: { browser: Zen, container: Work }   # Firefox family only; in Zen the container picks the Space
 ```
 
-`portero rules check` validates the file and warns about browsers, containers or the container extension that
-are missing on this Mac.
+A `cwd` condition routes links that command-line tools open from a shell by the directory they run in, for
+example `match: { cwd: ~/Documents/projects/work }`. It needs `$BROWSER` set to `portero open`; links from other
+apps never match it.
+
+`portero rules check` validates the file and warns about browsers, containers, the container extension or `cwd`
+directories that are missing on this Mac.
 
 ## Known limit
 
@@ -77,6 +82,7 @@ portero rules init        # writes the example rules to ~/.config/portero/rules.
 portero browsers          # the browsers and profile names Portero sees on this Mac
 portero open https://example.com/ --dry-run
 portero default set       # macOS asks to confirm Portero as the default browser
+export BROWSER="portero open"   # optional: links from shell tools go through Portero, cwd rules apply
 portero sync icloud       # optional: keep rules.yaml in iCloud Drive, shared between your Macs
 ```
 
