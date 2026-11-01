@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Mark a task flow step of Portero as completed (or skipped on the user's request).
+
+Usage:
+  flow-mark DEV-12 <step>                              # step done, verdict given
+  flow-mark DEV-12 <step> --skipped-by-user "<words>"  # the user explicitly skipped it
+  flow-mark DEV-12 --status                            # show markers for the key
+  flow-mark ADHOC-rules-gui brief                      # work without an issue yet: temporary key
+
+Keys: DEV-<n> / DEVOPS-<n> = Linear issue of the personal workspace (teams Dev / DevOps, project Portero);
+ADHOC-<slug> until the issue exists.
+Who marks what:
+  brief       main session, after brief reported "Вопросов нет"
+  plan        main session, after the user approved the architect's plan ("да"/"начинать")
+  developer   go-developer, after the local commit
+  qa          qa-engineer, only on PASS
+  crossreview main session, after the cross-review summary was shown to the user
+  security    security-reviewer, only on APPROVE (after cross-review, before the push)
+Skips are set only on the user's explicit words, quoted.
+"""
+import datetime
+import os
+import re
+import sys
+
+STEPS = ["brief", "plan", "developer", "qa", "crossreview", "security"]
+STATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "flow-state")
+
+
+def die(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
+
+def main():
+    args = sys.argv[1:]
+    if not args or not re.fullmatch(r"DEV(?:OPS)?-\d+|ADHOC-[A-Za-z0-9][A-Za-z0-9-]*", args[0], re.IGNORECASE):
+        die(__doc__)
+    key = args[0].upper()
+    os.makedirs(STATE_DIR, exist_ok=True)
+    if len(args) >= 2 and args[1] == "--status":
+        for s in STEPS:
+            path = os.path.join(STATE_DIR, f"{key}.{s}")
+            print(f"{s:12} {open(path).read().strip() if os.path.exists(path) else '-'}")
+        return
+    if len(args) < 2 or args[1] not in STEPS:
+        die(__doc__)
+    step = args[1]
+    skipped = None
+    if len(args) > 2:
+        if args[2] != "--skipped-by-user" or len(args) < 4 or not args[3].strip():
+            die('Skipping needs --skipped-by-user "<the user\'s words>".')
+        skipped = args[3].strip()
+    idx = STEPS.index(step)
+    if idx > 0 and not os.path.exists(os.path.join(STATE_DIR, f"{key}.{STEPS[idx - 1]}")):
+        die(f"{key}: previous step '{STEPS[idx - 1]}' is not marked; mark it (or its skip) first.")
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    line = f"skipped-by-user {ts}: {skipped}" if skipped else f"done {ts}"
+    with open(os.path.join(STATE_DIR, f"{key}.{step}"), "w") as f:
+        f.write(line + "\n")
+    print(f"{key}.{step}: {line}")
+    for later in STEPS[idx + 1:]:  # a step done again invalidates everything after it
+        path = os.path.join(STATE_DIR, f"{key}.{later}")
+        if os.path.exists(path):
+            os.remove(path)
+            print(f"{key}.{later}: cleared (must be redone after {step})")
+
+
+if __name__ == "__main__":
+    main()
