@@ -151,12 +151,25 @@ func (b Browser) ProfileDir(p Profile) string {
 }
 
 // DefaultProfile returns the profile an [Install...] section names as default, else the one marked
-// Default=1, else the first one.
+// Default=1, else the first one. Firefox and Firefox Developer Edition share one profiles.ini, so several
+// Install sections may name different profiles; the default is then unknown and the result is (Profile{}, false).
+// Callers treat that as "unknown profile": no extension check, no name resolution.
 func (b Browser) DefaultProfile(profiles []Profile) (Profile, bool) {
+	var inst Profile
+	n := 0
 	for _, p := range profiles {
 		if p.InstallDefault {
-			return p, true
+			if n == 0 {
+				inst = p
+			}
+			if p.Dir != inst.Dir {
+				return Profile{}, false
+			}
+			n++
 		}
+	}
+	if n > 0 {
+		return inst, true
 	}
 	for _, p := range profiles {
 		if p.Default {
