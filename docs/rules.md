@@ -7,17 +7,19 @@ One YAML file, local to the Mac. Portero looks for it in this order:
 3. `~/.config/portero/rules.yaml`
 
 `portero rules path` prints the file in use, `portero rules check` validates it, `portero rules match <url>
-[--opener <bundle id>]` shows the decision without opening anything.
+[--opener <bundle id>] [--cwd <dir>]` shows the decision without opening anything.
 
 `portero rules check` also checks the targets against this Mac and prints a `warning:` line for:
 
 - a browser that is not installed;
 - a container that the profile does not have yet (the extension creates it on first use);
 - a Firefox-family profile where the container extension is not active;
-- a container rule whose extension state cannot be read (profile not found, `extensions.json` unreadable): such links open without a container.
+- a container rule whose extension state cannot be read (profile not found, `extensions.json` unreadable): such links open without a container;
+- a rule none of whose `cwd` directories exist on this Mac (`none of its cwd directories exist on this Mac (...)`).
+  One existing directory is enough, so a file shared between Macs can list the paths of each Mac.
 
 Warnings do not fail the check (exit 0). A `container` on a browser outside the Firefox family is an error
-(exit 1).
+(exit 1), and so is a `cwd` prefix that is not absolute and does not start with `~/`.
 
 ## Format
 
@@ -30,6 +32,7 @@ rules:
       host: example.com | [a.com, b.com]   # exact; "*.a.com" = any subdomain and a.com; "*" elsewhere = glob
       path: /prefix | [/a, /b]             # segment prefix: /a matches /a and /a/..., not /ab
       opener: com.vendor.app | [...]       # bundle id of the app that opened the link
+      cwd: ~/dir | [/abs/dir, ...]         # working directory of a shell command; see "Working directory"
     open: { browser: <app name or bundle id>, profile: <optional>, container: <optional, Firefox family> }
 ```
 
@@ -39,6 +42,41 @@ rules:
 - `profile` means whatever the browser calls it: profile (Dia, Chrome, Firefox) or space (Arc). Name them the way
   you split your life, e.g. Personal and Work.
 - `profile` and `container` must not contain a tab or a line break.
+
+## Working directory
+
+`cwd` matches the working directory of the command that ran `portero open`. It routes links that command-line
+tools open from a shell, for example login pages, when `$BROWSER` points to Portero:
+
+```sh
+export BROWSER="portero open"
+```
+
+```yaml
+rules:
+  - name: CLI logins from work repositories
+    match: { cwd: ~/Documents/projects/work }
+    open: { browser: Google Chrome, profile: Work }
+```
+
+- `cwd` takes one directory prefix or a list. A prefix is an absolute path, `~` or `~/...`; `~` is the home
+  directory. A relative path or `~user` is an error in `portero rules check`.
+- Prefixes are cleaned and resolved through symlinks when they exist.
+- A prefix matches the directory itself and everything below it, on whole path segments: `/a/b` matches `/a/b`
+  and `/a/b/c`, not `/a/bc`. `/` matches every directory.
+- The comparison is case-insensitive on macOS (the default APFS volume is case-insensitive) and exact elsewhere.
+- The working directory is the current directory of `portero open` and `portero rules match`, resolved to its
+  physical path. `--cwd <dir>` replaces it; a `~` in the value is expanded by Portero, and a directory that does
+  not exist is accepted, for what-if checks.
+- Portero.app has no working directory: Launch Services starts it in `/`. Links from other apps never match a
+  `cwd` rule; only links opened through the CLI do.
+- `portero open --dry-run` and `portero rules match` print a `cwd: <dir>` line before the decision when the rules
+  file has a `cwd` rule or `--cwd` was given. A plain `portero open` prints nothing new.
+- When the working directory cannot be determined, `cwd` rules are skipped and the link still opens;
+  `portero open` prints `portero: cwd: unknown (...); cwd rules skipped` to stderr.
+- `decisions.log` does not record the working directory; the rule name shows which rule won.
+- A Portero build without `cwd` support rejects the whole rules file (unknown key). Update Portero on every Mac
+  that reads the file before adding the first `cwd` rule.
 
 ## Containers (Firefox, Firefox Developer Edition, Zen)
 
