@@ -5173,7 +5173,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 
         <!-- Edge paths -->
-        <path data-edge-from="cli" data-edge-to="rules" data-edge-label="--opener" data-edge-key="0" data-edge-id="cli-match" data-composition-points="528,120;631,120;631,212" d="M 528 120 L 631 120 L 631 212" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="cli" data-edge-to="rules" data-edge-label="--opener, --cwd" data-edge-key="0" data-edge-id="cli-match" data-composition-points="528,120;631,120;631,212" d="M 528 120 L 631 120 L 631 212" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="app" data-edge-to="ls" data-edge-label="click" data-edge-key="1" data-edge-id="click" data-composition-points="188,120;230,120" d="M 188 120 L 230 120" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="safari" data-edge-to="log" data-edge-label="ERROR" data-edge-key="2" data-edge-id="error-line" data-composition-points="892.8,372;972.8,372;972.8,272" d="M 892.8 372 L 972.8 372 L 972.8 272" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="ls" data-edge-to="handler" data-edge-label="GetURL" data-edge-key="3" data-edge-id="geturl" data-composition-points="305,146;305,246;383,246" d="M 305 146 L 305 246 L 383 246" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
@@ -5247,8 +5247,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="fine" x="458" y="268" class="t-backend" font-size="7" text-anchor="middle">opener from sender pid</text>
         </g>
 
-        <g id="node-rules" data-node-id="rules" data-node-label="Rules file" tabindex="0" role="button" aria-label="Focus Rules file, host, path, opener, Portero" aria-pressed="false" data-node-kind="database" data-node-sublabel="host, path, opener" data-node-tag="first match wins" data-node-context="Portero">
-          <title>Rules file · host, path, opener · Portero · first match wins</title>
+        <g id="node-rules" data-node-id="rules" data-node-label="Rules file" tabindex="0" role="button" aria-label="Focus Rules file, host, path, opener, cwd, Portero" aria-pressed="false" data-node-kind="database" data-node-sublabel="host, path, opener, cwd" data-node-tag="first match wins" data-node-context="Portero">
+          <title>Rules file · host, path, opener, cwd · Portero · first match wins</title>
           <rect x="561" y="212" width="140" height="68" rx="6" class="c-mask"/>
           <rect x="561" y="212" width="140" height="68" rx="6" class="c-database" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(567 218) scale(0.6875)">
@@ -5256,7 +5256,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="631" y="233" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Rules file</text>
-          <text data-detail="context" x="631" y="250" class="t-muted" font-size="8" text-anchor="middle">host, path, opener</text>
+          <text data-detail="context" x="631" y="250" class="t-muted" font-size="8" text-anchor="middle">host, path, opener, cwd</text>
         <text data-detail="fine" x="631" y="268" class="t-database" font-size="7" text-anchor="middle">first match wins</text>
         </g>
 
@@ -5297,9 +5297,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </g>
 
         <!-- Edge labels -->
-        <g data-detail="context" data-edge-from="cli" data-edge-to="rules" data-edge-label="--opener" data-edge-key="0" data-edge-id="cli-match">
-          <rect x="555.3" y="100" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="579.5" y="110" class="t-database" font-size="8" text-anchor="middle">--opener</text>
+        <g data-detail="context" data-edge-from="cli" data-edge-to="rules" data-edge-label="--opener, --cwd" data-edge-key="0" data-edge-id="cli-match">
+          <rect x="538.5" y="100" width="82" height="14" rx="3" class="c-mask"/>
+          <text x="579.5" y="110" class="t-database" font-size="8" text-anchor="middle">--opener, --cwd</text>
         </g>
         <g data-detail="context" data-edge-from="app" data-edge-to="ls" data-edge-label="click" data-edge-key="1" data-edge-id="click">
           <rect x="192" y="100" width="34" height="14" rx="3" class="c-mask"/>
@@ -5546,7 +5546,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </div>
         <ul>
           <li>&bull; $PORTERO_RULES, else rules: in config.yaml, else ~/.config/portero/rules.yaml</li>
-          <li>&bull; Match host (wildcards), path prefix, opener bundle id</li>
+          <li>&bull; Match host (wildcards), path prefix, opener bundle id, cwd (CLI only)</li>
           <li>&bull; First matching rule wins, otherwise default</li>
         </ul>
       </div>
