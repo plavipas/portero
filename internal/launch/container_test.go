@@ -72,3 +72,52 @@ func TestResolveTargetIgnoresContainerOutsideFirefox(t *testing.T) {
 		t.Errorf("got %q %q %q %v", profile, container, note, err)
 	}
 }
+
+// TestContainerURLHardLinks feeds links that tend to break hand-written encoders and checks that the
+// extension's query decodes back to the container name and to u.String() byte for byte.
+func TestContainerURLHardLinks(t *testing.T) {
+	long := "https://example.com/" + strings.Repeat("seg%2F", 2000) + "?q=" + strings.Repeat("a&b=c%26", 2000) + "#" + strings.Repeat("f", 4000)
+	links := map[string]string{
+		"already encoded slash": "https://example.com/a%2Fb/c?redirect=https%3A%2F%2Fexample.org%2F%3Fx%3D1",
+		"double encoded":        "https://example.com/?q=%252F%2520",
+		"idn host":              "https://bücher.example/straße?ä=ö",
+		"punycode host":         "https://xn--bcher-kva.example/",
+		"userinfo":              "https://user:p%40ss@example.com/a",
+		"ipv6 host":             "http://[2001:db8::1]:8080/a?b=c",
+		"ipv6 zone":             "http://[fe80::1%25en0]/",
+		"empty fragment":        "https://example.com/a?#",
+		"semicolon query":       "https://example.com/a?x=1;y=2",
+		"plus and space":        "https://example.com/a+b?q=a+b%20c",
+		"very long":             long,
+	}
+	containers := []string{"Work", "x&url=https://evil.example", "a b", "%41", "日本"}
+	for name, l := range links {
+		u, err := url.Parse(l)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for _, c := range containers {
+			out := ContainerURL(c, u)
+			if strings.ContainsAny(out[len("ext+container:"):], "#?/ +") {
+				t.Errorf("%s / %q: unescaped delimiter in %q", name, c, out)
+			}
+			q, err := url.ParseQuery(strings.TrimPrefix(out, "ext+container:"))
+			if err != nil {
+				t.Errorf("%s / %q: ParseQuery: %v", name, c, err)
+				continue
+			}
+			if len(q) != 2 || len(q["name"]) != 1 || len(q["url"]) != 1 || q.Get("name") != c || q.Get("url") != u.String() {
+				t.Errorf("%s / %q: round trip %v", name, c, q)
+			}
+		}
+	}
+}
+
+func TestContainerURLInjectionStaysInName(t *testing.T) {
+	u, _ := url.Parse("https://example.com/")
+	got := ContainerURL("x&url=https://evil.example", u)
+	want := "ext+container:name=x%26url%3Dhttps%3A%2F%2Fevil.example&url=https%3A%2F%2Fexample.com%2F"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
