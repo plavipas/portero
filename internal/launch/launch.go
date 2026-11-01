@@ -47,10 +47,14 @@ func resolveTarget(b browsers.Browser, t rules.Target) (profile, container, note
 	container = t.Container
 	if p, ok := firefoxProfile(b, t.Profile); ok {
 		if list, err := b.Containers(p); err == nil {
+			// The extension compares names case-sensitively: an exact match wins over a case-insensitive one.
 			for _, c := range list {
-				if strings.EqualFold(c.Name, t.Container) {
+				if c.Name == t.Container {
 					container = c.Name
 					break
+				}
+				if strings.EqualFold(c.Name, t.Container) && container == t.Container {
+					container = c.Name
 				}
 			}
 		}

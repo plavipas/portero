@@ -39,7 +39,7 @@ func FirefoxContainers(path string) ([]Container, error) {
 	var file struct {
 		Identities []struct {
 			ID     uint32 `json:"userContextId"`
-			Public bool   `json:"public"`
+			Public *bool  `json:"public"` // absent = public; only an explicit false hides a container
 			Name   string `json:"name"`
 			L10nID string `json:"l10nID"`
 		} `json:"identities"`
@@ -49,7 +49,7 @@ func FirefoxContainers(path string) ([]Container, error) {
 	}
 	var out []Container
 	for _, i := range file.Identities {
-		if !i.Public {
+		if i.Public != nil && !*i.Public {
 			continue
 		}
 		name := i.Name

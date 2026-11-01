@@ -62,7 +62,8 @@ const containersFixture = `{"version":8,"lastUserContextId":9,"identities":[
 {"userContextId":8,"public":false,"icon":"","color":"","name":"userContextIdInternal.webextStorageLocal"},
 {"userContextId":9,"public":true,"icon":"circle","color":"red","l10nID":"userContextShopping.label"},
 {"userContextId":10,"public":true,"icon":"circle","color":"red","l10nID":"userContextUnknown.label"},
-{"userContextId":11,"public":true,"icon":"circle","color":"red"}
+{"userContextId":11,"public":true,"icon":"circle","color":"red"},
+{"userContextId":12,"icon":"circle","color":"red","name":"Gamma"}
 ]}`
 
 func TestFirefoxContainers(t *testing.T) {
@@ -72,7 +73,7 @@ func TestFirefoxContainers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Container{{"Personal", 1}, {"Work", 2}, {"Banking", 3}, {"Shopping", 4}, {"Alpha", 5}, {"Beta", 6}, {"Shopping", 9}}
+	want := []Container{{"Personal", 1}, {"Work", 2}, {"Banking", 3}, {"Shopping", 4}, {"Alpha", 5}, {"Beta", 6}, {"Shopping", 9}, {"Gamma", 12}}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v", got)
 	}
