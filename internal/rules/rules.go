@@ -4,6 +4,7 @@ package rules
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -15,14 +16,20 @@ const CurrentVersion = 1
 type Target struct {
 	Browser string `yaml:"browser"`
 	Profile string `yaml:"profile,omitempty"`
+	// Container is a Firefox-family container name (needs the "Open external links in a container" extension).
+	Container string `yaml:"container,omitempty"`
 }
 
-// String renders "Browser" or "Browser/Profile".
+// String renders "Browser", "Browser/Profile", "Browser:Container" or "Browser/Profile:Container".
 func (t Target) String() string {
-	if t.Profile == "" {
-		return t.Browser
+	s := t.Browser
+	if t.Profile != "" {
+		s += "/" + t.Profile
 	}
-	return t.Browser + "/" + t.Profile
+	if t.Container != "" {
+		s += ":" + t.Container
+	}
+	return s
 }
 
 // Strings accepts one string or a list in YAML: `host: a.com` or `host: [a.com, b.com]`.
@@ -104,12 +111,28 @@ func (r *Rules) Validate() error {
 	if r.Default.Browser == "" {
 		return fmt.Errorf("rules: default has an empty browser")
 	}
+	if err := checkControl("default", r.Default); err != nil {
+		return err
+	}
 	for i, rule := range r.Rules {
+		if err := checkControl("rule "+label(i, rule.Name), rule.Open); err != nil {
+			return err
+		}
 		if rule.Match.empty() {
 			return fmt.Errorf("rules: rule %s has no match conditions (host, path or opener)", label(i, rule.Name))
 		}
 		if rule.Open.Browser == "" {
 			return fmt.Errorf("rules: rule %s has an empty browser", label(i, rule.Name))
+		}
+	}
+	return nil
+}
+
+// checkControl rejects tabs and line breaks in the fields that reach the log and the command line.
+func checkControl(where string, t Target) error {
+	for field, v := range map[string]string{"profile": t.Profile, "container": t.Container} {
+		if strings.ContainsAny(v, "\t\n\r") {
+			return fmt.Errorf("rules: %s: %s contains a control character", where, field)
 		}
 	}
 	return nil
