@@ -58,12 +58,15 @@ rules:
 - In Zen a Space can be bound to a container, so the link lands in the Space of that container.
 - The name is matched case-insensitively against `containers.json` of the profile (the named one, else the one
   the `[Install...]` section of profiles.ini names with `Default=`, else the one marked `Default=1`, else the
-  first; when several Install sections name different profiles the default is unknown and the name is sent as
-  written); the spelling from the file is sent. The built-in containers
+  first); the spelling from the file is sent. A name that is not in `containers.json` is sent as written and the
+  plan carries a note. The built-in containers
   are Personal, Work, Banking and Shopping under their English labels; a browser with a localized UI shows its own
   labels, so custom container names are the safer choice. An unknown name is created by the extension on first use.
-- When `extensions.json` of the profile is readable and the extension is not active there, the link opens without
-  a container. A `file://` link or any scheme other than `http`/`https` also opens without a container.
+- The link carries the container only when the extension is confirmed active in the resolved profile. Otherwise
+  it opens without a container and the plan says why: the extension is off, `extensions.json` is missing or
+  unreadable, the profile is not found, or the default profile is unknown because several `[Install...]`
+  sections of profiles.ini name different profiles. A `file://` link or any scheme other than `http`/`https`
+  also opens without a container.
 - A `container` on any other browser is ignored at launch (the plan says `container "<name>" ignored`) and is an
   error in `portero rules check`.
 

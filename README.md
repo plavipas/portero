@@ -40,7 +40,7 @@ line is logged.
 | Dia | AppleScript: new tab in the named profile of window 1; launches the app first when no window is open | profile name |
 | Arc | AppleScript: new tab in the named space (written from the dictionary, not yet verified live) | space title |
 | Chrome, Chromium, Brave, Edge, Vivaldi, Opera, Comet | `open -b <bundle> -n --args --profile-directory=<dir>`; the directory is looked up by the profile's display name in Local State | profile name or directory |
-| Firefox, Firefox Developer Edition, Zen | `open -a <app> -n --args -P <name>`; names from profiles.ini. With a container: the link is passed as `ext+container:name=<container>&url=<url>` (needs the "Open external links in a container" extension) | profile name, container name |
+| Firefox, Firefox Developer Edition, Zen | `open -a <app> -n --args -P <name>`; names from profiles.ini. With a container: the link is passed as `ext+container:name=<container>&url=<url>` (only when the "Open external links in a container" extension is confirmed active in the profile; otherwise the plain link) | profile name, container name |
 | Safari, Orion | `open -a` | - |
 
 A browser that is not in the table gets a plain `open -a <name>` (or `open -b` for a bundle id).

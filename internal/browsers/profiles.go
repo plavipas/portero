@@ -67,11 +67,12 @@ func FirefoxProfiles(profilesIni string) ([]Profile, error) {
 			cur = nil
 			inInstall = strings.HasPrefix(line, "[Install")
 		case inInstall:
-			if k, v, ok := strings.Cut(line, "="); ok && k == "Default" && v != "" {
-				installs = append(installs, v)
+			if k, v, ok := strings.Cut(line, "="); ok && strings.TrimSpace(k) == "Default" && strings.TrimSpace(v) != "" {
+				installs = append(installs, filepath.Clean(strings.TrimSpace(v)))
 			}
 		case cur != nil:
 			if k, v, ok := strings.Cut(line, "="); ok {
+				k, v = strings.TrimSpace(k), strings.TrimSpace(v)
 				switch k {
 				case "Name":
 					cur.Name = v
@@ -88,12 +89,16 @@ func FirefoxProfiles(profilesIni string) ([]Profile, error) {
 	}
 	base := filepath.Dir(profilesIni)
 	for i := range out {
-		abs := out[i].Dir
+		if out[i].Dir == "" {
+			continue
+		}
+		raw := filepath.Clean(out[i].Dir)
+		abs := raw
 		if !filepath.IsAbs(abs) {
 			abs = filepath.Join(base, abs)
 		}
 		for _, d := range installs {
-			if d == out[i].Dir || d == abs {
+			if d == raw || d == abs {
 				out[i].InstallDefault = true
 			}
 		}
