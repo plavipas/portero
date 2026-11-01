@@ -16,6 +16,8 @@ type Profile struct {
 	Dir  string
 	// Default is true for the Firefox profile marked Default=1 in profiles.ini.
 	Default bool
+	// InstallDefault is true when an [Install...] section of profiles.ini names this profile as Default=.
+	InstallDefault bool
 }
 
 // ChromiumProfiles reads `<localState>` (the Local State JSON) and returns name -> directory.
@@ -51,15 +53,23 @@ func FirefoxProfiles(profilesIni string) ([]Profile, error) {
 	defer f.Close()
 	var out []Profile
 	var cur *Profile
+	var installs []string
+	inInstall := false
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		switch {
 		case strings.HasPrefix(line, "[Profile"):
+			inInstall = false
 			out = append(out, Profile{})
 			cur = &out[len(out)-1]
 		case strings.HasPrefix(line, "["):
 			cur = nil
+			inInstall = strings.HasPrefix(line, "[Install")
+		case inInstall:
+			if k, v, ok := strings.Cut(line, "="); ok && k == "Default" && v != "" {
+				installs = append(installs, v)
+			}
 		case cur != nil:
 			if k, v, ok := strings.Cut(line, "="); ok {
 				switch k {
@@ -73,7 +83,22 @@ func FirefoxProfiles(profilesIni string) ([]Profile, error) {
 			}
 		}
 	}
-	return out, sc.Err()
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	base := filepath.Dir(profilesIni)
+	for i := range out {
+		abs := out[i].Dir
+		if !filepath.IsAbs(abs) {
+			abs = filepath.Join(base, abs)
+		}
+		for _, d := range installs {
+			if d == out[i].Dir || d == abs {
+				out[i].InstallDefault = true
+			}
+		}
+	}
+	return out, nil
 }
 
 // Resolve picks the profile whose Name matches (case-insensitive), else whose Dir matches exactly.
@@ -125,8 +150,14 @@ func (b Browser) ProfileDir(p Profile) string {
 	return filepath.Join(b.SupportDir(), p.Dir)
 }
 
-// DefaultProfile returns the profile marked Default=1, else the first one.
+// DefaultProfile returns the profile an [Install...] section names as default, else the one marked
+// Default=1, else the first one.
 func (b Browser) DefaultProfile(profiles []Profile) (Profile, bool) {
+	for _, p := range profiles {
+		if p.InstallDefault {
+			return p, true
+		}
+	}
 	for _, p := range profiles {
 		if p.Default {
 			return p, true
