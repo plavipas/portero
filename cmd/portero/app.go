@@ -48,7 +48,7 @@ func runApp() {
 }
 
 func routeLink(link, opener string) error {
-	u, err := parseLink2(link)
+	u, err := parseRoutable(link)
 	if err != nil {
 		return err
 	}
@@ -147,13 +147,16 @@ func printDefaultStatus(w io.Writer, note func(scheme string) string) {
 	}
 }
 
-// parseLink2 accepts http(s) links with a host and local documents (file:// URLs from Open With).
-func parseLink2(link string) (*url.URL, error) {
+// parseRoutable accepts http(s) links with a host and local documents (file:// URLs from Open With).
+func parseRoutable(link string) (*url.URL, error) {
 	u, err := url.Parse(link)
 	if err != nil {
 		return nil, fmt.Errorf("not a URL: %q", link)
 	}
-	if u.Scheme == "file" && u.Path != "" {
+	if u.Scheme == "file" {
+		if u.Path == "" || (u.Host != "" && u.Host != "localhost") {
+			return nil, fmt.Errorf("not a local file URL: %q", link)
+		}
 		return u, nil
 	}
 	if u.Host == "" {

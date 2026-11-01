@@ -14,6 +14,7 @@ scripts, `$BROWSER`) in the browser and profile that a rule picks. One link, one
   AppleScript dictionary, so a profile can still be chosen.
 - Keeps the rules in one plain file on the Mac; the file can live in iCloud Drive to be shared between
   Macs.
+- Opens local HTML files too (Open With, drag onto the icon): they go to the default browser and profile.
 - Logs every routing decision. A missing or broken rules file never swallows a link: it opens in Safari and the
   error is logged.
 - Ships a CLI: `portero open <url>`, `portero rules`, `portero sync`, usable as `$BROWSER`.

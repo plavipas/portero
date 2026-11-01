@@ -27,10 +27,10 @@ var handle Handler
 func porteroHandleURL(url, opener *C.char) {
 	u, o := C.GoString(url), C.GoString(opener)
 	go func() {
+		defer C.porteroDone() // always: the app must not stay alive because routing failed
 		if handle != nil {
 			handle(u, o)
 		}
-		C.porteroDone()
 	}()
 }
 
