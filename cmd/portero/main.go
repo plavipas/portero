@@ -23,7 +23,8 @@ const usage = `portero - default-browser router
 Usage:
   portero open <url> [--opener <bundle id>] [--dry-run]   Route a link; --dry-run prints the decision only
   portero rules [path]                                    Print the rules file in use
-  portero rules check                                     Parse and validate the rules file
+  portero rules check                                     Parse and validate the rules file; warns about missing
+                                                          browsers, containers and the container extension
   portero rules match <url> [--opener <bundle id>]        Show which rule a link would hit
   portero rules init                                      Write the example rules file if none exists
   portero browsers                                        Installed browsers Portero knows, with their profiles
@@ -135,6 +136,9 @@ func browsersCmd() error {
 		if profiles, err := b.Profiles(); err == nil && len(profiles) > 0 {
 			line += "\n" + "    profiles: " + browsers.Names(profiles)
 		}
+		for _, l := range containerLines(b) {
+			line += "\n" + l
+		}
 		fmt.Println(line)
 	}
 	return nil
@@ -166,6 +170,13 @@ func rulesCmd(args []string) error {
 		r, err := rules.Load(p)
 		if err != nil {
 			return err
+		}
+		warnings, err := checkTargets(r, realCheckEnv())
+		if err != nil {
+			return err
+		}
+		for _, w := range warnings {
+			fmt.Println(w)
 		}
 		fmt.Printf("%s: %d rule(s), default %s\n", p, len(r.Rules), r.Default)
 	case "match":

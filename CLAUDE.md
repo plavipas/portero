@@ -36,16 +36,16 @@ on an existing PR) are done directly: no issue, no agents, no markers.
 The order is enforced by `.claude/hooks/flow-guard.py` (PreToolUse on Agent/Skill): architect, go-developer,
 qa-engineer, cross-review and security-reviewer are blocked for a key until the previous step's marker exists in
 `.claude/flow-state/<KEY>.<step>`. The developer, qa (PASS) and security (APPROVE) write their own markers; the main
-session writes `brief` after "Вопросов нет", `plan` after the user's "да" on the plan and `crossreview` after showing
+session writes `brief` after "Вопросов нет", `plan` once the architect's plan was shown and `crossreview` after showing
 the cross-review summary, via `.claude/hooks/flow-mark`. Marking a step again clears every later marker. A step is
 skipped only on the user's explicit words (`--skipped-by-user "<words>"`).
 
 1. **Current state first.** Before any agent: branch, open PRs, latest release, `portero default status`.
 2. **brief** with the key: one question per reply, discussed to the end; "ок" / "дальше" / "как рекомендуешь"
    accepts the recommendation.
-3. **architect** with the key, the brief report and all answers -> plan with acceptance criteria and risks. Together
-   with the plan ask which AI does the cross-review (Codex default / DeepSeek), once per task. Nothing changes
-   before the user's "да"/"начинать".
+3. **architect** with the key, the brief report and all answers -> plan with acceptance criteria and risks. The plan
+   is shown to the user as a notification; the main session writes the `plan` marker and go-developer starts right
+   after it, without waiting for an answer. The cross-review AI is Codex unless the user names another (DeepSeek).
 4. **go-developer** -> feature branch, implementation, tests, local commit. Never pushes.
 5. **qa-engineer** -> adversarial verification; pass it only the task goal, the acceptance criteria and the diff.
    PASS required; FAIL goes back to the developer automatically.
@@ -55,8 +55,9 @@ skipped only on the user's explicit words (`--skipped-by-user "<words>"`).
 7. **security-reviewer** on the branch diff; APPROVE required, otherwise back to step 4.
 8. **push / PR** (no approval needed), then the `gitreason` workflow comments the notes of the PR and the Claude Code
    Review workflow reviews it; read it back with the `claude-pr-review` skill. Real findings go back to step 4.
-9. **Merge** only on the user's "да" (merge commit, never squash, so the per-commit notes survive). Then a work
-   summary (Сделано / Найдено / Осталось).
+9. **Merge** by the agent, without the user's "да", once qa, cross-review, security, the Claude review and CI are
+   green (merge commit, never squash, so the per-commit notes survive). Then a work summary (Сделано / Найдено /
+   Осталось).
 
 **Review loop - automatic, no questions** from the first developer commit to the PR: (a) developer <-> qa until
 PASS; (b) cross-review findings -> (a); (c) security findings -> (a), APPROVE -> (d); (d) push / PR, wait for the

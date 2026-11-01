@@ -14,6 +14,10 @@ import (
 type Profile struct {
 	Name string
 	Dir  string
+	// Default is true for the Firefox profile marked Default=1 in profiles.ini.
+	Default bool
+	// InstallDefault is true when an [Install...] section of profiles.ini names this profile as Default=.
+	InstallDefault bool
 }
 
 // ChromiumProfiles reads `<localState>` (the Local State JSON) and returns name -> directory.
@@ -49,27 +53,57 @@ func FirefoxProfiles(profilesIni string) ([]Profile, error) {
 	defer f.Close()
 	var out []Profile
 	var cur *Profile
+	var installs []string
+	inInstall := false
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		switch {
 		case strings.HasPrefix(line, "[Profile"):
+			inInstall = false
 			out = append(out, Profile{})
 			cur = &out[len(out)-1]
 		case strings.HasPrefix(line, "["):
 			cur = nil
+			inInstall = strings.HasPrefix(line, "[Install")
+		case inInstall:
+			if k, v, ok := strings.Cut(line, "="); ok && strings.TrimSpace(k) == "Default" && strings.TrimSpace(v) != "" {
+				installs = append(installs, filepath.Clean(strings.TrimSpace(v)))
+			}
 		case cur != nil:
 			if k, v, ok := strings.Cut(line, "="); ok {
+				k, v = strings.TrimSpace(k), strings.TrimSpace(v)
 				switch k {
 				case "Name":
 					cur.Name = v
 				case "Path":
 					cur.Dir = v
+				case "Default":
+					cur.Default = v == "1"
 				}
 			}
 		}
 	}
-	return out, sc.Err()
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	base := filepath.Dir(profilesIni)
+	for i := range out {
+		if out[i].Dir == "" {
+			continue
+		}
+		raw := filepath.Clean(out[i].Dir)
+		abs := raw
+		if !filepath.IsAbs(abs) {
+			abs = filepath.Join(base, abs)
+		}
+		for _, d := range installs {
+			if d == raw || d == abs {
+				out[i].InstallDefault = true
+			}
+		}
+	}
+	return out, nil
 }
 
 // Resolve picks the profile whose Name matches (case-insensitive), else whose Dir matches exactly.
@@ -111,4 +145,60 @@ func (b Browser) Profiles() ([]Profile, error) {
 		return FirefoxProfiles(filepath.Join(b.SupportDir(), "profiles.ini"))
 	}
 	return nil, nil
+}
+
+// ProfileDir is the absolute directory of a Firefox profile: Path= as is when absolute, else under SupportDir.
+func (b Browser) ProfileDir(p Profile) string {
+	if filepath.IsAbs(p.Dir) {
+		return p.Dir
+	}
+	return filepath.Join(b.SupportDir(), p.Dir)
+}
+
+// DefaultProfile returns the profile an [Install...] section names as default, else the one marked
+// Default=1, else the first one. Firefox and Firefox Developer Edition share one profiles.ini, so several
+// Install sections may name different profiles; the default is then unknown and the result is (Profile{}, false).
+// Callers treat that as "unknown profile": no extension check, no name resolution.
+func (b Browser) DefaultProfile(profiles []Profile) (Profile, bool) {
+	var inst Profile
+	n := 0
+	for _, p := range profiles {
+		if p.InstallDefault {
+			if n == 0 {
+				inst = p
+			}
+			if p.Dir != inst.Dir {
+				return Profile{}, false
+			}
+			n++
+		}
+	}
+	if n > 0 {
+		return inst, true
+	}
+	for _, p := range profiles {
+		if p.Default {
+			return p, true
+		}
+	}
+	if len(profiles) > 0 {
+		return profiles[0], true
+	}
+	return Profile{}, false
+}
+
+// Containers lists the containers of a Firefox profile; other browsers have none.
+func (b Browser) Containers(p Profile) ([]Container, error) {
+	if b.Kind != Firefox {
+		return nil, nil
+	}
+	return FirefoxContainers(filepath.Join(b.ProfileDir(p), "containers.json"))
+}
+
+// ContainerExtension reports whether the "Open external links in a container" add-on is active in the profile.
+func (b Browser) ContainerExtension(p Profile) (bool, error) {
+	if b.Kind != Firefox {
+		return false, nil
+	}
+	return FirefoxExtensionActive(filepath.Join(b.ProfileDir(p), "extensions.json"), ContainerExtensionID)
 }

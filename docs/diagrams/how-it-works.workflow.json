@@ -219,7 +219,7 @@
       "items": [
         "Dia, Arc: AppleScript via osascript, URL and profile only as argv",
         "Chrome family: open -b <bundle> -n --args --profile-directory=<dir>",
-        "Firefox family: open -a <app> -n --args -P <name>; others: open -a"
+        "Firefox family: open -a <app> -n --args -P <name>; container as ext+container:; others: open -a"
       ]
     },
     {

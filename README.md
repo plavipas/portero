@@ -40,21 +40,34 @@ line is logged.
 | Dia | AppleScript: new tab in the named profile of window 1; launches the app first when no window is open | profile name |
 | Arc | AppleScript: new tab in the named space (written from the dictionary, not yet verified live) | space title |
 | Chrome, Chromium, Brave, Edge, Vivaldi, Opera, Comet | `open -b <bundle> -n --args --profile-directory=<dir>`; the directory is looked up by the profile's display name in Local State | profile name or directory |
-| Firefox, Firefox Developer Edition, Zen | `open -a <app> -n --args -P <name>`; names from profiles.ini | profile name |
+| Firefox, Firefox Developer Edition, Zen | `open -a <app> -n --args -P <name>`; names from profiles.ini. With a container: the link is passed as `ext+container:name=<container>&url=<url>` (only when the "Open external links in a container" extension is confirmed active in the profile; otherwise the plain link) | profile name, container name |
 | Safari, Orion | `open -a` | - |
 
 A browser that is not in the table gets a plain `open -a <name>` (or `open -b` for a bundle id).
-`portero browsers` lists the installed ones with the profile names it found.
+`portero browsers` lists the installed ones with the profile names it found and, for the Firefox family, the
+containers of each profile and whether the container extension is active.
 
 ## Rules
 
 Rules are a local file, edited on the Mac. The repository holds the format and examples with
-placeholder hosts only. See `examples/` once the format lands.
+placeholder hosts only: [docs/rules.md](docs/rules.md) and [examples/rules.yaml](examples/rules.yaml).
+
+```yaml
+- name: team wiki
+  match: { host: wiki.example.com }
+  open: { browser: Zen, container: Work }   # Firefox family only; in Zen the container picks the Space
+```
+
+`portero rules check` validates the file and warns about browsers, containers or the container extension that
+are missing on this Mac.
 
 ## Known limit
 
 Links clicked **inside** a browser stay in that browser. Only links coming from other apps are routed.
 A companion browser extension that hands such clicks to Portero is on the list for a later version.
+
+A container link (`ext+container:`) sent to a Firefox-family browser that is still starting, for example while it
+applies an update, can be dropped before the extension is ready. Opening the link again works.
 
 ## Install (from source, macOS)
 

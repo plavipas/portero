@@ -15,11 +15,14 @@ import (
 
 func open(u *url.URL, t rules.Target, dry bool) (Plan, error) {
 	b, _ := browsers.Lookup(t.Browser)
-	profile, err := resolveProfile(b, t.Profile)
+	profile, container, note, err := resolveTarget(b, t)
 	if err != nil {
 		return Plan{}, err
 	}
-	plan := Plan{Browser: b, Profile: profile}
+	plan := Plan{Browser: b, Profile: profile, Container: container}
+	if note != "" {
+		plan.Steps = append(plan.Steps, note)
+	}
 	link := u.String()
 
 	switch b.Kind {
@@ -33,6 +36,11 @@ func open(u *url.URL, t rules.Target, dry bool) (Plan, error) {
 		args := []string{"-a", b.Name}
 		if profile != "" {
 			args = append(args, "-n", "--args", "-P", profile)
+		}
+		link, withContainer, notes := firefoxLink(b, u, t.Profile, container)
+		plan.Steps = append(plan.Steps, notes...)
+		if !withContainer {
+			plan.Container = ""
 		}
 		return runOpen(plan, dry, append(args, link))
 	case browsers.Dia:

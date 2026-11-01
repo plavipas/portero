@@ -112,3 +112,51 @@ func TestHelpers(t *testing.T) {
 		t.Error("Glob/HostMatches")
 	}
 }
+
+func TestTargetContainer(t *testing.T) {
+	r, err := Parse([]byte("version: 1\ndefault: {browser: Zen, container: Work}\nrules:\n  - match: {host: example.com}\n    open: {browser: Zen, profile: Default, container: Alpha}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Default.Container != "Work" || r.Rules[0].Open.Container != "Alpha" {
+		t.Errorf("parsed: %+v", r)
+	}
+	for _, c := range []struct {
+		t    Target
+		want string
+	}{
+		{Target{Browser: "Zen"}, "Zen"},
+		{Target{Browser: "Zen", Profile: "Default"}, "Zen/Default"},
+		{Target{Browser: "Zen", Container: "Work"}, "Zen:Work"},
+		{Target{Browser: "Zen", Profile: "Default", Container: "Work"}, "Zen/Default:Work"},
+	} {
+		if got := c.t.String(); got != c.want {
+			t.Errorf("String(%+v) = %q, want %q", c.t, got, c.want)
+		}
+	}
+}
+
+func TestSurroundingSpaces(t *testing.T) {
+	for name, text := range map[string]string{
+		"container": "version: 1\ndefault: {browser: Zen}\nrules:\n  - name: x\n    match: {host: example.com}\n    open: {browser: Zen, container: \" Work\"}\n",
+		"profile":   "version: 1\ndefault: {browser: Zen, profile: \"Default \"}\n",
+	} {
+		if _, err := Parse([]byte(text)); err == nil || !strings.Contains(err.Error(), name+" has leading or trailing spaces") {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+}
+
+func TestControlCharacters(t *testing.T) {
+	for name, text := range map[string]string{
+		"container":         "version: 1\ndefault: {browser: Zen}\nrules:\n  - name: x\n    match: {host: example.com}\n    open: {browser: Zen, container: \"a\\tb\"}\n",
+		"profile":           "version: 1\ndefault: {browser: Zen}\nrules:\n  - name: x\n    match: {host: example.com}\n    open: {browser: Zen, profile: \"a\\nb\"}\n",
+		"default/container": "version: 1\ndefault: {browser: Zen, container: \"a\\rb\"}\n",
+		"default/browser":   "version: 1\ndefault: {browser: \"Zen\\tX\"}\n",
+	} {
+		_, err := Parse([]byte(text))
+		if err == nil || !strings.Contains(err.Error(), strings.TrimPrefix(name, "default/")+" contains a control character") {
+			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+}
