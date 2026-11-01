@@ -16,6 +16,9 @@ concurrency:
 jobs:
   comment:
     runs-on: ubuntu-latest
+    # The consuming repository's token cannot download releases of the private plavipas/gitreason
+    # ("release not found"); until gitreason supports a GITREASON_TOKEN, a failure here must not block the PR.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
