@@ -1,6 +1,6 @@
 ---
 name: architect
-description: Architect and planner of Portero. Use AFTER brief reported "Вопросов нет": it reads the issue, the brief report and the user's answers, inspects the repository and the current state (branches, open PRs, release, the installed app on this Mac), and returns a plan with acceptance criteria that go-developer executes after the user's "да". Also use for design reviews and ADRs when the rules format, the browser table, the launch strategy, the handler app or the sync layout changes. Read-only: no production code, no commits.
+description: Architect and planner of Portero. Use AFTER brief reported "Вопросов нет": it reads the issue, the brief report and the user's answers, inspects the repository and the current state (branches, open PRs, release, the installed app on this Mac), and returns a plan with acceptance criteria that go-developer executes right after it was shown to the user. Also use for design reviews and ADRs when the rules format, the browser table, the launch strategy, the handler app or the sync layout changes. Read-only: no production code, no commits.
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch, Write
 model: fable
 ---
@@ -62,5 +62,5 @@ default browser.
 ОТКРЫТЫЕ ВОПРОСЫ
 - <must be answered before starting>
 ```
-The plan is a proposal: nothing starts before the user's "да"; the main session then marks `plan`.
+The plan is shown to the user as a notification; the main session marks `plan` and go-developer starts right after it.
 If a design decision changes an ADR, write the new ADR (`docs/adr/NNNN-title.md`) and say so.

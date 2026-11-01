@@ -11,7 +11,7 @@ Keys: DEV-<n> / DEVOPS-<n> = Linear issue of the personal workspace (teams Dev /
 ADHOC-<slug> until the issue exists.
 Who marks what:
   brief       main session, after brief reported "Вопросов нет"
-  plan        main session, after the user approved the architect's plan ("да"/"начинать")
+  plan        main session, after the architect's plan was shown
   developer   go-developer, after the local commit
   qa          qa-engineer, only on PASS
   crossreview main session, after the cross-review summary was shown to the user
