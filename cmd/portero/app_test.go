@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/plavipas/portero/internal/handler"
 )
@@ -56,7 +57,7 @@ func TestEnsureDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fakeHandlers{m: tt.start, onSet: tt.onSet}
-			states, err := ensureDefault("/x/Portero.app", f.current, f.set)
+			states, err := ensureDefault("/x/Portero.app", f.current, f.set, time.Millisecond, 20*time.Millisecond)
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -107,5 +108,35 @@ func TestPrintDefaultStatusNotes(t *testing.T) {
 	printDefaultStatus(&buf, nil)
 	if strings.Contains(buf.String(), "already set") {
 		t.Error("status without a note printed one")
+	}
+}
+
+func TestEnsureDefaultPollsStaleReads(t *testing.T) {
+	const safari = "com.apple.Safari"
+	reads := 0
+	// http reads foreign for the first 3 reads after the initial snapshot, then ours; https is ours after that.
+	current := func(s string) string {
+		reads++
+		if reads <= 2+3 {
+			return safari
+		}
+		return BundleID
+	}
+	set := func(string, string) error { return nil }
+	states, err := ensureDefault("/x/Portero.app", current, set, time.Millisecond, time.Second)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(states) != 2 || states[0].Already {
+		t.Errorf("states = %+v", states)
+	}
+
+	start := time.Now()
+	never := func(string) string { return safari }
+	if _, err := ensureDefault("/x/Portero.app", never, set, time.Millisecond, 30*time.Millisecond); err == nil {
+		t.Fatal("expected an error when the handler never flips")
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("polling took %v, want it bounded", d)
 	}
 }
