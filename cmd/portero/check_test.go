@@ -44,7 +44,8 @@ func TestCheckTargets(t *testing.T) {
 			[]string{`warning: rule "x": profile "Default" of Zen has no container "Alpha" (have: Personal, Work, Banking, Shopping); the extension would create it on first use`}, ""},
 		{"extension off", "{browser: Zen, container: Work}", testEnv(true, std, nil, false, nil),
 			[]string{`warning: rule "x": profile "Default" of Zen has no active "Open external links in a container" extension; links open without a container`}, ""},
-		{"unreadable files", "{browser: Zen, container: Work}", testEnv(true, nil, errors.New("x"), false, errors.New("y")), nil, ""},
+		{"unreadable files", "{browser: Zen, container: Work}", testEnv(true, nil, errors.New("x"), false, errors.New("y")),
+			[]string{`warning: rule "x": the state of the "Open external links in a container" extension in Zen is unknown (profile not found or extensions.json unreadable); links open without a container`}, ""},
 		{"not firefox", "{browser: Dia, container: Work}", testEnv(true, std, nil, true, nil), nil,
 			`rules: rule "x": container "Work" needs a Firefox-family browser (Firefox, Firefox Developer Edition, Zen); Dia does not take one`},
 	}

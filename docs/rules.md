@@ -13,7 +13,8 @@ One YAML file, local to the Mac. Portero looks for it in this order:
 
 - a browser that is not installed;
 - a container that the profile does not have yet (the extension creates it on first use);
-- a Firefox-family profile where the container extension is not active.
+- a Firefox-family profile where the container extension is not active;
+- a container rule whose extension state cannot be read (profile not found, `extensions.json` unreadable): such links open without a container.
 
 Warnings do not fail the check (exit 0). A `container` on a browser outside the Firefox family is an error
 (exit 1).
