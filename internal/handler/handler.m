@@ -23,6 +23,14 @@ static int generation = 0;
     porteroExitAfter(3000);
 }
 
+// Documents (Open With, drag onto the icon): HTML files declared in Info.plist arrive here as file:// URLs.
+- (void)application:(NSApplication *)app openURLs:(NSArray<NSURL *> *)urls {
+    for (NSURL *u in urls) {
+        generation++;
+        porteroHandleURL((char *)u.absoluteString.UTF8String, (char *)"");
+    }
+}
+
 - (void)handleGetURL:(NSAppleEventDescriptor *)event withReply:(NSAppleEventDescriptor *)reply {
     NSString *url = [[event paramDescriptorForKeyword:keyDirectObject] stringValue] ?: @"";
     pid_t pid = [[event attributeDescriptorForKeyword:keySenderPIDAttr] int32Value];
