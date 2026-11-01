@@ -1,0 +1,129 @@
+package rules
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"net/url"
+	"strings"
+)
+
+func bytesReader(b []byte) io.Reader { return bytes.NewReader(b) }
+
+// Request is one link to route.
+type Request struct {
+	URL    *url.URL
+	Opener string // bundle id of the app that opened the link, or ""
+}
+
+// Decision is the result of routing one link.
+type Decision struct {
+	Target Target
+	Rule   string // name or "#n" of the matched rule; "" when the default applied
+}
+
+// String renders "Browser/Profile  (rule: name)".
+func (d Decision) String() string {
+	rule := d.Rule
+	if rule == "" {
+		rule = "default"
+	}
+	return fmt.Sprintf("%s  (rule: %s)", d.Target, rule)
+}
+
+// Route returns the first matching rule's target, else the default.
+func (r *Rules) Route(req Request) Decision {
+	for i, rule := range r.Rules {
+		if rule.Match.matches(req) {
+			name := rule.Name
+			if name == "" {
+				name = fmt.Sprintf("#%d", i+1)
+			}
+			return Decision{Target: rule.Open, Rule: name}
+		}
+	}
+	return Decision{Target: r.Default}
+}
+
+func (m Match) matches(req Request) bool {
+	if len(m.Host) > 0 {
+		host := strings.ToLower(req.URL.Hostname())
+		if host == "" || !anyMatch(m.Host, func(p string) bool { return HostMatches(strings.ToLower(p), host) }) {
+			return false
+		}
+	}
+	if len(m.Path) > 0 {
+		path := req.URL.Path
+		if path == "" {
+			path = "/"
+		}
+		if !anyMatch(m.Path, func(p string) bool { return PathMatches(p, path) }) {
+			return false
+		}
+	}
+	if len(m.Opener) > 0 {
+		opener := strings.ToLower(req.Opener)
+		if opener == "" || !anyMatch(m.Opener, func(p string) bool { return strings.ToLower(p) == opener }) {
+			return false
+		}
+	}
+	return true
+}
+
+func anyMatch(patterns []string, f func(string) bool) bool {
+	for _, p := range patterns {
+		if f(p) {
+			return true
+		}
+	}
+	return false
+}
+
+// HostMatches: `example.com` exact; `*.example.com` any subdomain and the bare domain;
+// any other `*` is a glob.
+func HostMatches(pattern, host string) bool {
+	if base, ok := strings.CutPrefix(pattern, "*."); ok && !strings.Contains(base, "*") {
+		return host == base || strings.HasSuffix(host, "."+base)
+	}
+	if !strings.Contains(pattern, "*") {
+		return host == pattern
+	}
+	return Glob(pattern, host)
+}
+
+// PathMatches is a prefix on path segments: `/org` matches `/org` and `/org/x`, not `/organic`.
+// A trailing `*` or `/` on the prefix is ignored.
+func PathMatches(prefix, path string) bool {
+	p := strings.TrimSuffix(prefix, "*")
+	p = strings.TrimSuffix(p, "/")
+	if p == "" {
+		return true
+	}
+	return path == p || strings.HasPrefix(path, p+"/")
+}
+
+// Glob matches text against a pattern where `*` stands for any run of characters.
+func Glob(pattern, text string) bool {
+	p, t := []rune(pattern), []rune(text)
+	pi, ti, star, mark := 0, 0, -1, 0
+	for ti < len(t) {
+		switch {
+		case pi < len(p) && p[pi] == t[ti]:
+			pi++
+			ti++
+		case pi < len(p) && p[pi] == '*':
+			star, mark = pi, ti
+			pi++
+		case star >= 0:
+			pi = star + 1
+			mark++
+			ti = mark
+		default:
+			return false
+		}
+	}
+	for pi < len(p) && p[pi] == '*' {
+		pi++
+	}
+	return pi == len(p)
+}

@@ -1,13 +1,7 @@
-# Command Line Tools only: swift-testing's macro plugin is not on the default search path.
-CLT_PLUGINS := /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
-TEST_FLAGS := $(shell [ -d $(CLT_PLUGINS) ] && echo -Xswiftc -plugin-path -Xswiftc $(CLT_PLUGINS))
-
-.PHONY: build test release clean
+.PHONY: build test vet clean
 build:
-	swift build
+	go build -o bin/portero ./cmd/portero
 test:
-	swift test $(TEST_FLAGS)
-release:
-	swift build -c release
+	go vet ./... && go test ./...
 clean:
-	rm -rf .build
+	rm -rf bin

@@ -37,6 +37,13 @@ placeholder hosts only. See `examples/` once the format lands.
 
 Links clicked **inside** a browser stay in that browser. Only links coming from other apps are routed.
 
+## Build
+
+```sh
+make build        # bin/portero
+make test
+```
+
 ## Status
 
 Early development; not released yet.
