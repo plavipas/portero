@@ -83,14 +83,14 @@ func checkTargets(r *rules.Rules, env checkEnv) (warnings []string, err error) {
 			return warnings, fmt.Errorf("rules: %s: container %q needs a Firefox-family browser (%s); %s does not take one",
 				it.where, it.t.Container, firefoxFamily(), b.Name)
 		}
-		if !known {
-			continue
+		if !known && strings.Contains(b.Name, ".") {
+			continue // a bundle id outside the table: nothing to look up without Launch Services
 		}
 		if !env.installed(b) {
 			warnings = append(warnings, fmt.Sprintf("warning: %s: %s is not installed on this Mac", it.where, b.Name))
 			continue
 		}
-		if it.t.Container == "" {
+		if it.t.Container == "" || !known {
 			continue
 		}
 		if name, list, err := env.containers(b, it.t.Profile); err == nil {
