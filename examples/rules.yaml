@@ -19,6 +19,13 @@ rules:
       path: /work-projects                          # /work-projects and /work-projects/..., not /work-projects-2
     open: { browser: Dia, profile: Work }
 
+  - name: team wiki in a Firefox container
+    match:
+      host: wiki.example.com
+    # Zen / Firefox only. Needs the "Open external links in a container" extension in the profile;
+    # the container is created on first use if it does not exist. `portero rules check` warns when it is missing.
+    open: { browser: Zen, container: Work }
+
   - name: links clicked in Slack
     match:
       opener: com.tinyspeck.slackmacgap             # bundle id of the app that opened the link
