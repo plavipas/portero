@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/plavipas/portero/internal/browsers"
 	"github.com/plavipas/portero/internal/config"
 	"github.com/plavipas/portero/internal/decisionlog"
 	"github.com/plavipas/portero/internal/launch"
@@ -20,6 +21,7 @@ Usage:
   portero rules [path]                                    Print the rules file in use
   portero rules check                                     Parse and validate the rules file
   portero rules match <url> [--opener <bundle id>]        Show which rule a link would hit
+  portero browsers                                        Installed browsers Portero knows, with their profiles
   portero version
 `
 
@@ -36,6 +38,8 @@ func main() {
 		err = open(os.Args[2:])
 	case "rules":
 		err = rulesCmd(os.Args[2:])
+	case "browsers":
+		err = browsersCmd()
 	case "version":
 		fmt.Println("portero", version)
 	case "-h", "--help", "help":
@@ -87,12 +91,32 @@ func open(args []string) error {
 	d := r.Route(req)
 	fmt.Println(d)
 	if dry {
+		plan, err := launch.DryRun(u, d.Target)
+		if err != nil {
+			return err
+		}
+		fmt.Println("would run:", plan)
 		return nil
 	}
 	if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}
-	return launch.Open(u, d.Target)
+	_, err = launch.Open(u, d.Target)
+	return err
+}
+
+func browsersCmd() error {
+	for _, b := range browsers.Known {
+		if !b.Installed() {
+			continue
+		}
+		line := fmt.Sprintf("%-28s %-9s %s", b.Name, b.Kind, b.BundleID)
+		if profiles, err := b.Profiles(); err == nil && len(profiles) > 0 {
+			line += "\n" + "    profiles: " + browsers.Names(profiles)
+		}
+		fmt.Println(line)
+	}
+	return nil
 }
 
 func rulesCmd(args []string) error {
