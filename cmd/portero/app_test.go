@@ -46,6 +46,8 @@ func TestEnsureDefault(t *testing.T) {
 			func(f *fakeHandlers, s string) error { setBoth(f, s); return macErr }, []string{"http"}, []bool{false, false}, nil},
 		{"set error and handler unchanged", map[string]string{"http": safari, "https": safari},
 			func(*fakeHandlers, string) error { return macErr }, []string{"http"}, nil, []string{"http", safari, "couldn't be opened"}},
+		{"no handler at all", map[string]string{"http": "", "https": ""},
+			func(*fakeHandlers, string) error { return nil }, []string{"http"}, nil, []string{"http", "without a handler"}},
 		{"set ok but handler unchanged", map[string]string{"http": safari, "https": safari},
 			func(*fakeHandlers, string) error { return nil }, []string{"http"}, nil, []string{"http", safari}},
 		{"only https missing", map[string]string{"http": BundleID, "https": safari},

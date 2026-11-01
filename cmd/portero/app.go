@@ -93,10 +93,14 @@ func ensureDefault(app string, current func(scheme string) string, set func(app,
 			fmt.Printf("asking macOS to make Portero the handler of %s (confirm the dialog if one appears)\n", s)
 			setErr := set(app, s)
 			if now = current(s); now != BundleID {
-				if setErr != nil {
-					return states, fmt.Errorf("%s: still handled by %q: %w", s, now, setErr)
+				who := fmt.Sprintf("handled by %q", now)
+				if now == "" {
+					who = "without a handler"
 				}
-				return states, fmt.Errorf("%s: still handled by %q", s, now)
+				if setErr != nil {
+					return states, fmt.Errorf("%s: still %s: %w", s, who, setErr)
+				}
+				return states, fmt.Errorf("%s: still %s", s, who)
 			}
 		}
 		states = append(states, schemeState{Scheme: s, Handler: now, Already: already})
