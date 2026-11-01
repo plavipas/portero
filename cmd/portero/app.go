@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -66,6 +67,66 @@ func routeLink(link, opener string) error {
 	return err
 }
 
+// schemeState is the handler of one URL scheme and whether it was already Portero before `default set`.
+type schemeState struct {
+	Scheme  string
+	Handler string
+	Already bool
+}
+
+// ensureDefault makes app the handler of every scheme in handler.Schemes.
+//
+// macOS shows one dialog that sets http and https together, so the call for the second scheme can fail with
+// "The file couldn't be opened" although the scheme is already ours. The error of set is therefore not
+// informative: only the actual handler, read after each call, is trusted.
+func ensureDefault(app string, current func(scheme string) string, set func(app, scheme string) error) ([]schemeState, error) {
+	// Snapshot first: a scheme that the dialog for an earlier one flips to ours is "set now", not "already set".
+	before := map[string]string{}
+	for _, s := range handler.Schemes {
+		before[s] = current(s)
+	}
+	var states []schemeState
+	for _, s := range handler.Schemes {
+		already := before[s] == BundleID
+		now := current(s)
+		if now != BundleID {
+			fmt.Printf("asking macOS to make Portero the handler of %s (confirm the dialog if one appears)\n", s)
+			setErr := set(app, s)
+			if now = current(s); now != BundleID {
+				if setErr != nil {
+					return states, fmt.Errorf("%s: still handled by %q: %w", s, now, setErr)
+				}
+				return states, fmt.Errorf("%s: still handled by %q", s, now)
+			}
+		}
+		states = append(states, schemeState{Scheme: s, Handler: now, Already: already})
+	}
+	return states, nil
+}
+
+// printDefaultStatus prints one line per scheme and the app path; note, when not nil, adds a trailing remark.
+func printDefaultStatus(w io.Writer, note func(scheme string) string) {
+	for _, s := range handler.Schemes {
+		cur := handler.DefaultHandler(s)
+		mark := " "
+		if cur == BundleID {
+			mark = "*"
+		}
+		line := fmt.Sprintf("%s %-6s %s", mark, s, cur)
+		if note != nil {
+			if n := note(s); n != "" {
+				line += "  " + n
+			}
+		}
+		fmt.Fprintln(w, line)
+	}
+	if app := appBundle(); app != "" {
+		fmt.Fprintln(w, "app:", app)
+	} else {
+		fmt.Fprintln(w, "app: not running from Portero.app (use `make install`)")
+	}
+}
+
 func defaultCmd(args []string) error {
 	sub := "status"
 	if len(args) > 0 {
@@ -73,36 +134,25 @@ func defaultCmd(args []string) error {
 	}
 	switch sub {
 	case "status":
-		for _, s := range handler.Schemes {
-			cur := handler.DefaultHandler(s)
-			mark := " "
-			if cur == BundleID {
-				mark = "*"
-			}
-			fmt.Printf("%s %-6s %s\n", mark, s, cur)
-		}
-		if app := appBundle(); app != "" {
-			fmt.Println("app:", app)
-		} else {
-			fmt.Println("app: not running from Portero.app (use `make install`)")
-		}
+		printDefaultStatus(os.Stdout, nil)
 	case "set":
 		app := appBundle()
 		if app == "" {
 			return fmt.Errorf("run this from the installed app: ~/Applications/Portero.app/Contents/MacOS/portero default set")
 		}
-		// macOS sets http and https together from one dialog; asking again for a scheme that is already
-		// ours fails with "The file couldn't be opened", so check before each call.
-		for _, s := range handler.Schemes {
-			if handler.DefaultHandler(s) == BundleID {
-				continue
-			}
-			if err := handler.SetDefaultHandler(app, s); err != nil && handler.DefaultHandler(s) != BundleID {
-				return fmt.Errorf("%s: %w", s, err)
+		states, err := ensureDefault(app, handler.DefaultHandler, handler.SetDefaultHandler)
+		if err != nil {
+			return err
+		}
+		notes := map[string]string{}
+		for _, st := range states {
+			if st.Already {
+				notes[st.Scheme] = "already set"
+			} else {
+				notes[st.Scheme] = "set now"
 			}
 		}
-		fmt.Println("Portero is the default browser (confirm the macOS dialog if it is still open)")
-		return defaultCmd(nil)
+		printDefaultStatus(os.Stdout, func(s string) string { return notes[s] })
 	default:
 		return fmt.Errorf("unknown default command %q", sub)
 	}
