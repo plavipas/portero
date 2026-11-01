@@ -168,7 +168,9 @@ func TestDefaultProfileInstallSection(t *testing.T) {
 		{"install only", noLegacy + "[Install1]\nDefault=Profiles/a\n", "Main"},
 		{"neither", noLegacy, "Work"},
 		{"install path missing falls back to Default=1", profs + "[Install1]\nDefault=Profiles/zzz\n", "Main"},
-		{"first install section match wins", profs + "[InstallA]\nDefault=Profiles/zzz\n[InstallB]\nDefault=Profiles/b\n", "Work"},
+		{"missing path in one install section is ignored", profs + "[InstallA]\nDefault=Profiles/zzz\n[InstallB]\nDefault=Profiles/b\n", "Work"},
+		{"two install sections, same profile", profs + "[InstallA]\nDefault=Profiles/b\n[InstallB]\nDefault=Profiles/b\n", "Work"},
+		{"two install sections, two profiles: unknown", profs + "[InstallA]\nDefault=Profiles/b\n[InstallB]\nDefault=Profiles/a\n", ""},
 		{"absolute install path", noLegacy + "[Install1]\nDefault=ABSDIR/Profiles/a\n", "Main"},
 		{"case sensitive", profs + "[Install1]\nDefault=profiles/b\n", "Main"},
 	}
@@ -184,8 +186,8 @@ func TestDefaultProfileInstallSection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if d, ok := b.DefaultProfile(profiles); !ok || d.Name != tc.want {
-				t.Errorf("got %+v %v, want %s", d, ok, tc.want)
+			if d, ok := b.DefaultProfile(profiles); ok != (tc.want != "") || d.Name != tc.want {
+				t.Errorf("got %+v %v, want %q", d, ok, tc.want)
 			}
 		})
 	}

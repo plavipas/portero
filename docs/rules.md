@@ -57,7 +57,9 @@ rules:
   `{f069aec0-43c5-4bbf-b6b4-df95c4326b98}`).
 - In Zen a Space can be bound to a container, so the link lands in the Space of that container.
 - The name is matched case-insensitively against `containers.json` of the profile (the named one, else the one
-  marked `Default=1` in profiles.ini, else the first); the spelling from the file is sent. The built-in containers
+  the `[Install...]` section of profiles.ini names with `Default=`, else the one marked `Default=1`, else the
+  first; when several Install sections name different profiles the default is unknown and the name is sent as
+  written); the spelling from the file is sent. The built-in containers
   are Personal, Work, Banking and Shopping under their English labels; a browser with a localized UI shows its own
   labels, so custom container names are the safer choice. An unknown name is created by the extension on first use.
 - When `extensions.json` of the profile is readable and the extension is not active there, the link opens without
