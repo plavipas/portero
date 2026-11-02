@@ -85,7 +85,7 @@ func TestGuardOriginMustNameThisServer(t *testing.T) {
 		{"origin with user info", "http://evil@" + testAddr, 403},
 		{"no scheme", testAddr, 403},
 		{"lookalike host", "http://127.0.0.1:7777.evil.example", 403},
-		{"upper-case own origin", "http://LOCALHOST:7777", 200},
+		{"alias of the Host is not the Host (D3)", "http://LOCALHOST:7777", 403},
 	}
 	for _, tc := range tests {
 		req := httptest.NewRequest(http.MethodPost, "/api/validate", strings.NewReader(`{}`))
