@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/plavipas/portero/internal/config"
 )
@@ -72,13 +73,25 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	// A temp file in the same folder renamed over dst: a crash or a full disk never leaves half a rules file,
+	// and a symlink at dst is replaced instead of written through.
+	tmp, err := os.CreateTemp(filepath.Dir(dst), ".rules-*.tmp") // 0600
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
+	defer os.Remove(tmp.Name())
+	if _, err := io.Copy(tmp, in); err != nil {
+		tmp.Close()
 		return err
 	}
-	return out.Close()
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), dst)
+}
+
+// InICloud reports whether path lies inside the Portero folder of iCloud Drive.
+func InICloud(path string) bool {
+	dir := ICloudDir()
+	return path == dir || strings.HasPrefix(path, dir+string(filepath.Separator))
 }

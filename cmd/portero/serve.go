@@ -273,7 +273,7 @@ func announce(authLink string) string { return "Portero UI: " + authLink + "  (C
 // rulesNow is the active rules file and where it lives, asked on every request.
 func rulesNow() (string, string) {
 	p := config.RulesFile()
-	if strings.HasPrefix(p, sync.ICloudDir()) {
+	if sync.InICloud(p) {
 		return p, "icloud"
 	}
 	return p, "local"
