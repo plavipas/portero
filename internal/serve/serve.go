@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/plavipas/portero/internal/browsers"
 	"github.com/plavipas/portero/internal/check"
@@ -46,6 +47,19 @@ type Options struct {
 	Browsers func() []BrowserInfo
 	// Plan describes what opening u in t would run; nil where launching is not supported.
 	Plan func(u *url.URL, t rules.Target) (string, error)
+	// ConfigFile is shown on the settings page; it is never read or written by the server.
+	ConfigFile string
+	// DefaultStatus reads the default browser setting; nil where macOS is not available (no Default block).
+	DefaultStatus func() DefaultInfo
+	// SetDefault asks macOS to make Portero the default browser; it may block until the user answers the
+	// macOS dialog. nil where unsupported.
+	SetDefault func() ([]SchemeResult, error)
+	// SetDefaultWait is how long a request waits for SetDefault before it answers 202; zero means 60 s.
+	SetDefaultWait time.Duration
+	// DefaultStale is how long a SetDefault call counts as pending; zero means 3 minutes.
+	DefaultStale time.Duration
+	// Sync switches the rules file between the local folder and iCloud Drive; nil where unsupported.
+	Sync *SyncFuncs
 }
 
 // Server serves the UI and its JSON API.
@@ -56,7 +70,12 @@ type Server struct {
 	amu          sync.Mutex // guards used and warned
 	used, warned bool
 	hosts        map[string]bool
-	port         string // from SetAddr; part of the session cookie name
+	port         string     // from SetAddr; part of the session cookie name
+	smu          sync.Mutex // guards pending and last
+	pending      bool       // a SetDefault call is running
+	last         *defaultResult
+	since        time.Time // when the pending call started
+	attempt      int
 }
 
 // New builds a server; call SetAddr with the bound address before serving.
@@ -90,6 +109,12 @@ func New(opts Options) *Server {
 	}
 	if opts.RulesPlace == "" {
 		opts.RulesPlace = "local"
+	}
+	if opts.SetDefaultWait <= 0 {
+		opts.SetDefaultWait = 60 * time.Second
+	}
+	if opts.DefaultStale <= 0 {
+		opts.DefaultStale = 3 * time.Minute
 	}
 	return &Server{opts: opts, hosts: map[string]bool{}}
 }

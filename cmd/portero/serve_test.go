@@ -1,6 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -11,6 +15,7 @@ import (
 	"github.com/plavipas/portero/internal/config"
 	"github.com/plavipas/portero/internal/launch"
 	"github.com/plavipas/portero/internal/rules"
+	"github.com/plavipas/portero/internal/serve"
 )
 
 func TestListenAddr(t *testing.T) {
@@ -242,5 +247,115 @@ func TestSessionSecretFutureMtimeRotates(t *testing.T) {
 	b, err := sessionSecret(path)
 	if err != nil || b == a {
 		t.Errorf("a secret with a future mtime was kept: %q %v", b, err)
+	}
+}
+
+// settingsCall sends one request to a server wired like `portero serve` (without the Mac-only default hooks).
+func settingsCall(t *testing.T, h http.Handler, method, path, body string) (int, map[string]any) {
+	t.Helper()
+	const addr = "127.0.0.1:7777"
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Host = addr
+	req.AddCookie(&http.Cookie{Name: "portero_ui_7777", Value: "sess"})
+	if method == http.MethodPost {
+		req.Header.Set("Origin", "http://"+addr)
+		req.Header.Set("Content-Type", "application/json")
+	}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	var m map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &m); err != nil {
+		t.Fatalf("%s %s: %d not JSON: %q", method, path, w.Code, w.Body.String())
+	}
+	return w.Code, m
+}
+
+func TestServeSettingsSyncMovesTheRulesFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("PORTERO_RULES", "")
+	cloud := filepath.Join(home, "Library", "Mobile Documents", "com~apple~CloudDocs")
+	if err := os.MkdirAll(cloud, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	local := filepath.Join(config.Dir(), "rules.yaml")
+	if err := os.MkdirAll(config.Dir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const text = "version: 1\ndefault: {browser: Safari}\n"
+	if err := os.WriteFile(local, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := serve.New(serve.Options{Rules: rulesNow, LogFile: config.LogFile(), ConfigFile: config.File(),
+		Session: "sess", Nonce: "n", Notice: io.Discard, Sync: serveSync()})
+	s.SetAddr("127.0.0.1:7777")
+	h := s.Handler()
+
+	code, m := settingsCall(t, h, "GET", "/api/settings", "")
+	sy := m["sync"].(map[string]any)
+	if code != 200 || sy["mode"] != "local" || sy["icloud_available"] != true || sy["pinned"] != false {
+		t.Fatalf("before: %d %v", code, m)
+	}
+
+	icloud := filepath.Join(cloud, "Portero", "rules.yaml")
+	code, m = settingsCall(t, h, "POST", "/api/settings/sync", `{"mode":"icloud"}`)
+	if code != 200 || m["changed"] != true || m["rules_path"] != icloud {
+		t.Fatalf("enable: %d %v", code, m)
+	}
+	if b, err := os.ReadFile(icloud); err != nil || string(b) != text {
+		t.Errorf("icloud file: %q %v", b, err)
+	}
+	if _, err := os.Stat(local); !os.IsNotExist(err) {
+		t.Errorf("local rules.yaml should have moved: %v", err)
+	}
+	if b, err := os.ReadFile(local + ".local-backup"); err != nil || string(b) != text {
+		t.Errorf("backup: %q %v", b, err)
+	}
+	if fi, err := os.Stat(config.File()); err != nil || fi.Mode().Perm() != 0o600 {
+		t.Errorf("config.yaml: %v %v", fi, err)
+	}
+	code, m = settingsCall(t, h, "GET", "/api/state", "")
+	if code != 200 || m["rules_path"] != icloud || m["rules_place"] != "icloud" {
+		t.Errorf("state after enable: %d %v %v", code, m["rules_path"], m["rules_place"])
+	}
+	if code, m = settingsCall(t, h, "POST", "/api/settings/sync", `{"mode":"icloud"}`); code != 200 || m["changed"] != false {
+		t.Errorf("repeat: %d %v", code, m)
+	}
+
+	code, m = settingsCall(t, h, "POST", "/api/settings/sync", `{"mode":"off"}`)
+	if code != 200 || m["changed"] != true || m["rules_path"] != local {
+		t.Fatalf("disable: %d %v", code, m)
+	}
+	if b, err := os.ReadFile(local); err != nil || string(b) != text {
+		t.Errorf("local file after off: %q %v", b, err)
+	}
+	if _, err := os.Stat(config.File()); !os.IsNotExist(err) {
+		t.Errorf("config.yaml should be gone: %v", err)
+	}
+	code, m = settingsCall(t, h, "GET", "/api/state", "")
+	if code != 200 || m["rules_path"] != local || m["rules_place"] != "local" {
+		t.Errorf("state after off: %d %v %v", code, m["rules_path"], m["rules_place"])
+	}
+}
+
+func TestServeSettingsSyncPinnedAndNoICloud(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("PORTERO_RULES", "")
+	s := serve.New(serve.Options{Rules: rulesNow, LogFile: config.LogFile(), Session: "sess", Notice: io.Discard, Sync: serveSync()})
+	s.SetAddr("127.0.0.1:7777")
+	h := s.Handler()
+	// No iCloud Drive folder in the temp HOME.
+	if code, _ := settingsCall(t, h, "POST", "/api/settings/sync", `{"mode":"icloud"}`); code != 422 {
+		t.Errorf("no iCloud Drive: %d", code)
+	}
+	if _, err := os.Stat(filepath.Join(home, "Library")); !os.IsNotExist(err) {
+		t.Errorf("a failed enable created %v", err)
+	}
+	t.Setenv("PORTERO_RULES", filepath.Join(home, "pinned.yaml"))
+	if code, _ := settingsCall(t, h, "POST", "/api/settings/sync", `{"mode":"icloud"}`); code != 409 {
+		t.Errorf("pinned: %d", code)
 	}
 }

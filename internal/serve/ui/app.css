@@ -108,3 +108,25 @@ tr.err td { color: var(--security-stroke); }
 .nd-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 6px; }
 .nd-head .muted { color: var(--text-muted); font-size: 12px; flex: 1; }
 .nd-empty { margin: 4px 0 0; font-size: 12px; }
+
+/* settings page and the confirmation dialog */
+[hidden] { display: none !important; }
+.block { border: 1px solid var(--panel-border); background: var(--panel); border-radius: 8px; padding: 8px 12px; }
+.rows { list-style: none; margin: 0 0 8px; padding: 0; }
+.rows li { display: flex; gap: 10px; padding: 2px 0; }
+.rows .scheme { min-width: 3.5em; color: var(--text-muted); }
+.rows .yes { color: var(--backend-stroke); }
+.rows .no { color: var(--cloud-stroke); }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0 0 8px; }
+.kv dt { color: var(--text-muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.mono { font: 12px ui-monospace, Menlo, monospace; }
+.switch { display: flex; gap: 8px; align-items: center; }
+.switch input { width: auto; }
+#settings .hint { margin: 6px 0 0; }
+#settings .hint.error { color: var(--security-stroke); }
+dialog { color: var(--text); background: var(--bg); border: 1px solid var(--lane-stroke); border-radius: 10px; max-width: 520px; padding: 14px 18px; }
+dialog::backdrop { background: rgba(2, 6, 23, 0.6); }
+dialog h2 { margin-top: 0; }
+dialog p { margin: 6px 0; }
+dialog .toolbar { justify-content: flex-end; margin-top: 12px; }

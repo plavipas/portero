@@ -107,13 +107,7 @@ func serveCmd(args []string) error {
 		return fmt.Errorf("serve: refusing to listen on %s", ln.Addr())
 	}
 
-	rulesNow := func() (string, string) {
-		p := config.RulesFile()
-		if strings.HasPrefix(p, sync.ICloudDir()) {
-			return p, "icloud"
-		}
-		return p, "local"
-	}
+	defStatus, setDef := serveDefault()
 	session := "" // empty: serve.New makes a per-run secret
 	if f := sessionFile(); f != "" {
 		var err error
@@ -123,7 +117,8 @@ func serveCmd(args []string) error {
 	}
 	s := serve.New(serve.Options{
 		Rules: rulesNow, LogFile: config.LogFile(), Session: session,
-		Env: check.RealEnv(), Browsers: browserList, Plan: servePlan(),
+		Env: check.RealEnv(), Browsers: browserList, Plan: servePlan(), ConfigFile: config.File(),
+		DefaultStatus: defStatus, SetDefault: setDef, Sync: serveSync(),
 	})
 	s.SetAddr(ln.Addr().String())
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
@@ -274,3 +269,23 @@ func sessionFile() string {
 // announce is the one line serve prints: the single-use link. It takes the link only, so the session secret
 // cannot end up in it (TestServeAnnouncesLinkOnly).
 func announce(authLink string) string { return "Portero UI: " + authLink + "  (Ctrl-C stops it)\n" }
+
+// rulesNow is the active rules file and where it lives, asked on every request.
+func rulesNow() (string, string) {
+	p := config.RulesFile()
+	if sync.InICloud(p) {
+		return p, "icloud"
+	}
+	return p, "local"
+}
+
+// serveSync wires the settings page to `portero sync`. The rules file is pinned when PORTERO_RULES names it.
+func serveSync() *serve.SyncFuncs {
+	return &serve.SyncFuncs{
+		Enable: sync.EnableICloud, Disable: sync.Disable, ICloudDir: sync.ICloudDir,
+		ICloudAvailable: func() bool { _, err := os.Stat(filepath.Dir(sync.ICloudDir())); return err == nil },
+		ICloudExists:    func() bool { _, err := os.Stat(filepath.Join(sync.ICloudDir(), "rules.yaml")); return err == nil },
+		LocalPath:       func() string { return filepath.Join(config.Dir(), "rules.yaml") },
+		Pinned:          func() bool { return os.Getenv("PORTERO_RULES") != "" },
+	}
+}

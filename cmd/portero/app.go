@@ -83,7 +83,7 @@ type schemeState struct {
 // informative: only the actual handler, read after each call, is trusted.
 //
 // After set the handler is polled every `every` for up to `within`, because Launch Services can lag behind the dialog.
-func ensureDefault(app string, current func(scheme string) string, set func(app, scheme string) error, every, within time.Duration) ([]schemeState, error) {
+func ensureDefault(w io.Writer, app string, current func(scheme string) string, set func(app, scheme string) error, every, within time.Duration) ([]schemeState, error) {
 	// Snapshot first: a scheme that the dialog for an earlier one flips to ours is "set now", not "already set".
 	before := map[string]string{}
 	for _, s := range handler.Schemes {
@@ -94,7 +94,7 @@ func ensureDefault(app string, current func(scheme string) string, set func(app,
 		already := before[s] == BundleID
 		now := current(s)
 		if now != BundleID {
-			fmt.Printf("asking macOS to make Portero the handler of %s (confirm the dialog if one appears)\n", s)
+			fmt.Fprintf(w, "asking macOS to make Portero the handler of %s (confirm the dialog if one appears)\n", s)
 			setErr := set(app, s)
 			now = waitHandler(current, s, every, within)
 			if now != BundleID {
@@ -111,6 +111,23 @@ func ensureDefault(app string, current func(scheme string) string, set func(app,
 		states = append(states, schemeState{Scheme: s, Handler: now, Already: already})
 	}
 	return states, nil
+}
+
+// stateNote is the remark `default set` and the UI show for one scheme.
+func stateNote(st schemeState) string {
+	if st.Already {
+		return "already set"
+	}
+	return "set now"
+}
+
+// stateNotes maps each scheme to its remark.
+func stateNotes(states []schemeState) map[string]string {
+	notes := map[string]string{}
+	for _, st := range states {
+		notes[st.Scheme] = stateNote(st)
+	}
+	return notes
 }
 
 // waitHandler reads the handler of scheme until it is ours or the deadline passes; it always reads at least once.
@@ -187,15 +204,8 @@ func defaultCmd(args []string) error {
 		if app == "" {
 			return fmt.Errorf("run this from the installed app: ~/Applications/Portero.app/Contents/MacOS/portero default set")
 		}
-		states, err := ensureDefault(app, handler.DefaultHandler, handler.SetDefaultHandler, 100*time.Millisecond, 1500*time.Millisecond)
-		notes := map[string]string{}
-		for _, st := range states {
-			if st.Already {
-				notes[st.Scheme] = "already set"
-			} else {
-				notes[st.Scheme] = "set now"
-			}
-		}
+		states, err := ensureDefault(os.Stdout, app, handler.DefaultHandler, handler.SetDefaultHandler, 100*time.Millisecond, 1500*time.Millisecond)
+		notes := stateNotes(states)
 		printDefaultStatus(os.Stdout, func(s string) string { return notes[s] })
 		if err != nil {
 			return err

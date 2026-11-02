@@ -14,10 +14,11 @@
   <span class="path" id="rules-path"></span>
   <span class="badge" id="rules-place"></span>
   <span class="spacer"></span>
+  <button type="button" id="btn-settings" class="ghost" aria-controls="settings" aria-expanded="false">Settings</button>
   <button type="button" id="theme" class="ghost" aria-label="Toggle light and dark theme">Theme</button>
 </header>
 <main class="split">
-  <section class="left" aria-label="Routing">
+  <section class="left" id="routing" aria-label="Routing">
     <div class="status" id="summary"></div>
     <div class="diagram" id="diagram-wrap">
       <svg id="diagram" role="img" aria-label="Routing diagram: openers, rules, targets"></svg>
@@ -41,6 +42,34 @@
       <summary>Browsers on this Mac</summary>
       <ul id="browsers"></ul>
     </details>
+  </section>
+  <section class="left" id="settings" aria-label="Settings" hidden>
+    <h2>Default browser</h2>
+    <div class="block" id="set-default">
+      <ul class="rows" id="default-rows"></ul>
+      <div class="toolbar">
+        <button type="button" id="btn-default" class="primary">Make Portero the default browser</button>
+        <span class="hint" id="default-hint" aria-live="polite"></span>
+      </div>
+    </div>
+    <h2>Sync</h2>
+    <div class="block" id="set-sync">
+      <dl class="kv">
+        <dt>Rules are</dt><dd id="sync-mode"></dd>
+        <dt>Rules file</dt><dd class="mono" id="sync-path"></dd>
+        <dt>iCloud folder</dt><dd class="mono" id="sync-dir"></dd>
+      </dl>
+      <label class="switch"><input type="checkbox" id="sync-switch"> Sync rules through iCloud Drive</label>
+      <p class="hint" id="sync-hint" aria-live="polite"></p>
+    </div>
+    <h2>Files</h2>
+    <div class="block">
+      <dl class="kv">
+        <dt>Rules file</dt><dd class="mono" id="file-rules"></dd>
+        <dt>Decisions log</dt><dd class="mono" id="file-log"></dd>
+        <dt>Config</dt><dd class="mono" id="file-config"></dd>
+      </dl>
+    </div>
   </section>
   <section class="right" aria-label="Rules file">
     <div class="toolbar">
@@ -68,6 +97,16 @@
     </div>
   </section>
 </main>
+<dialog id="confirm" aria-labelledby="confirm-title">
+  <div class="dlg">
+    <h2 id="confirm-title"></h2>
+    <div id="confirm-body"></div>
+    <div class="toolbar">
+      <button type="button" class="ghost" id="confirm-cancel">Cancel</button>
+      <button type="button" class="primary" id="confirm-ok">Continue</button>
+    </div>
+  </div>
+</dialog>
 <script src="app.js"></script>
 </body>
 </html>

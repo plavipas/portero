@@ -270,7 +270,7 @@ func syncCmd(args []string) error {
 	case "status":
 		p := config.RulesFile()
 		where := "local"
-		if strings.HasPrefix(p, sync.ICloudDir()) {
+		if sync.InICloud(p) {
 			where = "iCloud Drive"
 		}
 		fmt.Printf("rules: %s (%s)\n", p, where)
