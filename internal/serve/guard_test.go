@@ -3,6 +3,7 @@ package serve
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -70,5 +71,58 @@ func TestGuardBeforeSetAddr(t *testing.T) {
 	s.Handler().ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
 		t.Errorf("no addr set: %d", w.Code)
+	}
+}
+
+func TestGuardOriginMustNameThisServer(t *testing.T) {
+	r := newRig(t, goodRules)
+	tests := []struct {
+		name, origin string
+		want         int
+	}{
+		{"other port", "http://127.0.0.1:7778", 403},
+		{"origin with a path", "http://" + testAddr + "/x", 403},
+		{"origin with user info", "http://evil@" + testAddr, 403},
+		{"no scheme", testAddr, 403},
+		{"lookalike host", "http://127.0.0.1:7777.evil.example", 403},
+		{"upper-case own origin", "http://LOCALHOST:7777", 200},
+	}
+	for _, tc := range tests {
+		req := httptest.NewRequest(http.MethodPost, "/api/validate", strings.NewReader(`{}`))
+		req.Host = testAddr
+		req.Header.Set("Origin", tc.origin)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.srv.Handler().ServeHTTP(w, req)
+		if w.Code != tc.want {
+			t.Errorf("%s: %d, want %d", tc.name, w.Code, tc.want)
+		}
+	}
+}
+
+func TestGuardHeadAllowedWithoutOrigin(t *testing.T) {
+	r := newRig(t, goodRules)
+	req := httptest.NewRequest(http.MethodHead, "/api/state", nil)
+	req.Host = "LOCALHOST:7777"
+	w := httptest.NewRecorder()
+	r.srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("HEAD with an upper-case own host: %d", w.Code)
+	}
+}
+
+func TestGuardRejectedPostDoesNotWrite(t *testing.T) {
+	r := newRig(t, goodRules)
+	req := httptest.NewRequest(http.MethodPost, "/api/apply", strings.NewReader(`{"yaml":"version: 1\ndefault: {browser: Safari}\n","base_hash":"`+sum(goodRules)+`"}`))
+	req.Host = testAddr
+	req.Header.Set("Origin", "http://evil.example.com")
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("foreign origin apply: %d", w.Code)
+	}
+	if b, _ := os.ReadFile(r.rules); string(b) != goodRules {
+		t.Error("a rejected apply changed the rules file")
 	}
 }

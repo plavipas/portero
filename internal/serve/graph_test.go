@@ -85,3 +85,23 @@ func mk(opener, rule, target string) Decision {
 	d.Path = d.path()
 	return d
 }
+
+func TestBuildGraphKeepsHostileLabelsAsData(t *testing.T) {
+	d, ok := parseLine("2026-01-01T00:00:00Z\t<img src=x onerror=alert(1)>\t\"><script>x</script>\tSafari\thttps://example.com/<b>")
+	if !ok {
+		t.Fatal("line not parsed")
+	}
+	g := BuildGraph(nil, []Decision{d})
+	if len(g.Openers) != 1 || g.Openers[0].Label != "<img src=x onerror=alert(1)>" {
+		t.Errorf("opener label changed: %+v", g.Openers)
+	}
+	found := false
+	for _, n := range g.Rules {
+		if n.ID == `r:"><script>x</script>` && n.Stale == false {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("rule node from the log missing: %+v", g.Rules)
+	}
+}
