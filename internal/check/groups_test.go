@@ -86,3 +86,11 @@ func TestDuplicateNames(t *testing.T) {
 		})
 	}
 }
+
+func TestDuplicateChildNamesInGroup(t *testing.T) {
+	r := parse(t, "version: 1\ndefault: {browser: Safari}\nrules:\n  - name: Shell\n    open: {browser: Safari}\n    rules:\n      - {name: dup, match: {host: a.example.com}}\n      - {name: dup, match: {host: b.example.com}}\n      - {match: {host: c.example.com}}\n      - {match: {host: d.example.com}}\n")
+	want := []string{`warning: group "Shell": rule name "dup" is used twice; the log merges them`}
+	if got := Names(r); !reflect.DeepEqual(got, want) {
+		t.Errorf("warnings %q, want %q", got, want)
+	}
+}

@@ -174,6 +174,18 @@ func Names(r *rules.Rules) (warnings []string) {
 			warnings = append(warnings, fmt.Sprintf("warning: name %q is used twice; the diagram and the log merge them", name))
 		}
 		seen[name] = true
+		if rule.IsGroup() {
+			inner := map[string]bool{}
+			for _, c := range rule.Rules {
+				if c.Name == "" {
+					continue
+				}
+				if inner[c.Name] {
+					warnings = append(warnings, fmt.Sprintf("warning: group %q: rule name %q is used twice; the log merges them", rule.Name, c.Name))
+				}
+				inner[c.Name] = true
+			}
+		}
 	}
 	return warnings
 }

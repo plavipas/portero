@@ -95,7 +95,7 @@ func TestGroupOpenControlCharacters(t *testing.T) {
 
 func TestGroupNullRulesWithoutMatchIsRefused(t *testing.T) {
 	text := "version: 1\ndefault: {browser: Safari}\nrules:\n  - name: Work\n    open: {browser: Dia}\n    rules:\n"
-	if _, err := Parse([]byte(text)); err == nil || !strings.Contains(err.Error(), "no match conditions") {
+	if _, err := Parse([]byte(text)); err == nil || !strings.Contains(err.Error(), "has no rules") {
 		t.Errorf("error %v, want a refusal", err)
 	}
 }

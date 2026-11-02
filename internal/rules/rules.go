@@ -106,10 +106,32 @@ type Rule struct {
 	Open  Target `yaml:"open"`
 	// Rules makes the element a group; the children have a match and no open.
 	Rules []Rule `yaml:"rules,omitempty"`
+
+	// keyed: the `rules` key was present in the file, also with a null or empty value.
+	keyed bool
 }
 
 // IsGroup reports whether the element has a `rules` key (also an empty list, which Validate rejects).
-func (r Rule) IsGroup() bool { return r.Rules != nil }
+func (r Rule) IsGroup() bool { return r.keyed || r.Rules != nil }
+
+// markGroups sets keyed on every element whose mapping has a `rules` key; seq is the sequence node of rules.
+func markGroups(rs []Rule, seq *yaml.Node) {
+	if seq == nil || seq.Kind != yaml.SequenceNode {
+		return
+	}
+	for i := range rs {
+		if i >= len(seq.Content) || seq.Content[i].Kind != yaml.MappingNode {
+			continue
+		}
+		m := seq.Content[i]
+		for j := 0; j+1 < len(m.Content); j += 2 {
+			if m.Content[j].Value == "rules" {
+				rs[i].keyed = true
+				markGroups(rs[i].Rules, m.Content[j+1])
+			}
+		}
+	}
+}
 
 // Rules is the whole file.
 type Rules struct {
@@ -125,6 +147,15 @@ func Parse(text []byte) (*Rules, error) {
 	dec.KnownFields(true)
 	if err := dec.Decode(&r); err != nil {
 		return nil, fmt.Errorf("rules: %w", err)
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(text, &doc); err == nil && len(doc.Content) > 0 && doc.Content[0].Kind == yaml.MappingNode {
+		m := doc.Content[0]
+		for j := 0; j+1 < len(m.Content); j += 2 {
+			if m.Content[j].Value == "rules" {
+				markGroups(r.Rules, m.Content[j+1])
+			}
+		}
 	}
 	if err := r.Validate(); err != nil {
 		return nil, err
