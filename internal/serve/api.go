@@ -69,7 +69,13 @@ func hashOf(b []byte) string {
 
 // readRules returns the bytes of the rules file; exists is false when there is none.
 func (s *Server) readRules() (data []byte, exists bool, err error) {
-	data, err = os.ReadFile(s.rulesPath())
+	return readRulesAt(s.rulesPath())
+}
+
+// readRulesAt reads one resolved rules path; Apply uses it so the symlink check, the read and the write all
+// refer to the same file even when `portero sync` moves the active path during the request.
+func readRulesAt(path string) (data []byte, exists bool, err error) {
+	data, err = os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil
 	}
@@ -357,7 +363,7 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, "rules file is a symlink; edit the target by hand")
 		return
 	}
-	old, exists, err := s.readRules()
+	old, exists, err := readRulesAt(path) // the same path as the symlink check and the write below
 	if err != nil {
 		fail(w, http.StatusInternalServerError, "cannot read the rules file: "+err.Error())
 		return
