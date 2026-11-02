@@ -1,4 +1,4 @@
-package main
+package check
 
 import (
 	"errors"
@@ -9,11 +9,11 @@ import (
 	"github.com/plavipas/portero/internal/rules"
 )
 
-func testEnv(installed bool, list []browsers.Container, cerr error, active bool, aerr error) checkEnv {
-	return checkEnv{
-		installed:  func(b browsers.Browser) bool { return installed || b.Name == "Safari" },
-		containers: func(browsers.Browser, string) (string, []browsers.Container, error) { return "Default", list, cerr },
-		extension:  func(browsers.Browser, string) (string, bool, error) { return "Default", active, aerr },
+func testEnv(installed bool, list []browsers.Container, cerr error, active bool, aerr error) Env {
+	return Env{
+		Installed:  func(b browsers.Browser) bool { return installed || b.Name == "Safari" },
+		Containers: func(browsers.Browser, string) (string, []browsers.Container, error) { return "Default", list, cerr },
+		Extension:  func(browsers.Browser, string) (string, bool, error) { return "Default", active, aerr },
 	}
 }
 
@@ -32,7 +32,7 @@ func TestCheckTargets(t *testing.T) {
 	tests := []struct {
 		name    string
 		open    string
-		env     checkEnv
+		env     Env
 		want    []string
 		wantErr string
 	}{
@@ -53,7 +53,7 @@ func TestCheckTargets(t *testing.T) {
 			`rules: rule "x": container "Work" needs a Firefox-family browser (Firefox, Firefox Developer Edition, Zen); Dia does not take one`},
 	}
 	for _, tc := range tests {
-		got, err := checkTargets(parse(t, head+tc.open+"\n"), tc.env)
+		got, err := Targets(parse(t, head+tc.open+"\n"), tc.env)
 		if tc.wantErr != "" {
 			if err == nil || err.Error() != tc.wantErr {
 				t.Errorf("%s: err = %v", tc.name, err)
@@ -68,11 +68,11 @@ func TestCheckTargets(t *testing.T) {
 
 func TestCheckTargetsDefaultAndUnnamed(t *testing.T) {
 	r := parse(t, "version: 1\ndefault: {browser: Dia, container: Work}\n")
-	if _, err := checkTargets(r, testEnv(true, nil, nil, true, nil)); err == nil || !strings.HasPrefix(err.Error(), `rules: default: container "Work"`) {
+	if _, err := Targets(r, testEnv(true, nil, nil, true, nil)); err == nil || !strings.HasPrefix(err.Error(), `rules: default: container "Work"`) {
 		t.Errorf("default: %v", err)
 	}
 	r = parse(t, "version: 1\ndefault: {browser: Safari}\nrules:\n  - match: {host: example.com}\n    open: {browser: Zen}\n")
-	w, _ := checkTargets(r, testEnv(false, nil, nil, false, nil))
+	w, _ := Targets(r, testEnv(false, nil, nil, false, nil))
 	if len(w) != 1 || !strings.HasPrefix(w[0], `warning: rule #1:`) {
 		t.Errorf("unnamed: %q", w)
 	}
@@ -81,8 +81,8 @@ func TestCheckTargetsDefaultAndUnnamed(t *testing.T) {
 func TestCheckCwd(t *testing.T) {
 	head := "version: 1\ndefault: {browser: Safari}\nrules:\n  - name: x\n    match: {cwd: "
 	tail := "}\n    open: {browser: Zen}\n  - match: {host: example.com}\n    open: {browser: Zen}\n"
-	exists := func(have ...string) checkEnv {
-		return checkEnv{dirExists: func(p string) bool {
+	exists := func(have ...string) Env {
+		return Env{DirExists: func(p string) bool {
 			for _, h := range have {
 				if p == h {
 					return true
@@ -94,7 +94,7 @@ func TestCheckCwd(t *testing.T) {
 	tests := []struct {
 		name string
 		cwd  string
-		env  checkEnv
+		env  Env
 		want []string
 	}{
 		{"none exists", "[~/Documents/projects/work, /opt/other]", exists(),
@@ -103,7 +103,7 @@ func TestCheckCwd(t *testing.T) {
 		{"single exists", "/opt/other", exists("/opt/other"), nil},
 	}
 	for _, tc := range tests {
-		got := checkCwd(parse(t, head+tc.cwd+tail), tc.env)
+		got := Cwd(parse(t, head+tc.cwd+tail), tc.env)
 		if strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
 			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
 		}

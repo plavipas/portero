@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/plavipas/portero/internal/browsers"
+	"github.com/plavipas/portero/internal/check"
 	"github.com/plavipas/portero/internal/config"
 	"github.com/plavipas/portero/internal/decisionlog"
 	"github.com/plavipas/portero/internal/launch"
@@ -227,11 +228,10 @@ func rulesCmd(args []string) error {
 		if err != nil {
 			return err
 		}
-		warnings, err := checkTargets(r, realCheckEnv())
+		warnings, err := check.All(r, check.RealEnv())
 		if err != nil {
 			return err
 		}
-		warnings = append(warnings, checkCwd(r, realCheckEnv())...)
 		for _, w := range warnings {
 			fmt.Println(w)
 		}
