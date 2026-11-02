@@ -28,6 +28,9 @@ func (s *Server) routesAPI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/validate", s.handleValidate)
 	mux.HandleFunc("POST /api/match", s.handleMatch)
 	mux.HandleFunc("POST /api/apply", s.handleApply)
+	mux.HandleFunc("GET /api/settings", s.handleSettings)
+	mux.HandleFunc("POST /api/settings/default", s.handleSetDefault)
+	mux.HandleFunc("POST /api/settings/sync", s.handleSettingsSync)
 }
 
 // Summary is the rules file as the UI lists it.
