@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -170,9 +171,9 @@ func (s *Server) handleSettingsSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	call := f.Disable
-	// Neither direction may write through a symlink (the editor refuses them too): off copies the iCloud file
-	// over the local path, on copies the local file into iCloud.
-	for _, p := range []string{s.rulesPath(), localPathOf(f)} {
+	// Neither direction may write through or adopt a symlink (the editor refuses them too): off copies the iCloud
+	// file over the local path, on copies the local file into iCloud or adopts the file already there.
+	for _, p := range []string{s.rulesPath(), localPathOf(f), icloudRulesOf(f)} {
 		if p == "" {
 			continue
 		}
@@ -217,4 +218,12 @@ func localPathOf(f *SyncFuncs) string {
 		return ""
 	}
 	return f.LocalPath()
+}
+
+// icloudRulesOf is the rules file Enable would adopt or write in iCloud Drive.
+func icloudRulesOf(f *SyncFuncs) string {
+	if f.ICloudDir == nil || f.ICloudDir() == "" {
+		return ""
+	}
+	return filepath.Join(f.ICloudDir(), "rules.yaml")
 }

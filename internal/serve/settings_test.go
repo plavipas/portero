@@ -444,3 +444,30 @@ func TestSyncRefusesSymlinkedLocalRules(t *testing.T) {
 		t.Error("the symlink target was changed")
 	}
 }
+
+func TestSyncRefusesSymlinkedICloudRules(t *testing.T) {
+	dir := t.TempDir()
+	icloud := filepath.Join(dir, "icloud")
+	if err := os.MkdirAll(icloud, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(dir, "elsewhere.yaml")
+	if err := os.WriteFile(target, []byte("other\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(icloud, "rules.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	r := newRig(t, goodRules)
+	r.srv.opts.Sync = &SyncFuncs{
+		Enable:          func() (string, error) { called = true; return "", nil },
+		Disable:         func() (string, error) { called = true; return "", nil },
+		ICloudDir:       func() string { return icloud },
+		ICloudAvailable: func() bool { return true },
+	}
+	w := r.do("POST", "/api/settings/sync", `{"mode":"icloud"}`)
+	if w.Code != 422 || called {
+		t.Fatalf("got %d, called=%v: %s", w.Code, called, w.Body.String())
+	}
+}
