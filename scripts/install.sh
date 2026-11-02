@@ -58,8 +58,11 @@ if [ -n "$DRY" ]; then
 fi
 
 mkdir -p "$HOME/Applications" "$HOME/.local/bin"
+# Copy next to the target first and swap: a failed copy (disk full, permissions) leaves the old app in place.
+rm -rf "$DEST.new"
+cp -R "$APP" "$DEST.new"
 rm -rf "$DEST"
-cp -R "$APP" "$DEST"
+mv "$DEST.new" "$DEST"
 # The sweep uses the freshly installed binary; the dump may list the build copy too, it is already gone.
 # A failed enumeration does not stop the install (the new app must still be registered) but is reported
 # and makes the install exit non-zero, so a stale copy cannot stay registered unnoticed.

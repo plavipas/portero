@@ -14,7 +14,7 @@ var hexSuffix = regexp.MustCompile(` \(0x[0-9a-f]+\)$`)
 // Others returns the app paths registered under bundle id id, except keep. Records are separated by lines of
 // dashes; only the first "path:" and "identifier:" of a record count, so "all roles:" lines of other records
 // never match. Paths are returned in dump order without duplicates.
-func Others(dump io.Reader, id, keep string) []string {
+func Others(dump io.Reader, id, keep string) ([]string, error) {
 	keep = filepath.Clean(keep)
 	var out []string
 	seen := map[string]bool{}
@@ -46,7 +46,10 @@ func Others(dump io.Reader, id, keep string) []string {
 		}
 	}
 	flush()
-	return out
+	if err := sc.Err(); err != nil {
+		return nil, err // a truncated dump must not look like "no other copies"
+	}
+	return out, nil
 }
 
 func isSeparator(line string) bool {
