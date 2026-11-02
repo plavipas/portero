@@ -63,8 +63,8 @@ input { font: inherit; color: var(--text); background: var(--panel); border: 1px
 .edge.static { opacity: .3; stroke-dasharray: 3 4; }
 .edge.flow { stroke: var(--arrow-emphasis); opacity: 1; stroke-dasharray: 8 6; animation: dash 1s linear infinite; }
 .edge.hl { stroke: var(--arrow-emphasis); opacity: 1; }
-.dim .edge:not(.hl) { opacity: .08; }
-.dim .node:not(.hl) { opacity: .35; }
+.dim .edge:not(.hl):not(.flow) { opacity: .08; }
+.dim .node:not(.hl):not(.last) { opacity: .35; }
 @keyframes dash { to { stroke-dashoffset: -28; } }
 @media (prefers-reduced-motion: reduce) { .edge.flow { animation: none; } }
 .table-wrap { overflow-x: auto; border: 1px solid var(--panel-border); border-radius: 8px; }
