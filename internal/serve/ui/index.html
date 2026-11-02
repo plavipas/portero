@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portero</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <img class="logo" src="logo.svg" alt="" width="32" height="32">
+  <h1>Portero</h1>
+  <span class="path" id="rules-path"></span>
+  <span class="badge" id="rules-place"></span>
+  <span class="spacer"></span>
+  <button type="button" id="theme" class="ghost" aria-label="Toggle light and dark theme">Theme</button>
+</header>
+<main class="split">
+  <section class="left" aria-label="Routing">
+    <div class="status" id="summary"></div>
+    <div class="diagram" id="diagram-wrap">
+      <svg id="diagram" role="img" aria-label="Routing diagram: openers, rules, targets"></svg>
+      <p class="empty" id="no-decisions" hidden>No decisions yet. Links Portero routes will show up here.</p>
+    </div>
+    <h2>Last decisions</h2>
+    <div class="table-wrap">
+      <table id="decisions">
+        <thead><tr><th>Time</th><th>Opener</th><th>Rule</th><th>Opened in</th><th>URL</th><th></th></tr></thead>
+        <tbody id="decisions-body"></tbody>
+      </table>
+    </div>
+    <details class="browsers">
+      <summary>Browsers on this Mac</summary>
+      <ul id="browsers"></ul>
+    </details>
+  </section>
+  <section class="right" aria-label="Rules file">
+    <div class="toolbar">
+      <button type="button" id="btn-validate">Validate</button>
+      <button type="button" id="btn-apply" class="primary" disabled>Apply</button>
+      <button type="button" id="btn-reload" class="ghost" hidden>Reload</button>
+      <span class="hint" id="state-line"></span>
+    </div>
+    <div class="editor">
+      <pre class="gutter" id="gutter" aria-hidden="true"></pre>
+      <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-label="Rules file"></textarea>
+    </div>
+    <div class="panel" id="problems" aria-live="polite"></div>
+    <fieldset class="match">
+      <legend>Match a link</legend>
+      <label>URL <input id="m-url" type="text" placeholder="https://example.com/path" autocomplete="off"></label>
+      <label>Opener <input id="m-opener" type="text" placeholder="bundle id (optional)" autocomplete="off"></label>
+      <label>Directory <input id="m-cwd" type="text" placeholder="working directory (optional)" autocomplete="off"></label>
+      <button type="button" id="btn-match">Match</button>
+      <div class="result" id="match-result" aria-live="polite"></div>
+    </fieldset>
+    <div class="diff-wrap">
+      <h2>Changes</h2>
+      <div class="diff" id="diff"></div>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
