@@ -44,4 +44,9 @@ if HOME=$T PORTERO_BUILD_DIR="$T/Applications" sh scripts/install.sh >/dev/null 
 	exit 1
 fi
 [ "$(cat "$T/Applications/Portero.app/marker" 2>/dev/null)" = keep ] || { echo "FAIL: installed app was touched by a build into ~/Applications" >&2; exit 1; }
-echo "ok: a build directory equal to ~/Applications is refused"
+if HOME=$T PORTERO_BUILD_DIR="$T/Applications/Portero.app/sub" sh scripts/install.sh >/dev/null 2>&1; then
+	echo "FAIL: install.sh accepted a build directory inside the installed app" >&2
+	exit 1
+fi
+[ "$(cat "$T/Applications/Portero.app/marker" 2>/dev/null)" = keep ] || { echo "FAIL: installed app was touched by a build inside it" >&2; exit 1; }
+echo "ok: a build directory equal to or inside ~/Applications is refused"
