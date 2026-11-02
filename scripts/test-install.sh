@@ -2,6 +2,8 @@
 # Checks that a failing build leaves the installed app intact (fake HOME, nothing real is touched).
 set -eu
 cd "$(dirname "$0")/.."
+# Needs lsregister, codesign and a cgo macOS build.
+[ "$(uname -s)" = Darwin ] || { echo "skip: install tests run on macOS only"; exit 0; }
 # Keep Go's real caches: with HOME=$T Go would download modules into $T (read-only files, a cold build).
 GOMODCACHE=$(go env GOMODCACHE) GOCACHE=$(go env GOCACHE) GOPATH=$(go env GOPATH)
 export GOMODCACHE GOCACHE GOPATH
@@ -9,6 +11,8 @@ T=$(mktemp -d "${TMPDIR:-/tmp}/portero-installtest.XXXXXX")
 trap 'chmod -R u+w "$T" 2>/dev/null; rm -rf "$T"' EXIT
 mkdir -p "$T/Applications/Portero.app"
 echo keep > "$T/Applications/Portero.app/marker"
+had_build=0
+[ ! -e build ] || had_build=1 # an old build/ from before DEV-46 is not this test's leftover
 for dry in "" 1; do
 	if HOME=$T INSTALL_DRY_RUN=$dry PORTERO_BUILD_DIR="$PWD/build" sh scripts/install.sh >/dev/null 2>&1; then
 		echo "FAIL: install.sh succeeded with a build directory inside the repo (dry=$dry)" >&2
@@ -16,7 +20,7 @@ for dry in "" 1; do
 	fi
 	[ "$(cat "$T/Applications/Portero.app/marker")" = keep ] || { echo "FAIL: installed app was touched (dry=$dry)" >&2; exit 1; }
 done
-[ ! -e build ] || { echo "FAIL: build/ left in the repo" >&2; exit 1; }
+[ "$had_build" = 1 ] || [ ! -e build ] || { echo "FAIL: build/ left in the repo" >&2; exit 1; }
 echo "ok: failing build leaves the installed app intact"
 
 # A build directory the caller chose is never deleted, even when its name looks like a temp one.

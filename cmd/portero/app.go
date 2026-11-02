@@ -303,7 +303,7 @@ func defaultReport(cur map[string]string, resolved, resolvedVer, installed, runn
 		}
 	}
 	ok = true
-	if installed != "" && filepath.Clean(resolved) != filepath.Clean(installed) {
+	if installed != "" && !samePath(resolved, installed) {
 		lines = append(lines, fmt.Sprintf("warning: macOS opens links with %s, not %s; run make install", resolved, installed))
 		ok = false
 	}
@@ -322,9 +322,23 @@ func defaultReport(cur map[string]string, resolved, resolvedVer, installed, runn
 func schemeMismatch(resolvedBy map[string]string) string {
 	first := handler.Schemes[0]
 	for _, s := range handler.Schemes[1:] {
-		if filepath.Clean(resolvedBy[s]) != filepath.Clean(resolvedBy[first]) {
+		if !samePath(resolvedBy[s], resolvedBy[first]) {
 			return fmt.Sprintf("warning: %s links open %s, %s links open %s; run make install", first, resolvedBy[first], s, resolvedBy[s])
 		}
 	}
 	return ""
+}
+
+// samePath reports whether a and b name the same file: the same file on disk when both exist (symlinked HOME,
+// another letter case on a case-insensitive volume), else the same cleaned path.
+func samePath(a, b string) bool {
+	if a == "" || b == "" {
+		return a == b
+	}
+	if fa, err := os.Stat(a); err == nil {
+		if fb, err := os.Stat(b); err == nil {
+			return os.SameFile(fa, fb)
+		}
+	}
+	return filepath.Clean(a) == filepath.Clean(b)
 }

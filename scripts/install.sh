@@ -65,10 +65,17 @@ fi
 
 mkdir -p "$HOME/Applications" "$HOME/.local/bin"
 # Copy next to the target first and swap: a failed copy (disk full, permissions) leaves the old app in place.
-rm -rf "$DEST.new"
+rm -rf "$DEST.new" "$DEST.old"
 cp -R "$APP" "$DEST.new"
-rm -rf "$DEST"
-mv "$DEST.new" "$DEST"
+# Swap with two renames and a rollback: the old app is only deleted once the new one is in place.
+if [ -e "$DEST" ]; then mv "$DEST" "$DEST.old"; fi
+if mv "$DEST.new" "$DEST"; then
+	rm -rf "$DEST.old"
+else
+	[ ! -e "$DEST.old" ] || mv "$DEST.old" "$DEST"
+	echo "error: could not move the new app into place; the old app was restored" >&2
+	exit 1
+fi
 # The sweep uses the freshly installed binary; the dump may list the build copy too, it is already gone.
 # A failed enumeration does not stop the install (the new app must still be registered) but is reported
 # and makes the install exit non-zero, so a stale copy cannot stay registered unnoticed.

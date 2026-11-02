@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -250,5 +251,23 @@ func TestSchemeMismatch(t *testing.T) {
 	diff := map[string]string{"http": "/a/Portero.app", "https": "/old/Portero.app"}
 	if w := schemeMismatch(diff); !strings.Contains(w, "/old/Portero.app") {
 		t.Errorf("mismatch not reported: %q", w)
+	}
+}
+
+func TestSamePathFollowsSymlinks(t *testing.T) {
+	dir := t.TempDir()
+	app := filepath.Join(dir, "Portero.app")
+	if err := os.Mkdir(app, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "home")
+	if err := os.Symlink(dir, link); err != nil {
+		t.Fatal(err)
+	}
+	if !samePath(app, filepath.Join(link, "Portero.app")) {
+		t.Error("symlinked path not recognized as the same app")
+	}
+	if samePath(app, filepath.Join(dir, "Other.app")) {
+		t.Error("different paths reported as the same")
 	}
 }
