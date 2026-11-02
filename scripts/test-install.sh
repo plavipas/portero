@@ -15,3 +15,11 @@ for dry in "" 1; do
 done
 [ ! -e build ] || { echo "FAIL: build/ left in the repo" >&2; exit 1; }
 echo "ok: failing build leaves the installed app intact"
+
+# A build directory the caller chose is never deleted, even when its name looks like a temp one.
+B="$T/portero-build.mine"
+mkdir -p "$B"
+echo keep > "$B/marker"
+HOME=$T INSTALL_DRY_RUN=1 PORTERO_BUILD_DIR="$B" sh scripts/install.sh >/dev/null 2>&1 || { echo "FAIL: dry-run install failed" >&2; exit 1; }
+[ "$(cat "$B/marker" 2>/dev/null)" = keep ] || { echo "FAIL: caller's build directory was removed" >&2; exit 1; }
+echo "ok: a caller-provided build directory is kept"

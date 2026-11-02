@@ -30,8 +30,10 @@ unreg() {
 	wait "$wd" 2>/dev/null || true
 }
 
-# rmbuild: remove the temporary build directory (only one this script family created).
+# rmbuild: remove the temporary build directory, but only when build-app.sh created it with mktemp (no
+# PORTERO_BUILD_DIR given): a directory the caller chose is never deleted, whatever its name.
 rmbuild() {
+	[ -z "${PORTERO_BUILD_DIR:-}" ] || return 0
 	case "$BUILD_DIR" in
 	*/portero-build.*) rm -rf "$BUILD_DIR" ;;
 	esac
@@ -46,7 +48,7 @@ if [ -n "$DRY" ]; then
 	done
 	echo "would register $DEST"
 	echo "would link $HOME/.local/bin/portero"
-	echo "would remove $BUILD_DIR"
+	[ -n "${PORTERO_BUILD_DIR:-}" ] || echo "would remove $BUILD_DIR"
 	rmbuild
 	exit 0
 fi
