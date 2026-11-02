@@ -78,7 +78,7 @@ checking `Host` and `Origin` is not enough. The server therefore has a single-us
 - **A single-use link.** On every start the server makes a one-time nonce (32 random bytes, hex) and prints
   `http://127.0.0.1:<port>/auth/<nonce>`; the browser that `portero serve` opens gets the same link. The first
   `GET /auth/<nonce>` (constant-time compare) sets the session cookie `portero_ui_<port>` (`HttpOnly`,
-  `SameSite=Strict`, `Path=/`) and redirects to `/`. The cookie carries a different random secret, kept per user in `~/.config/portero/ui-session` (mode 0600, created on the first run) so that a page opened earlier survives a server restart on the same `--port` with a plain reload; the secret is never in
+  `SameSite=Strict`, `Path=/`) and redirects to `/`. The cookie carries a different random secret, kept per user in `~/.config/portero/ui-session` (mode 0600, created on the first run, rotated after seven days; `portero sync` never copies it; delete the file to reset every session) so that a page opened earlier survives a server restart on the same `--port` with a plain reload; the secret is never in
   a URL, a log line or a process's argv. The link works once: a second use, or a wrong nonce, gets 403, and a
   second use of the right nonce prints `portero serve: the UI link was used again; if that was not you, stop the
   server` once, so a link taken from `ps` or the browser history shows up. After use the link in the browser

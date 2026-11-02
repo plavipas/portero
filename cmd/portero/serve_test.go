@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/plavipas/portero/internal/config"
 	"github.com/plavipas/portero/internal/launch"
@@ -82,17 +83,8 @@ func TestUILinkCarriesNonceOnly(t *testing.T) {
 	if bare != "http://127.0.0.1:5555/" || auth != "http://127.0.0.1:5555/auth/nonce123" {
 		t.Errorf("%q %q", bare, auth)
 	}
-	// The session secret is read from its file and handed to the server only; it must never be printed,
-	// so the only place serve.go may name it is the Options field and the loader.
-	src, err := os.ReadFile("serve.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, line := range strings.Split(string(src), "\n") {
-		if strings.Contains(line, "session") && (strings.Contains(line, "Print") || strings.Contains(line, "Fprint") || strings.Contains(line, "log.")) {
-			t.Errorf("serve.go prints the session secret: %s", strings.TrimSpace(line))
-		}
-	}
+	// The session secret never appears in a link: uiLinks takes the nonce only (see TestOpenUILogsNoToken).
+
 }
 
 func TestSessionSecretPersists(t *testing.T) {
@@ -114,10 +106,46 @@ func TestSessionSecretPersists(t *testing.T) {
 	if err != nil || c == a || len(c) != 64 {
 		t.Errorf("replaced a bad file: %q %v", c, err)
 	}
-	os.Chmod(path, 0o644) // readable by others: the secret counts as leaked and is replaced
+	if err := os.Chmod(path, 0o644); err != nil { // readable by others: the secret counts as leaked
+		t.Fatal(err)
+	}
 	d, err := sessionSecret(path)
 	fi, _ = os.Stat(path)
 	if err != nil || d == c || len(d) != 64 || fi.Mode().Perm() != 0o600 {
 		t.Errorf("world-readable file kept: %q %v mode %v", d, err, fi.Mode().Perm())
+	}
+	// not hex: replaced
+	if err := os.WriteFile(path, []byte(strings.Repeat("z", 64)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e, err := sessionSecret(path)
+	if err != nil || e == d || len(e) != 64 {
+		t.Errorf("non-hex file kept: %q %v", e, err)
+	}
+	// older than the TTL: rotated
+	old := time.Now().Add(-sessionTTL - time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	g, err := sessionSecret(path)
+	if err != nil || g == e {
+		t.Errorf("expired secret kept: %q %v", g, err)
+	}
+	// a symlink to a private file elsewhere: never followed, replaced by a plain file
+	target := filepath.Join(t.TempDir(), "elsewhere")
+	if err := os.WriteFile(target, []byte(g+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(path)
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+	h, err := sessionSecret(path)
+	li, _ := os.Lstat(path)
+	if err != nil || h == g || li.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("symlink accepted: %q %v mode %v", h, err, li.Mode())
+	}
+	if b, _ := os.ReadFile(target); strings.TrimSpace(string(b)) != g {
+		t.Error("the symlink target was modified")
 	}
 }

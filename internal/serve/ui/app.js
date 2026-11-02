@@ -154,7 +154,7 @@ function selectNode(id) {
   drawNodeDetails(id);
 }
 
-function pathsThrough(id) { return S.decisions.filter((d) => d.path && d.path.includes(id)); }
+function pathsThrough(id) { return S.decisions.filter((d) => Array.isArray(d.path) && d.path.length === 3 && d.path.includes(id)); }
 
 function applySelection() {
   const id = S.selected, root = $("diagram");
@@ -275,7 +275,10 @@ function replayDecision(d) {
 }
 
 $("nd-close").addEventListener("click", () => selectNode(null));
-document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.selected) selectNode(null); });
+document.addEventListener("keydown", (e) => {
+  const tag = e.target && e.target.tagName;
+  if (e.key === "Escape" && S.selected && tag !== "INPUT" && tag !== "TEXTAREA") selectNode(null);
+});
 
 async function poll() {
   try {
