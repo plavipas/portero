@@ -2,6 +2,7 @@ package serve
 
 import (
 	"errors"
+	"mime"
 	"net"
 	"net/http"
 	"strings"
@@ -47,11 +48,11 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		case http.MethodGet, http.MethodHead:
 		case http.MethodPost:
 			origin := r.Header.Get("Origin")
-			if origin == "" || origin == "null" || !s.hostOK(strings.TrimPrefix(origin, "http://")) || !strings.HasPrefix(origin, "http://") {
+			if !strings.EqualFold(origin, "http://"+r.Host) { // exactly the page's own origin; also rejects "" and "null"
 				http.Error(w, "forbidden origin", http.StatusForbidden)
 				return
 			}
-			if !strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
+			if !isJSON(r.Header.Get("Content-Type")) {
 				http.Error(w, "content type must be application/json", http.StatusUnsupportedMediaType)
 				return
 			}
@@ -63,4 +64,10 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isJSON accepts "application/json" with optional parameters, not "application/jsonx".
+func isJSON(ct string) bool {
+	mt, _, err := mime.ParseMediaType(ct)
+	return err == nil && mt == "application/json"
 }

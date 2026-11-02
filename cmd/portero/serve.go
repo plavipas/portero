@@ -104,13 +104,15 @@ func serveCmd(args []string) error {
 		return fmt.Errorf("serve: refusing to listen on %s", ln.Addr())
 	}
 
-	rulesPath := config.RulesFile()
-	place := "local"
-	if strings.HasPrefix(rulesPath, sync.ICloudDir()) {
-		place = "icloud"
+	rulesNow := func() (string, string) {
+		p := config.RulesFile()
+		if strings.HasPrefix(p, sync.ICloudDir()) {
+			return p, "icloud"
+		}
+		return p, "local"
 	}
 	s := serve.New(serve.Options{
-		RulesFile: rulesPath, RulesPlace: place, LogFile: config.LogFile(),
+		Rules: rulesNow, LogFile: config.LogFile(),
 		Env: check.RealEnv(), Browsers: browserList, Plan: servePlan(),
 	})
 	s.SetAddr(ln.Addr().String())
