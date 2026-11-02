@@ -26,6 +26,18 @@ func (s *Server) SetAddr(hostport string) {
 	s.hosts[strings.ToLower(hostport)] = true
 	s.hosts["localhost:"+port] = true
 	s.hosts["127.0.0.1:"+port] = true
+	s.port = port
+}
+
+// cookieName carries the port: browsers store cookies per host without the port, so a second portero serve
+// on another port must not overwrite this one's session, and the token must not travel to other local servers.
+func (s *Server) cookieName() string {
+	s.gmu.Lock()
+	defer s.gmu.Unlock()
+	if s.port == "" {
+		return "portero_ui"
+	}
+	return "portero_ui_" + s.port
 }
 
 func (s *Server) hostOK(h string) bool {
@@ -81,8 +93,6 @@ func isJSON(ct string) bool {
 	return err == nil && mt == "application/json"
 }
 
-const cookieName = "portero_ui"
-
 // equal compares secrets in constant time.
 func equal(a, b string) bool { return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1 }
 
@@ -93,12 +103,12 @@ func (s *Server) auth(w http.ResponseWriter, _ *http.Request, token string) {
 		http.Error(w, "open the URL printed by portero serve", http.StatusForbidden)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: s.opts.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Value: s.opts.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
 	w.Header().Set("Location", "/")
 	w.WriteHeader(http.StatusSeeOther)
 }
 
 func (s *Server) cookieOK(r *http.Request) bool {
-	c, err := r.Cookie(cookieName)
+	c, err := r.Cookie(s.cookieName())
 	return err == nil && equal(c.Value, s.opts.Token)
 }
