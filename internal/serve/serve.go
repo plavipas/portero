@@ -7,8 +7,10 @@ package serve
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 
 	"github.com/plavipas/portero/internal/browsers"
@@ -30,8 +32,12 @@ type BrowserInfo struct {
 type Options struct {
 	RulesFile  string
 	RulesPlace string // "local" or "icloud"
-	// Token is the per-run secret of the UI; empty means a fresh random one (see Token()).
-	Token string
+	// Nonce is the one-time secret in the link that opens the UI (see Nonce()); empty means a fresh random one.
+	Nonce string
+	// Session is the secret the session cookie carries; it is never in a URL. Empty means a fresh random one.
+	Session string
+	// Notice receives the warning about a reused link; nil means os.Stdout.
+	Notice io.Writer
 	// Rules, when set, is asked on every request and wins over RulesFile/RulesPlace, so a `portero sync`
 	// while the server runs is picked up without a restart.
 	Rules    func() (path, place string)
@@ -44,11 +50,13 @@ type Options struct {
 
 // Server serves the UI and its JSON API.
 type Server struct {
-	opts  Options
-	mu    sync.Mutex // serializes Apply
-	gmu   sync.RWMutex
-	hosts map[string]bool
-	port  string // from SetAddr; part of the session cookie name
+	opts         Options
+	mu           sync.Mutex // serializes Apply
+	gmu          sync.RWMutex
+	amu          sync.Mutex // guards used and warned
+	used, warned bool
+	hosts        map[string]bool
+	port         string // from SetAddr; part of the session cookie name
 }
 
 // New builds a server; call SetAddr with the bound address before serving.
@@ -71,12 +79,14 @@ func New(opts Options) *Server {
 	if opts.Browsers == nil {
 		opts.Browsers = func() []BrowserInfo { return nil }
 	}
-	if opts.Token == "" {
-		b := make([]byte, 32)
-		if _, err := rand.Read(b); err != nil {
-			panic("serve: no randomness for the UI token: " + err.Error())
-		}
-		opts.Token = hex.EncodeToString(b)
+	if opts.Nonce == "" {
+		opts.Nonce = randomHex()
+	}
+	if opts.Session == "" {
+		opts.Session = randomHex()
+	}
+	if opts.Notice == nil {
+		opts.Notice = os.Stdout
 	}
 	if opts.RulesPlace == "" {
 		opts.RulesPlace = "local"
@@ -110,5 +120,13 @@ func (s *Server) rulesPlace() string {
 	return s.opts.RulesPlace
 }
 
-// Token is the secret that opens the UI: `GET /auth/<token>` sets the session cookie.
-func (s *Server) Token() string { return s.opts.Token }
+// Nonce is the one-time secret of the link: `GET /auth/<nonce>` works once and sets the session cookie.
+func (s *Server) Nonce() string { return s.opts.Nonce }
+
+func randomHex() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic("serve: no randomness for the UI secrets: " + err.Error())
+	}
+	return hex.EncodeToString(b)
+}

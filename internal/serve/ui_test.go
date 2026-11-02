@@ -61,7 +61,7 @@ func TestUIServed(t *testing.T) {
 		t.Errorf("/nope: %d", w.Code)
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(&http.Cookie{Name: cookieName, Value: testToken})
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: testSession})
 	req.Host = "evil.example.com"
 	w := httptest.NewRecorder()
 	r.srv.Handler().ServeHTTP(w, req)

@@ -15,11 +15,16 @@ page. Everything else in ADR 0001 stands: one local YAML file, no service, no ac
 2. **The page is self-contained**: plain HTML, CSS and JS embedded in the binary; no node toolchain, no external
    loads (no CDN, no fonts, no analytics). The diagram is drawn by the page's own JS as SVG, in the look of the
    archify diagrams (shared theme tokens), not by the archify tool at runtime.
-3. **Every request is guarded**. A per-run token (32 random bytes from `crypto/rand`, hex) is printed in the
-   URL `portero serve` shows (`/auth/<token>`); `GET /auth/<token>` sets an `HttpOnly; SameSite=Strict` cookie
-   and redirects to `/`. Every API call and every UI file needs that cookie (constant-time compare), so a local
-   process, another macOS user or a container that merely reaches the port can neither read the log nor write
-   the rules. The token is never written to the decision log. On top of that, `Host` must be the bound address (or `localhost:<port>`), `Origin` must be
+3. **Every request is guarded**. `portero serve` prints (and opens) a single-use link `/auth/<nonce>` (nonce: 32
+   random bytes from `crypto/rand`, hex). The first `GET /auth/<nonce>` sets an `HttpOnly; SameSite=Strict`
+   cookie that carries a separate random session secret, never put in a URL, and redirects to `/`; a second use
+   or a wrong nonce is 403, and a second use of the right nonce is reported on stdout, so a link read from the
+   argv of the browser start (`ps` shows other users' arguments) cannot be replayed unnoticed. Every API call
+   and every UI file needs the cookie (constant-time compare), so a local process, another macOS user or a
+   container that merely reaches the port can neither read the log nor write the rules. The nonce is never
+   written to the decision log. The port in the cookie name only keeps two servers apart: browsers send a
+   `127.0.0.1` cookie to every port (low risk; a header-based design is a possible follow-up). On top of that,
+   `Host` must be the bound address (or `localhost:<port>`), `Origin` must be
    present and equal to the page's own origin, `Content-Type` must be `application/json`, the body is capped.
    A cross-site page in any browser can neither read nor change the rules through the server.
 4. **The server writes exactly one file**: the rules file that `config.RulesFile()` resolves. The path never
