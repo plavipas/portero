@@ -248,7 +248,6 @@ type exitCode int
 
 func (e exitCode) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
 
-// installedApp is the app `make install` maintains: the running bundle, or the standard path for a bare CLI.
 // installedApp is the canonical install location, whichever copy is running: a stale copy elsewhere that
 // Launch Services picked must show up as a mismatch, not as "healthy".
 func installedApp() string {
@@ -264,7 +263,11 @@ func printResolution(w io.Writer) bool {
 	for _, s := range handler.Schemes {
 		cur[s] = handler.DefaultHandler(s)
 	}
-	resolved := handler.DefaultApp(handler.Schemes[0])
+	resolvedBy := map[string]string{}
+	for _, s := range handler.Schemes {
+		resolvedBy[s] = handler.DefaultApp(s)
+	}
+	resolved := resolvedBy[handler.Schemes[0]]
 	var ver string
 	if resolved != "" {
 		short, build := handler.BundleVersion(resolved)
@@ -273,6 +276,9 @@ func printResolution(w io.Writer) bool {
 		}
 	}
 	lines, ok := defaultReport(cur, resolved, ver, installedApp(), version)
+	if w := schemeMismatch(resolvedBy); w != "" {
+		lines, ok = append(lines, w), false
+	}
 	for _, l := range lines {
 		fmt.Fprintln(w, l)
 	}
@@ -309,4 +315,16 @@ func defaultReport(cur map[string]string, resolved, resolvedVer, installed, runn
 		ok = false
 	}
 	return lines, ok
+}
+
+// schemeMismatch is a warning when the schemes resolve to different apps (an http link and an https link would
+// open different copies), else "".
+func schemeMismatch(resolvedBy map[string]string) string {
+	first := handler.Schemes[0]
+	for _, s := range handler.Schemes[1:] {
+		if filepath.Clean(resolvedBy[s]) != filepath.Clean(resolvedBy[first]) {
+			return fmt.Sprintf("warning: %s links open %s, %s links open %s; run make install", first, resolvedBy[first], s, resolvedBy[s])
+		}
+	}
+	return ""
 }
