@@ -30,3 +30,20 @@ func TestAppendContainerWithSpacesKeepsFiveColumns(t *testing.T) {
 		t.Errorf("columns = %q", cols)
 	}
 }
+
+func TestAppendGroupLabelKeepsFiveColumns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.log")
+	u, _ := url.Parse("https://example.com/a")
+	d := rules.Decision{Rule: "Work / GitHub", Group: "Work", Target: rules.Target{Browser: "Dia", Profile: "Work"}}
+	if err := Append(path, d, rules.Request{URL: u}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols := strings.Split(strings.TrimSuffix(string(raw), "\n"), "\t")
+	if len(cols) != 5 || cols[2] != "Work / GitHub" {
+		t.Errorf("columns = %q", cols)
+	}
+}

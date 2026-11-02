@@ -1,7 +1,6 @@
 package serve
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/plavipas/portero/internal/browsers"
@@ -26,25 +25,42 @@ func specialID(name string) string {
 	return ""
 }
 
+// fileNodes maps every label the log can carry for a rule of the file to its node: a plain rule to its own
+// node, a group and each "Group / child" to the group node.
+func fileNodes(r *rules.Rules) map[string]string {
+	m := map[string]string{}
+	if r == nil {
+		return m
+	}
+	for i, rule := range r.Rules {
+		if rule.IsGroup() {
+			m[rule.Name] = ruleID(rule.Name)
+			for _, c := range rule.Rules {
+				m[rules.ChildLabel(rule, c)] = ruleID(rule.Name)
+			}
+			continue
+		}
+		l := rules.Label(i, rule)
+		m[l] = ruleID(l)
+	}
+	return m
+}
+
 // logRuleID maps the rule column of the log to a node. The log cannot tell a user rule named "default" or
 // "file" from the built-in outcome of the same name, so when the rules file has such a rule it wins;
-// otherwise the built-in node is used.
+// otherwise the built-in node is used. A label the file does not have gets a node of its own (stale).
 func logRuleID(r *rules.Rules, name string) string {
 	sp := specialID(name)
-	if sp == "" || sp == "s:error" {
-		if sp == "" {
-			return ruleID(name)
-		}
+	if sp == "s:error" {
 		return sp
 	}
-	if r != nil {
-		for _, rule := range r.Rules {
-			if rule.Name == name {
-				return ruleID(name)
-			}
-		}
+	if id, ok := fileNodes(r)[name]; ok {
+		return id
 	}
-	return sp
+	if sp != "" {
+		return sp
+	}
+	return ruleID(name)
 }
 
 // ResolvePaths sets Path[1] of every decision against the rules file (nil when it is broken).
@@ -128,10 +144,7 @@ func BuildGraph(r *rules.Rules, decisions []Decision) Graph {
 	// The file: rules in order, then the special ones.
 	if r != nil {
 		for i, rule := range r.Rules {
-			name := rule.Name
-			if name == "" {
-				name = fmt.Sprintf("#%d", i+1)
-			}
+			name := rules.Label(i, rule)
 			addRule(ruleID(name), name, "rule", false)
 			t := rule.Open
 			addTarget(t.String(), &t)

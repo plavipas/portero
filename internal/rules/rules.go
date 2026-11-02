@@ -71,34 +71,45 @@ func (m Match) empty() bool {
 	return len(m.Host) == 0 && len(m.Path) == 0 && len(m.Opener) == 0 && len(m.Cwd) == 0
 }
 
-func checkCwd(rule string, prefixes []string) error {
+func checkCwd(where string, prefixes []string) error {
 	for _, p := range prefixes {
 		if p == "" || strings.ContainsAny(p, "\t\n\r") {
-			return fmt.Errorf("rules: rule %s: cwd %q is empty or has a control character", rule, p)
+			return fmt.Errorf("rules: %s: cwd %q is empty or has a control character", where, p)
 		}
 		if !strings.HasPrefix(p, "/") && p != "~" && !strings.HasPrefix(p, "~/") {
-			return fmt.Errorf("rules: rule %s: cwd %q must be an absolute path or start with ~/", rule, p)
+			return fmt.Errorf("rules: %s: cwd %q must be an absolute path or start with ~/", where, p)
 		}
 	}
 	return nil
 }
 
-// UsesCwd reports whether any rule has a cwd condition.
+// UsesCwd reports whether any rule, including the rules inside groups, has a cwd condition.
 func (r *Rules) UsesCwd() bool {
 	for _, rule := range r.Rules {
 		if len(rule.Match.Cwd) > 0 {
 			return true
 		}
+		for _, c := range rule.Rules {
+			if len(c.Match.Cwd) > 0 {
+				return true
+			}
+		}
 	}
 	return false
 }
 
-// Rule is one line of the table: conditions and the target.
+// Rule is one element of the table. A plain rule has match and open. A group (an element with a `rules` key)
+// has a name, one open target and a list of child rules that carry only a match.
 type Rule struct {
 	Name  string `yaml:"name,omitempty"`
 	Match Match  `yaml:"match"`
 	Open  Target `yaml:"open"`
+	// Rules makes the element a group; the children have a match and no open.
+	Rules []Rule `yaml:"rules,omitempty"`
 }
+
+// IsGroup reports whether the element has a `rules` key (also an empty list, which Validate rejects).
+func (r Rule) IsGroup() bool { return r.Rules != nil }
 
 // Rules is the whole file.
 type Rules struct {
@@ -130,7 +141,7 @@ func Load(path string) (*Rules, error) {
 	return Parse(text)
 }
 
-// Validate checks the version, that every rule has a condition and a browser.
+// Validate checks the version, that every rule has a condition and a browser, and the shape of groups.
 func (r *Rules) Validate() error {
 	if r.Version != CurrentVersion {
 		return fmt.Errorf("rules: version %d is not supported (expected %d)", r.Version, CurrentVersion)
@@ -142,18 +153,83 @@ func (r *Rules) Validate() error {
 		return err
 	}
 	for i, rule := range r.Rules {
-		if err := checkControl("rule "+label(i, rule.Name), rule.Open); err != nil {
+		if rule.IsGroup() {
+			if err := validateGroup(i, rule); err != nil {
+				return err
+			}
+			continue
+		}
+		where := "rule " + quoted(i, rule.Name)
+		if err := checkName(where, rule.Name); err != nil {
+			return err
+		}
+		if err := checkControl(where, rule.Open); err != nil {
 			return err
 		}
 		if rule.Match.empty() {
-			return fmt.Errorf("rules: rule %s has no match conditions (host, path, opener or cwd)", label(i, rule.Name))
+			return fmt.Errorf("rules: %s has no match conditions (host, path, opener or cwd)", where)
 		}
-		if err := checkCwd(label(i, rule.Name), rule.Match.Cwd); err != nil {
+		if err := checkCwd(where, rule.Match.Cwd); err != nil {
 			return err
 		}
 		if rule.Open.Browser == "" {
-			return fmt.Errorf("rules: rule %s has an empty browser", label(i, rule.Name))
+			return fmt.Errorf("rules: %s has an empty browser", where)
 		}
+	}
+	return nil
+}
+
+func validateGroup(i int, g Rule) error {
+	if g.Name == "" {
+		return fmt.Errorf("rules: group #%d has no name", i+1)
+	}
+	gw := fmt.Sprintf("group %q", g.Name)
+	if err := checkName(gw, g.Name); err != nil {
+		return err
+	}
+	if g.Open.Browser == "" {
+		return fmt.Errorf("rules: %s has an empty browser", gw)
+	}
+	if err := checkControl(gw, g.Open); err != nil {
+		return err
+	}
+	if !g.Match.empty() {
+		return fmt.Errorf("rules: %s has match; conditions go into its rules", gw)
+	}
+	if len(g.Rules) == 0 {
+		return fmt.Errorf("rules: %s has no rules", gw)
+	}
+	for j, c := range g.Rules {
+		where := gw + ", rule " + quoted(j, c.Name)
+		if err := checkName(where, c.Name); err != nil {
+			return err
+		}
+		if c.IsGroup() {
+			return fmt.Errorf("rules: %s: groups cannot contain groups", where)
+		}
+		if c.Open != (Target{}) {
+			return fmt.Errorf("rules: %s: open is set on the group only", where)
+		}
+		if c.Match.empty() {
+			return fmt.Errorf("rules: %s has no match conditions (host, path, opener or cwd)", where)
+		}
+		if err := checkCwd(where, c.Match.Cwd); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkName rejects names that would break the tab-separated log or the "Group / rule" label.
+func checkName(where, name string) error {
+	if strings.ContainsAny(name, "\t\n\r") {
+		return fmt.Errorf("rules: %s: name contains a control character", where)
+	}
+	if name != strings.TrimSpace(name) {
+		return fmt.Errorf("rules: %s: name has leading or trailing spaces", where)
+	}
+	if strings.Contains(name, " / ") {
+		return fmt.Errorf("rules: %s: name must not contain \" / \" (it separates a group from its rule in the log)", where)
 	}
 	return nil
 }
@@ -173,9 +249,27 @@ func checkControl(where string, t Target) error {
 	return nil
 }
 
-func label(i int, name string) string {
+// quoted renders a name in quotes for errors, or #n (1-based position) when there is none.
+func quoted(i int, name string) string {
 	if name != "" {
 		return fmt.Sprintf("%q", name)
 	}
 	return fmt.Sprintf("#%d", i+1)
+}
+
+// Label is the name a plain rule or a group goes by in the log, the diagram and warnings: its name, or "#n"
+// where n is its 1-based position in the top-level list (groups counted).
+func Label(i int, rule Rule) string {
+	if rule.Name != "" {
+		return rule.Name
+	}
+	return fmt.Sprintf("#%d", i+1)
+}
+
+// ChildLabel is "Group / child"; a child without a name goes by the group name alone.
+func ChildLabel(group, child Rule) string {
+	if child.Name == "" {
+		return group.Name
+	}
+	return group.Name + " / " + child.Name
 }

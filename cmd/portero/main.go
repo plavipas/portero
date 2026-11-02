@@ -240,7 +240,7 @@ func rulesCmd(args []string) error {
 		for _, w := range warnings {
 			fmt.Println(w)
 		}
-		fmt.Printf("%s: %d rule(s), default %s\n", p, len(r.Rules), r.Default)
+		fmt.Printf("%s: %s, default %s\n", p, ruleCounts(r), r.Default)
 	case "match":
 		a, err := parseLink(flag.NewFlagSet("match", flag.ContinueOnError), args)
 		if err != nil {
@@ -290,4 +290,21 @@ func syncCmd(args []string) error {
 		return fmt.Errorf("unknown sync command %q", sub)
 	}
 	return nil
+}
+
+// ruleCounts is the summary of `rules check`: "3 rule(s)" or "5 rule(s): 2 plain, 3 in 1 group(s)".
+func ruleCounts(r *rules.Rules) string {
+	plain, grouped, groups := 0, 0, 0
+	for _, rule := range r.Rules {
+		if rule.IsGroup() {
+			groups++
+			grouped += len(rule.Rules)
+		} else {
+			plain++
+		}
+	}
+	if groups == 0 {
+		return fmt.Sprintf("%d rule(s)", plain)
+	}
+	return fmt.Sprintf("%d rule(s): %d plain, %d in %d group(s)", plain+grouped, plain, grouped, groups)
 }
