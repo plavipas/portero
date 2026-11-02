@@ -119,6 +119,7 @@ func serveCmd(args []string) error {
 		Rules: rulesNow, LogFile: config.LogFile(), Session: session,
 		Env: check.RealEnv(), Browsers: browserList, Plan: servePlan(), ConfigFile: config.File(),
 		DefaultStatus: defStatus, SetDefault: setDef, Sync: serveSync(),
+		Offloaded: sync.Offloaded, Download: startDownload,
 	})
 	s.SetAddr(ln.Addr().String())
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
@@ -164,6 +165,9 @@ func openUI(link, authLink string, open func(*url.URL, rules.Target) (launch.Pla
 	}
 	cwd, _ := linkCwd("")
 	req := rules.Request{URL: u, Cwd: cwd}
+	if p := config.RulesFile(); sync.Offloaded(p) {
+		return offloadedFallback(link, launchURL, "", p, open)
+	}
 	r, err := rules.Load(config.RulesFile())
 	if err != nil {
 		_ = decisionlog.AppendError(config.LogFile(), link, "", fmt.Errorf("%w; opened in %s", err, fallback.Browser))
@@ -284,7 +288,12 @@ func serveSync() *serve.SyncFuncs {
 	return &serve.SyncFuncs{
 		Enable: sync.EnableICloud, Disable: sync.Disable, ICloudDir: sync.ICloudDir,
 		ICloudAvailable: func() bool { _, err := os.Stat(filepath.Dir(sync.ICloudDir())); return err == nil },
-		ICloudExists:    func() bool { _, err := os.Stat(filepath.Join(sync.ICloudDir(), "rules.yaml")); return err == nil },
+		ICloudExists: func() bool {
+			p := filepath.Join(sync.ICloudDir(), "rules.yaml")
+			_, err := os.Stat(p)
+			return err == nil || sync.Offloaded(p)
+		},
+		ICloudOffloaded: func() bool { return sync.Offloaded(filepath.Join(sync.ICloudDir(), "rules.yaml")) },
 		LocalPath:       func() string { return filepath.Join(config.Dir(), "rules.yaml") },
 		Pinned:          func() bool { return os.Getenv("PORTERO_RULES") != "" },
 	}

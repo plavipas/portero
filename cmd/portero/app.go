@@ -14,6 +14,7 @@ import (
 	"github.com/plavipas/portero/internal/handler"
 	"github.com/plavipas/portero/internal/launch"
 	"github.com/plavipas/portero/internal/rules"
+	"github.com/plavipas/portero/internal/sync"
 )
 
 // fallback is used when the rules file cannot be read: the link still opens somewhere.
@@ -47,10 +48,32 @@ func runApp() {
 	})
 }
 
-func routeLink(link, opener string) error {
+// startDownload asks iCloud to fetch an offloaded rules file; the macOS implementation in the app, a fake in tests.
+var startDownload = handler.StartDownload
+
+// offloadedFallback handles a link while the rules file is offloaded by iCloud: reading it would block, so the
+// link opens in the fallback browser at once, the event is logged and the download is started so the next link
+// finds the file. launchURL is what the browser is started with (it may differ from link). It returns the
+// error of the browser launch.
+func offloadedFallback(link string, launchURL *url.URL, opener, rulesPath string, open func(*url.URL, rules.Target) (launch.Plan, error)) error {
+	_, openErr := open(launchURL, fallback)
+	cause := fmt.Errorf("rules file offloaded by iCloud, download started; opened in %s", fallback.Browser)
+	if err := startDownload(rulesPath); err != nil {
+		cause = fmt.Errorf("rules file offloaded by iCloud, download not started (%v); opened in %s", err, fallback.Browser)
+	}
+	_ = decisionlog.AppendError(config.LogFile(), link, opener, cause)
+	return openErr
+}
+
+func routeLink(link, opener string) error { return routeLinkWith(link, opener, launch.Open) }
+
+func routeLinkWith(link, opener string, open func(*url.URL, rules.Target) (launch.Plan, error)) error {
 	u, err := parseRoutable(link)
 	if err != nil {
 		return err
+	}
+	if p := config.RulesFile(); sync.Offloaded(p) {
+		return offloadedFallback(link, u, opener, p, open)
 	}
 	// The handler has no meaningful cwd (Launch Services starts the app in /), so cwd rules never match here.
 	req := rules.Request{URL: u, Opener: opener}
@@ -58,14 +81,14 @@ func routeLink(link, opener string) error {
 	if err != nil {
 		// A missing or broken rules file must never swallow a link: Safari is always there.
 		_ = decisionlog.AppendError(config.LogFile(), link, opener, fmt.Errorf("%w; opened in %s", err, fallback.Browser))
-		_, openErr := launch.Open(u, fallback)
+		_, openErr := open(u, fallback)
 		return openErr
 	}
 	d := decide(r, req)
 	if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}
-	_, err = launch.Open(u, d.Target)
+	_, err = open(u, d.Target)
 	return err
 }
 

@@ -362,11 +362,12 @@ func TestSettingsGetSyncExtras(t *testing.T) {
 	f := &syncFake{avail: true}
 	sf := f.funcs("/x")
 	sf.ICloudExists = func() bool { return true }
+	sf.ICloudOffloaded = func() bool { return true }
 	sf.LocalPath = func() string { return "/cfg/rules.yaml" }
 	r := settingsRig(t, Options{Sync: sf})
 	_, m := r.get("/api/settings")
 	sy := m["sync"].(map[string]any)
-	if sy["icloud_exists"] != true || sy["local_path"] != "/cfg/rules.yaml" {
+	if sy["icloud_exists"] != true || sy["icloud_offloaded"] != true || sy["local_path"] != "/cfg/rules.yaml" {
 		t.Errorf("sync = %v", sy)
 	}
 }
@@ -469,5 +470,26 @@ func TestSyncRefusesSymlinkedICloudRules(t *testing.T) {
 	w := r.do("POST", "/api/settings/sync", `{"mode":"icloud"}`)
 	if w.Code != 422 || called {
 		t.Fatalf("got %d, called=%v: %s", w.Code, called, w.Body.String())
+	}
+}
+
+func TestOffloadedRulesAnswer503WithoutReading(t *testing.T) {
+	r := newRig(t, goodRules)
+	downloads := 0
+	r.srv.opts.Offloaded = func(string) bool { return true }
+	r.srv.opts.Download = func(string) error { downloads++; return nil }
+	for _, c := range []struct{ method, path, body string }{
+		{"GET", "/api/state", ""},
+		{"POST", "/api/validate", `{"yaml":"version: 1\ndefault: {browser: Safari}\n"}`},
+		{"POST", "/api/match", `{"url":"https://example.com/"}`},
+		{"POST", "/api/apply", `{"yaml":"version: 1\ndefault: {browser: Safari}\n","base_hash":""}`},
+	} {
+		w := r.do(c.method, c.path, c.body)
+		if w.Code != 503 || !strings.Contains(w.Body.String(), "offloaded by iCloud") {
+			t.Errorf("%s %s: %d %s", c.method, c.path, w.Code, w.Body.String())
+		}
+	}
+	if downloads != 4 {
+		t.Errorf("download requested %d times, want 4", downloads)
 	}
 }

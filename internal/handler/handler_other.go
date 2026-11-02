@@ -13,3 +13,8 @@ var errUnsupported = errors.New("the link handler app exists only on macOS")
 func Run(h Handler)                                  { panic(errUnsupported) }
 func DefaultHandler(scheme string) string            { return "" }
 func SetDefaultHandler(appPath, scheme string) error { return errUnsupported }
+
+// StartDownload is not supported here.
+func StartDownload(path string) error {
+	return errors.New("iCloud download is not supported on this system")
+}
