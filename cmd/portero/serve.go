@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -111,8 +114,12 @@ func serveCmd(args []string) error {
 		}
 		return p, "local"
 	}
+	session, err := sessionSecret(filepath.Join(config.Dir(), "ui-session"))
+	if err != nil {
+		return err
+	}
 	s := serve.New(serve.Options{
-		Rules: rulesNow, LogFile: config.LogFile(),
+		Rules: rulesNow, LogFile: config.LogFile(), Session: session,
 		Env: check.RealEnv(), Browsers: browserList, Plan: servePlan(),
 	})
 	s.SetAddr(ln.Addr().String())
@@ -178,4 +185,27 @@ func openUI(link, authLink string, open func(*url.URL, rules.Target) (launch.Pla
 func uiLinks(addr, nonce string) (bare, auth string) {
 	bare = "http://" + addr + "/"
 	return bare, bare + "auth/" + nonce
+}
+
+// sessionSecret returns the per-user secret behind the UI session cookie, created once (32 random bytes, hex)
+// in a 0600 file under the config directory. Keeping it across runs lets a page opened earlier survive a server
+// restart on the same port with a plain reload, while the one-time nonce in the link stays per run.
+func sessionSecret(path string) (string, error) {
+	if b, err := os.ReadFile(path); err == nil {
+		if v := strings.TrimSpace(string(b)); len(v) == 64 {
+			return v, nil
+		}
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	v := hex.EncodeToString(raw)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte(v+"\n"), 0o600); err != nil {
+		return "", err
+	}
+	return v, nil
 }
