@@ -4,6 +4,7 @@ package lsreg
 import (
 	"bufio"
 	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -25,7 +26,7 @@ func Others(dump io.Reader, id, keep string) ([]string, error) {
 			return
 		}
 		p := filepath.Clean(path)
-		if p == keep || seen[p] {
+		if p == keep || sameFile(p, keep) || seen[p] {
 			return
 		}
 		seen[p] = true
@@ -54,4 +55,14 @@ func Others(dump io.Reader, id, keep string) ([]string, error) {
 
 func isSeparator(line string) bool {
 	return len(line) >= 20 && strings.Trim(line, "-") == ""
+}
+
+// sameFile reports whether a and b are the same existing file (symlinked HOME, another letter case).
+func sameFile(a, b string) bool {
+	fa, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	fb, err := os.Stat(b)
+	return err == nil && os.SameFile(fa, fb)
 }

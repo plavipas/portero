@@ -2,6 +2,7 @@ package lsreg
 
 import (
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -70,5 +71,25 @@ func TestOthersStripsBothRecordSuffixForms(t *testing.T) {
 	}
 	if want := []string{"/a/Portero.app", "/b/Portero.app"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestOthersKeepsTheSameAppReachedThroughASymlink(t *testing.T) {
+	dir := t.TempDir()
+	app := filepath.Join(dir, "Portero.app")
+	if err := os.Mkdir(app, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "home")
+	if err := os.Symlink(dir, link); err != nil {
+		t.Fatal(err)
+	}
+	dump := strings.Repeat("-", 30) + "\npath:  " + app + " (0x405c)\nidentifier:  dev.example.app\n"
+	got, err := Others(strings.NewReader(dump), "dev.example.app", filepath.Join(link, "Portero.app"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Errorf("the kept app was listed as another copy: %q", got)
 	}
 }
