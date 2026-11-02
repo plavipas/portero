@@ -69,7 +69,7 @@ func hashOf(b []byte) string {
 
 // readRules returns the bytes of the rules file; exists is false when there is none.
 func (s *Server) readRules() (data []byte, exists bool, err error) {
-	data, err = os.ReadFile(s.opts.RulesFile)
+	data, err = os.ReadFile(s.rulesPath())
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil
 	}
@@ -145,8 +145,8 @@ func (s *Server) handleState(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	st := map[string]any{
-		"rules_path":  s.opts.RulesFile,
-		"rules_place": s.opts.RulesPlace,
+		"rules_path":  s.rulesPath(),
+		"rules_place": s.rulesPlace(),
 		"exists":      exists,
 		"text":        string(data),
 		"hash":        "",
@@ -201,14 +201,22 @@ func (s *Server) handleGraph(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.graph(r, page.Decisions))
 }
 
+// handleDecisions: without an `offset` parameter it returns the tail of the log (the last decisions);
+// with `offset=N` it returns what follows N, as the UI polls.
 func (s *Server) handleDecisions(w http.ResponseWriter, r *http.Request) {
-	offset, _ := strconv.ParseInt(r.URL.Query().Get("offset"), 10, 64)
-	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	q := r.URL.Query()
+	offset, _ := strconv.ParseInt(q.Get("offset"), 10, 64)
+	limit, err := strconv.Atoi(q.Get("limit"))
 	if err != nil || limit <= 0 {
 		limit = stateDecisions
 	}
 	limit = min(limit, 1000)
-	page, err := AfterPage(s.opts.LogFile, offset, limit)
+	var page Page
+	if q.Has("offset") {
+		page, err = AfterPage(s.opts.LogFile, offset, limit)
+	} else {
+		page, err = TailPage(s.opts.LogFile, limit)
+	}
 	if err != nil {
 		fail(w, http.StatusInternalServerError, "cannot read the decision log: "+err.Error())
 		return
@@ -339,9 +347,9 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	path := s.opts.RulesFile
+	path := s.rulesPath()
 	if fi, err := os.Lstat(path); err == nil && fi.Mode()&fs.ModeSymlink != 0 {
-		fail(w, http.StatusConflict, "rules file is a symlink; edit the target by hand")
+		fail(w, http.StatusUnprocessableEntity, "rules file is a symlink; edit the target by hand")
 		return
 	}
 	old, exists, err := s.readRules()
@@ -349,10 +357,15 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "cannot read the rules file: "+err.Error())
 		return
 	}
-	if exists && hashOf(old) != req.BaseHash {
+	curHash := ""
+	if exists {
+		curHash = hashOf(old)
+	}
+	// Stale: the file changed, or it was removed/moved (e.g. `portero sync`) after the page loaded.
+	if curHash != req.BaseHash {
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error":        map[string]any{"message": "the rules file changed on disk; reload it before applying"},
-			"current_hash": hashOf(old)})
+			"current_hash": curHash})
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

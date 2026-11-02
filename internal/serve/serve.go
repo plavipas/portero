@@ -28,9 +28,12 @@ type BrowserInfo struct {
 type Options struct {
 	RulesFile  string
 	RulesPlace string // "local" or "icloud"
-	LogFile    string
-	Env        check.Env
-	Browsers   func() []BrowserInfo
+	// Rules, when set, is asked on every request and wins over RulesFile/RulesPlace, so a `portero sync`
+	// while the server runs is picked up without a restart.
+	Rules    func() (path, place string)
+	LogFile  string
+	Env      check.Env
+	Browsers func() []BrowserInfo
 	// Plan describes what opening u in t would run; nil where launching is not supported.
 	Plan func(u *url.URL, t rules.Target) (string, error)
 }
@@ -75,4 +78,22 @@ func (s *Server) Handler() http.Handler {
 	s.routesAPI(mux)
 	s.routesUI(mux)
 	return s.guard(mux)
+}
+
+func (s *Server) rulesPath() string {
+	if s.opts.Rules != nil {
+		p, _ := s.opts.Rules()
+		return p
+	}
+	return s.opts.RulesFile
+}
+
+func (s *Server) rulesPlace() string {
+	if s.opts.Rules != nil {
+		if _, pl := s.opts.Rules(); pl != "" {
+			return pl
+		}
+		return "local"
+	}
+	return s.opts.RulesPlace
 }

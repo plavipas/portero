@@ -3,6 +3,7 @@ package serve
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -252,7 +253,7 @@ func TestApplyRefusesSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, m := r.post("/api/apply", map[string]any{"yaml": goodRules + "# x\n", "base_hash": sum(goodRules)})
-	if code != 409 || !strings.Contains(m["error"].(map[string]any)["message"].(string), "symlink") {
+	if code != 422 || !strings.Contains(m["error"].(map[string]any)["message"].(string), "symlink") {
 		t.Fatalf("%d %v", code, m)
 	}
 	if b, _ := os.ReadFile(target); string(b) != goodRules {
@@ -346,5 +347,77 @@ func TestDecisionsEndpointLimitIsCapped(t *testing.T) {
 	_, m := r.get("/api/decisions?offset=0&limit=100000")
 	if n := len(m["decisions"].([]any)); n != 1000 {
 		t.Errorf("limit not capped at 1000: %d", n)
+	}
+}
+
+func TestApplyRemovedFileIsStale(t *testing.T) {
+	r := newRig(t, goodRules)
+	os.Remove(r.rules) // e.g. `portero sync icloud` moved it
+	code, m := r.post("/api/apply", map[string]any{"yaml": goodRules, "base_hash": sum(goodRules)})
+	if code != 409 || m["current_hash"] != "" {
+		t.Fatalf("%d %v", code, m)
+	}
+	if _, err := os.Stat(r.rules); err == nil {
+		t.Error("a file was created for a stale base hash")
+	}
+}
+
+func TestRulesPathResolvedPerRequest(t *testing.T) {
+	r := newRig(t, goodRules)
+	other := filepath.Join(r.dir, "moved", "rules.yaml")
+	os.MkdirAll(filepath.Dir(other), 0o755)
+	os.WriteFile(other, []byte(goodRules+"# moved\n"), 0o600)
+	path, place := r.rules, "local"
+	r.srv.opts.Rules = func() (string, string) { return path, place }
+	if _, m := r.get("/api/state"); m["rules_path"] != r.rules || m["rules_place"] != "local" {
+		t.Fatalf("%v", m)
+	}
+	path, place = other, "icloud"
+	_, m := r.get("/api/state")
+	if m["rules_path"] != other || m["rules_place"] != "icloud" || !strings.HasSuffix(m["text"].(string), "# moved\n") {
+		t.Errorf("not re-resolved: %v", m)
+	}
+}
+
+func TestDecisionsWithoutOffsetIsTail(t *testing.T) {
+	r := newRig(t, goodRules)
+	var b strings.Builder
+	for i := 0; i < 10; i++ {
+		b.WriteString(okLine(i))
+	}
+	os.WriteFile(r.log, []byte(b.String()), 0o600)
+	_, m := r.get("/api/decisions?limit=3")
+	ds := m["decisions"].([]any)
+	if len(ds) != 3 || ds[2].(map[string]any)["url"] != "https://example.com/9" || m["offset"].(float64) != float64(b.Len()) {
+		t.Errorf("tail: %v", m)
+	}
+	_, m = r.get("/api/decisions?offset=0&limit=3")
+	if ds := m["decisions"].([]any); len(ds) != 3 || ds[0].(map[string]any)["url"] != "https://example.com/0" {
+		t.Errorf("offset=0 reads from the start: %v", m)
+	}
+}
+
+func TestGuardOriginEqualsHostAndJSONType(t *testing.T) {
+	r := newRig(t, goodRules)
+	try := func(host, origin, ctype string) int {
+		req := httptest.NewRequest("POST", "/api/validate", strings.NewReader("{}"))
+		req.Host = host
+		req.Header.Set("Origin", origin)
+		req.Header.Set("Content-Type", ctype)
+		w := httptest.NewRecorder()
+		r.srv.Handler().ServeHTTP(w, req)
+		return w.Code
+	}
+	if c := try("localhost:7777", "http://127.0.0.1:7777", "application/json"); c != 403 {
+		t.Errorf("origin alias differs from Host: %d", c)
+	}
+	if c := try("localhost:7777", "http://localhost:7777", "application/json"); c != 200 {
+		t.Errorf("same origin: %d", c)
+	}
+	if c := try(testAddr, "http://"+testAddr, "application/jsonx"); c != 415 {
+		t.Errorf("application/jsonx: %d", c)
+	}
+	if c := try(testAddr, "http://"+testAddr, "application/json; charset=utf-8"); c != 200 {
+		t.Errorf("charset: %d", c)
 	}
 }
