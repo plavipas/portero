@@ -83,7 +83,6 @@ func TestUILinkCarriesNonceOnly(t *testing.T) {
 	if bare != "http://127.0.0.1:5555/" || auth != "http://127.0.0.1:5555/auth/nonce123" {
 		t.Errorf("%q %q", bare, auth)
 	}
-	// The session secret never appears in a link: uiLinks takes the nonce only (see TestOpenUILogsNoToken).
 
 }
 
@@ -147,5 +146,39 @@ func TestSessionSecretPersists(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(target); strings.TrimSpace(string(b)) != g {
 		t.Error("the symlink target was modified")
+	}
+}
+
+func TestServeAnnouncesLinkOnly(t *testing.T) {
+	nonce := strings.Repeat("ab", 32)
+	_, auth := uiLinks("127.0.0.1:5555", nonce)
+	line := announce(auth)
+	if !strings.Contains(line, auth) || !strings.Contains(line, nonce) {
+		t.Errorf("announce lacks the link: %q", line)
+	}
+	// The secret behind the cookie is read into a variable the announce line never sees; make sure the
+	// loader itself produces something distinct from the nonce and that the line cannot contain it.
+	secret, err := sessionSecret(filepath.Join(t.TempDir(), "ui-session"))
+	if err != nil || secret == nonce || strings.Contains(line, secret) {
+		t.Errorf("session secret leaks into the announce line: %v", err)
+	}
+}
+
+func TestSessionDirIsPrivate(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "portero")
+	if _, err := sessionSecret(filepath.Join(dir, "ui-session")); err != nil {
+		t.Fatal(err)
+	}
+	fi, _ := os.Stat(dir)
+	if fi.Mode().Perm() != 0o700 {
+		t.Errorf("session dir mode %v, want 0700", fi.Mode().Perm())
+	}
+	if _, err := sessionSecret(filepath.Join(t.TempDir(), "no", "such", "dir-is-a-file", "x")); err == nil {
+		// a path whose parent cannot be created must fail, not panic
+		f := filepath.Join(t.TempDir(), "file")
+		os.WriteFile(f, nil, 0o600)
+		if _, err := sessionSecret(filepath.Join(f, "ui-session")); err == nil {
+			t.Error("expected an error when the parent is a file")
+		}
 	}
 }
