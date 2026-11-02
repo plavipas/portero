@@ -3,6 +3,7 @@ package serve
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -401,6 +402,7 @@ func TestGuardOriginEqualsHostAndJSONType(t *testing.T) {
 	r := newRig(t, goodRules)
 	try := func(host, origin, ctype string) int {
 		req := httptest.NewRequest("POST", "/api/validate", strings.NewReader("{}"))
+		req.AddCookie(&http.Cookie{Name: cookieName, Value: testToken})
 		req.Host = host
 		req.Header.Set("Origin", origin)
 		req.Header.Set("Content-Type", ctype)

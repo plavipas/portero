@@ -22,7 +22,7 @@ scripts, `$BROWSER`) in the browser and profile that a rule picks. One link, one
   error is logged.
 - Ships a CLI: `portero open <url>`, `portero rules`, `portero sync`, `portero serve`, usable as `$BROWSER`.
 - `portero serve` runs a local web UI on a loopback address: a live diagram of where links went and an editor for
-  the rules file with validation, a test match and a backup of the previous file. See [docs/ui.md](docs/ui.md).
+  the rules file with validation, a test match and a backup of the previous file. See [docs/ui.md](docs/ui.md). Access needs a per-run token printed by the command (loopback is reachable by other local users and containers).
 
 ## How it works
 

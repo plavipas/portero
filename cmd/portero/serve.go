@@ -123,11 +123,13 @@ func serveCmd(args []string) error {
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
 
+	// The token opens the UI (see internal/serve/guard.go): it is printed and handed to the browser, never logged.
 	link := "http://" + ln.Addr().String() + "/"
-	fmt.Printf("Portero UI: %s  (Ctrl-C stops it)\n", link)
+	authLink := link + "auth/" + s.Token()
+	fmt.Printf("Portero UI: %s  (Ctrl-C stops it)\n", authLink)
 	if !*noOpen {
-		if err := openUI(link); err != nil {
-			fmt.Fprintln(os.Stderr, "portero: could not open the UI:", err)
+		if err := openUI(link, authLink, launch.Open); err != nil {
+			fmt.Fprintln(os.Stderr, "portero: could not open the UI:", strings.ReplaceAll(err.Error(), s.Token(), "<token>"))
 		}
 	}
 	select {
@@ -142,10 +144,16 @@ func serveCmd(args []string) error {
 	return srv.Shutdown(shutdown)
 }
 
-// openUI opens the UI address like `portero open` would: by the user's rules, with the shell's working
-// directory. A rules file that cannot be read sends it to the fallback browser and logs an ERROR line.
-func openUI(link string) error {
+// openUI routes the UI address like `portero open` would: by the user's rules, with the shell's working
+// directory. link is the bare address (what rules match and the log records); authLink, which carries the
+// token, is only what the browser is started with. A rules file that cannot be read sends it to the fallback
+// browser and logs an ERROR line.
+func openUI(link, authLink string, open func(*url.URL, rules.Target) (launch.Plan, error)) error {
 	u, err := url.Parse(link)
+	if err != nil {
+		return err
+	}
+	launchURL, err := url.Parse(authLink)
 	if err != nil {
 		return err
 	}
@@ -154,13 +162,13 @@ func openUI(link string) error {
 	r, err := rules.Load(config.RulesFile())
 	if err != nil {
 		_ = decisionlog.AppendError(config.LogFile(), link, "", fmt.Errorf("%w; opened in %s", err, fallback.Browser))
-		_, openErr := launch.Open(u, fallback)
+		_, openErr := open(launchURL, fallback)
 		return openErr
 	}
 	d := r.Route(req)
 	if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}
-	_, err = launch.Open(u, d.Target)
+	_, err = open(launchURL, d.Target)
 	return err
 }

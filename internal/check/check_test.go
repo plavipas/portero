@@ -48,6 +48,8 @@ func TestCheckTargets(t *testing.T) {
 			[]string{`warning: rule "x": the state of the "Open external links in a container" extension in Zen is unknown (profile not found or extensions.json unreadable); links open without a container`}, ""},
 		{"unlisted app not installed", "{browser: Some Browser}", testEnv(false, std, nil, true, nil),
 			[]string{`warning: rule "x": Some Browser is not installed on this Mac`}, ""},
+		{"path as browser", "{browser: /Users/Shared/x.app}", testEnv(false, std, nil, true, nil),
+			[]string{`warning: rule "x": browser "/Users/Shared/x.app" is a path; Portero opens it with open -a`}, ""},
 		{"unlisted bundle id skipped", "{browser: com.example.browser}", testEnv(false, std, nil, true, nil), nil, ""},
 		{"not firefox", "{browser: Dia, container: Work}", testEnv(true, std, nil, true, nil), nil,
 			`rules: rule "x": container "Work" needs a Firefox-family browser (Firefox, Firefox Developer Edition, Zen); Dia does not take one`},

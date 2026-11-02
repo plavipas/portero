@@ -9,12 +9,17 @@ page. Everything else in ADR 0001 stands: one local YAML file, no service, no ac
 
 1. **`portero serve` is a loopback-only HTTP server** (`internal/serve`, standard library `net/http`,
    `go:embed`). It binds `127.0.0.1` on a random free port by default (`--port N`, `--listen 127.0.0.1:N`);
-   a non-loopback listen address is refused. There is no authentication, so the server must never be reachable
-   from another host.
+   a non-loopback listen address is refused. Loopback is not private on this Mac: every local process, every other
+   macOS user (Fast User Switching) and containers or VMs reach `127.0.0.1`. That is why decision 3 adds a
+   per-run token.
 2. **The page is self-contained**: plain HTML, CSS and JS embedded in the binary; no node toolchain, no external
    loads (no CDN, no fonts, no analytics). The diagram is drawn by the page's own JS as SVG, in the look of the
    archify diagrams (shared theme tokens), not by the archify tool at runtime.
-3. **Every write is guarded**: `Host` must be the bound address (or `localhost:<port>`), `Origin` must be
+3. **Every request is guarded**. A per-run token (32 random bytes from `crypto/rand`, hex) is printed in the
+   URL `portero serve` shows (`/auth/<token>`); `GET /auth/<token>` sets an `HttpOnly; SameSite=Strict` cookie
+   and redirects to `/`. Every API call and every UI file needs that cookie (constant-time compare), so a local
+   process, another macOS user or a container that merely reaches the port can neither read the log nor write
+   the rules. The token is never written to the decision log. On top of that, `Host` must be the bound address (or `localhost:<port>`), `Origin` must be
    present and equal to the page's own origin, `Content-Type` must be `application/json`, the body is capped.
    A cross-site page in any browser can neither read nor change the rules through the server.
 4. **The server writes exactly one file**: the rules file that `config.RulesFile()` resolves. The path never

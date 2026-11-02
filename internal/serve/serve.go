@@ -5,6 +5,8 @@
 package serve
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"net/url"
 	"sync"
@@ -28,6 +30,8 @@ type BrowserInfo struct {
 type Options struct {
 	RulesFile  string
 	RulesPlace string // "local" or "icloud"
+	// Token is the per-run secret of the UI; empty means a fresh random one (see Token()).
+	Token string
 	// Rules, when set, is asked on every request and wins over RulesFile/RulesPlace, so a `portero sync`
 	// while the server runs is picked up without a restart.
 	Rules    func() (path, place string)
@@ -66,6 +70,13 @@ func New(opts Options) *Server {
 	if opts.Browsers == nil {
 		opts.Browsers = func() []BrowserInfo { return nil }
 	}
+	if opts.Token == "" {
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			panic("serve: no randomness for the UI token: " + err.Error())
+		}
+		opts.Token = hex.EncodeToString(b)
+	}
 	if opts.RulesPlace == "" {
 		opts.RulesPlace = "local"
 	}
@@ -97,3 +108,6 @@ func (s *Server) rulesPlace() string {
 	}
 	return s.opts.RulesPlace
 }
+
+// Token is the secret that opens the UI: `GET /auth/<token>` sets the session cookie.
+func (s *Server) Token() string { return s.opts.Token }
