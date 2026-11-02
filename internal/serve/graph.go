@@ -8,14 +8,54 @@ import (
 	"github.com/plavipas/portero/internal/rules"
 )
 
-// Node ids: "o:<bundle id or ->", "r:<rule>", "t:<Target.String()>".
+// Node ids: "o:<bundle id or ->", "r:<user rule name>", "s:default|file|error" for the built-in nodes,
+// "t:<Target.String()>". The built-ins have their own namespace so a user rule named "default" stays apart.
 func openerID(o string) string { return "o:" + o }
-func ruleID(r string) string {
-	if r == "" {
-		r = "default"
+func ruleID(r string) string   { return "r:" + r }
+
+// specialID is the node of a rule name the log uses for built-in outcomes, "" for any other name.
+func specialID(name string) string {
+	switch name {
+	case "default", "":
+		return "s:default"
+	case "file":
+		return "s:file"
+	case "ERROR":
+		return "s:error"
 	}
-	return "r:" + r
+	return ""
 }
+
+// logRuleID maps the rule column of the log to a node. The log cannot tell a user rule named "default" or
+// "file" from the built-in outcome of the same name, so when the rules file has such a rule it wins;
+// otherwise the built-in node is used.
+func logRuleID(r *rules.Rules, name string) string {
+	sp := specialID(name)
+	if sp == "" || sp == "s:error" {
+		if sp == "" {
+			return ruleID(name)
+		}
+		return sp
+	}
+	if r != nil {
+		for _, rule := range r.Rules {
+			if rule.Name == name {
+				return ruleID(name)
+			}
+		}
+	}
+	return sp
+}
+
+// ResolvePaths sets Path[1] of every decision against the rules file (nil when it is broken).
+func ResolvePaths(r *rules.Rules, ds []Decision) {
+	for i := range ds {
+		if ds[i].Kind == "ok" {
+			ds[i].Path[1] = logRuleID(r, ds[i].Rule)
+		}
+	}
+}
+
 func targetID(t string) string { return "t:" + t }
 
 // Node is one box of the diagram.
@@ -98,19 +138,20 @@ func BuildGraph(r *rules.Rules, decisions []Decision) Graph {
 			addEdge(ruleID(name), targetID(t.String()), 0)
 		}
 	}
-	addRule(ruleID("default"), "default", "default", false)
-	addRule(ruleID("file"), "file", "file", false)
-	addRule(ruleID("ERROR"), "ERROR → Safari fallback", "error", false)
+	addRule("s:default", "default", "default", false)
+	addRule("s:file", "file", "file", false)
+	addRule("s:error", "ERROR → Safari fallback", "error", false)
 	if r != nil {
 		t := r.Default
 		addTarget(t.String(), &t)
-		addEdge(ruleID("default"), targetID(t.String()), 0)
-		addEdge(ruleID("file"), targetID(t.String()), 0)
+		addEdge("s:default", targetID(t.String()), 0)
+		addEdge("s:file", targetID(t.String()), 0)
 	}
 	addTarget(fallbackTarget, nil)
-	addEdge(ruleID("ERROR"), targetID(fallbackTarget), 0)
+	addEdge("s:error", targetID(fallbackTarget), 0)
 
 	// The log.
+	ResolvePaths(r, decisions)
 	for _, d := range decisions {
 		g.Total++
 		oid := d.Path[0]
@@ -125,7 +166,7 @@ func BuildGraph(r *rules.Rules, decisions []Decision) Graph {
 		}
 		rid, tid := d.Path[1], d.Path[2]
 		if !seen[rid] {
-			addRule(rid, strings.TrimPrefix(rid, "r:"), "rule", r != nil)
+			addRule(rid, strings.TrimPrefix(rid, "r:"), "rule", r != nil) // only unknown user rules get here
 		}
 		if !seen[tid] {
 			addTarget(strings.TrimPrefix(tid, "t:"), nil)

@@ -75,7 +75,7 @@ func TestTailErrorGarbageAndPartial(t *testing.T) {
 	}
 	e := page.Decisions[1]
 	if e.Kind != "error" || e.Target != "rules: broken; opened in Safari" || e.URL != "https://example.com/a\tb" ||
-		e.Path != [3]string{"o:com.example.app", "r:ERROR", "t:Safari"} {
+		e.Path != [3]string{"o:com.example.app", "s:error", "t:Safari"} {
 		t.Errorf("error line: %+v", e)
 	}
 	if want := int64(len(content) - len("2026-01-01T00:00:00Z\t-\tdefault\tSa")); page.Offset != want {

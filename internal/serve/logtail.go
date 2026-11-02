@@ -189,7 +189,7 @@ func parseLine(l string) (Decision, bool) {
 // path is the decision's route through the graph.
 func (d Decision) path() [3]string {
 	if d.Kind == "error" {
-		return [3]string{openerID(d.Opener), ruleID("ERROR"), targetID(fallbackTarget)}
+		return [3]string{openerID(d.Opener), specialID("ERROR"), targetID(fallbackTarget)}
 	}
-	return [3]string{openerID(d.Opener), ruleID(d.Rule), targetID(d.Target)}
+	return [3]string{openerID(d.Opener), logRuleID(nil, d.Rule), targetID(d.Target)}
 }
