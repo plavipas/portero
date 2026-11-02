@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var hexSuffix = regexp.MustCompile(` \(0x[0-9a-f]+\)$`)
+var hexSuffix = regexp.MustCompile(`(?i) \(0x[0-9a-f]+(-0x[0-9a-f]+)?\)$`) // "(0x405c)" or "(0x0-0x1a2b3c)"
 
 // Others returns the app paths registered under bundle id id, except keep. Records are separated by lines of
 // dashes; only the first "path:" and "identifier:" of a record count, so "all roles:" lines of other records
