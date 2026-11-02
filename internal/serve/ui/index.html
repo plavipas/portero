@@ -23,6 +23,13 @@
       <svg id="diagram" role="img" aria-label="Routing diagram: openers, rules, targets"></svg>
       <p class="empty" id="no-decisions" hidden>No decisions yet. Links Portero routes will show up here.</p>
     </div>
+    <div class="node-details" id="node-details" hidden>
+      <div class="nd-head"><strong id="nd-title"></strong><span class="muted" id="nd-sub"></span><button type="button" class="ghost" id="nd-close">close</button></div>
+      <div class="table-wrap">
+        <table id="nd-table"><thead><tr id="nd-head-row"></tr></thead><tbody id="nd-body"></tbody></table>
+      </div>
+      <p class="empty" id="nd-empty" hidden>No logged links through this node yet.</p>
+    </div>
     <h2>Last decisions</h2>
     <div class="table-wrap">
       <table id="decisions">
