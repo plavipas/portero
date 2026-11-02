@@ -241,3 +241,14 @@ func TestInstalledAppFallsBackToHomeApplicationsForABareCLI(t *testing.T) {
 		t.Errorf("installedApp() = %q, want %q", got, want)
 	}
 }
+
+func TestSchemeMismatch(t *testing.T) {
+	same := map[string]string{"http": "/a/Portero.app", "https": "/a/Portero.app/"}
+	if w := schemeMismatch(same); w != "" {
+		t.Errorf("same app reported as mismatch: %q", w)
+	}
+	diff := map[string]string{"http": "/a/Portero.app", "https": "/old/Portero.app"}
+	if w := schemeMismatch(diff); !strings.Contains(w, "/old/Portero.app") {
+		t.Errorf("mismatch not reported: %q", w)
+	}
+}
