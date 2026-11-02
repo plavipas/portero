@@ -180,7 +180,8 @@ func Names(r *rules.Rules) (warnings []string) {
 				if c.Name == "" {
 					continue
 				}
-				if inner[c.Name] {
+				if inner[c.Name] && !warned[rule.Name+" / "+c.Name] {
+					warned[rule.Name+" / "+c.Name] = true
 					warnings = append(warnings, fmt.Sprintf("warning: group %q: rule name %q is used twice; the log merges them", rule.Name, c.Name))
 				}
 				inner[c.Name] = true
