@@ -197,15 +197,27 @@ const sessionTTL = 7 * 24 * time.Hour
 
 func sessionSecret(path string) (string, error) { return sessionSecretOnce(path, false) }
 
+// validSession returns the secret in path when the file is a plain file (no symlink), readable by nobody
+// else, 64 hex characters and younger than sessionTTL.
+func validSession(path string) (string, bool) {
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o077 != 0 || time.Since(fi.ModTime()) >= sessionTTL {
+		return "", false
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	v := strings.TrimSpace(string(b))
+	if _, err := hex.DecodeString(v); err != nil || len(v) != 64 {
+		return "", false
+	}
+	return v, true
+}
+
 func sessionSecretOnce(path string, retry bool) (string, error) {
-	if fi, err := os.Lstat(path); err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o077 == 0 &&
-		time.Since(fi.ModTime()) < sessionTTL {
-		if b, err := os.ReadFile(path); err == nil {
-			v := strings.TrimSpace(string(b))
-			if _, err := hex.DecodeString(v); err == nil && len(v) == 64 {
-				return v, nil
-			}
-		}
+	if v, ok := validSession(path); ok {
+		return v, nil
 	}
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
@@ -215,10 +227,19 @@ func sessionSecretOnce(path string, retry bool) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil { // an existing directory keeps its mode
 		return "", err
 	}
-	_ = os.Remove(path) // never write through a symlink or into a file with the wrong mode
+	// Create exclusively, never through a symlink. Two servers starting at once both get here: one creates
+	// the file, the other sees EEXIST and reads what the first one wrote. A file that exists but is not valid
+	// (symlink, wrong mode, expired, garbage) is removed once and the creation retried.
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	if errors.Is(err, fs.ErrExist) && !retry {
-		return sessionSecretOnce(path, true) // another portero serve created it between Remove and open: use that one
+	if errors.Is(err, fs.ErrExist) {
+		if v2, ok := validSession(path); ok {
+			return v2, nil
+		}
+		if retry {
+			return "", fmt.Errorf("%s: cannot replace the session file", path)
+		}
+		_ = os.Remove(path)
+		return sessionSecretOnce(path, true)
 	}
 	if err != nil {
 		return "", err
