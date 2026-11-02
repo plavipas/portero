@@ -8,6 +8,8 @@ One YAML file, local to the Mac. Portero looks for it in this order:
 
 `portero rules path` prints the file in use, `portero rules check` validates it, `portero rules match <url>
 [--opener <bundle id>] [--cwd <dir>]` shows the decision without opening anything.
+The file can also be edited in the local UI (`portero serve`, see [ui.md](ui.md)): it validates the text before
+saving and keeps the previous file as `rules.yaml.bak`.
 
 `portero rules check` also checks the targets against this Mac and prints a `warning:` line for:
 
