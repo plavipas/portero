@@ -100,3 +100,10 @@ tr.err td { color: var(--security-stroke); }
 .diff .add { background: var(--add-bg); }
 .diff .del { background: var(--del-bg); }
 .diff .same { color: var(--text-muted); }
+
+/* node details: click a node to pin it and list the paths through it */
+.node { cursor: pointer; }
+.node.sel rect { stroke-width: 3; }
+.node-details { margin: 8px 0 4px; padding: 8px 10px; border: 1px solid var(--backend-stroke); border-radius: 8px; }
+.nd-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 6px; }
+.nd-head .muted { color: var(--text-muted); font-size: 12px; flex: 1; }
