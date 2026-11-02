@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -169,6 +170,17 @@ func (s *Server) handleSettingsSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	call := f.Disable
+	// Neither direction may write through a symlink (the editor refuses them too): off copies the iCloud file
+	// over the local path, on copies the local file into iCloud.
+	for _, p := range []string{s.rulesPath(), localPathOf(f)} {
+		if p == "" {
+			continue
+		}
+		if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			fail(w, http.StatusUnprocessableEntity, p+" is a symlink; change syncing by hand")
+			return
+		}
+	}
 	if want == "icloud" {
 		if f.ICloudAvailable != nil && !f.ICloudAvailable() {
 			fail(w, http.StatusUnprocessableEntity, "iCloud Drive is not available on this Mac")
@@ -198,4 +210,11 @@ func readStrict(w http.ResponseWriter, r *http.Request, v any) bool {
 		return false
 	}
 	return true
+}
+
+func localPathOf(f *SyncFuncs) string {
+	if f.LocalPath == nil {
+		return ""
+	}
+	return f.LocalPath()
 }
