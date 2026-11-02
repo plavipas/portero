@@ -90,6 +90,26 @@ char *porteroDefaultHandler(const char *scheme) {
     }
 }
 
+// Path of the app that opens scheme links now, or "".
+char *porteroDefaultAppPath(const char *scheme) {
+    @autoreleasepool {
+        NSURL *probe = [NSURL URLWithString:[NSString stringWithFormat:@"%s://example.com", scheme]];
+        NSURL *appURL = [[NSWorkspace sharedWorkspace] URLForApplicationToOpenURL:probe];
+        return strdup((appURL.path ?: @"").UTF8String);
+    }
+}
+
+// "short\nbuild" of the bundle at appPath (empty parts when unreadable).
+char *porteroBundleVersion(const char *appPath) {
+    @autoreleasepool {
+        NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:appPath]];
+        NSDictionary *info = [NSBundle bundleWithURL:url].infoDictionary;
+        NSString *s = info[@"CFBundleShortVersionString"] ?: @"";
+        NSString *b = info[@"CFBundleVersion"] ?: @"";
+        return strdup([NSString stringWithFormat:@"%@\n%@", s, b].UTF8String);
+    }
+}
+
 // Ask macOS to make the app at appPath the default for scheme; macOS shows its own confirmation.
 // Returns an error message or "".
 char *porteroSetDefaultHandler(const char *appPath, const char *scheme) {

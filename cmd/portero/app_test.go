@@ -180,3 +180,51 @@ func TestEnsureDefaultAnnouncesOnTheWriter(t *testing.T) {
 		t.Errorf("output %q", buf.String())
 	}
 }
+
+func TestDefaultReport(t *testing.T) {
+	ours := map[string]string{"http": BundleID, "https": BundleID}
+	other := map[string]string{"http": "com.example.browser", "https": "com.example.browser"}
+	const inst = "/h/Applications/Portero.app"
+	tests := []struct {
+		name                                      string
+		cur                                       map[string]string
+		resolved, resolvedVer, installed, running string
+		want                                      []string
+		ok                                        bool
+	}{
+		{"all match", ours, inst, "1.2.3", inst, "1.2.3", []string{"resolved: " + inst + " (1.2.3)"}, true},
+		{"other path", ours, "/tmp/x/Portero.app", "1.2.3", inst, "1.2.3", []string{
+			"resolved: /tmp/x/Portero.app (1.2.3)",
+			"warning: macOS opens links with /tmp/x/Portero.app, not " + inst + "; run make install"}, true},
+		{"other version", ours, inst, "1.0.0", inst, "1.2.3", []string{
+			"resolved: " + inst + " (1.0.0)",
+			"warning: resolved app is 1.0.0, this binary is 1.2.3"}, true},
+		{"empty resolved", ours, "", "", inst, "1.2.3", []string{"resolved: none (macOS has no app for links)"}, false},
+		{"bare CLI uses the standard path", ours, inst, "1.2.3", inst, "1.2.3", []string{"resolved: " + inst + " (1.2.3)"}, true},
+		{"dev binary", ours, inst, "1.2.3", inst, "dev", []string{"resolved: " + inst + " (1.2.3)", "note: dev binary, version not compared"}, true},
+		{"not the default", other, "/Applications/Other.app", "9", inst, "1.2.3", []string{"resolved: /Applications/Other.app (9)"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := defaultReport(tt.cur, tt.resolved, tt.resolvedVer, tt.installed, tt.running)
+			if ok != tt.ok || strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Errorf("got %q ok=%v, want %q ok=%v", got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
+func TestLsregOthersCmd(t *testing.T) {
+	dump := strings.Repeat("-", 30) + "\npath:  /a/Portero.app (0x405c)\nidentifier:  " + BundleID + "\n" +
+		strings.Repeat("-", 30) + "\npath:  /b c/Portero.app (0x405c)\nidentifier:  " + BundleID + "\n"
+	var out bytes.Buffer
+	if err := lsregOthersCmd([]string{BundleID, "/a/Portero.app"}, strings.NewReader(dump), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "/b c/Portero.app\n" {
+		t.Errorf("got %q", out.String())
+	}
+	if err := lsregOthersCmd([]string{BundleID}, strings.NewReader(""), &out); err == nil {
+		t.Error("missing argument accepted")
+	}
+}

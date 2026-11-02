@@ -1,0 +1,54 @@
+// Package lsreg reads the output of `lsregister -dump`. It is portable and never touches the file system.
+package lsreg
+
+import (
+	"bufio"
+	"io"
+	"path/filepath"
+	"regexp"
+	"strings"
+)
+
+var hexSuffix = regexp.MustCompile(` \(0x[0-9a-f]+\)$`)
+
+// Others returns the app paths registered under bundle id id, except keep. Records are separated by lines of
+// dashes; only the first "path:" and "identifier:" of a record count, so "all roles:" lines of other records
+// never match. Paths are returned in dump order without duplicates.
+func Others(dump io.Reader, id, keep string) []string {
+	keep = filepath.Clean(keep)
+	var out []string
+	seen := map[string]bool{}
+	var path, ident string
+	flush := func() {
+		defer func() { path, ident = "", "" }()
+		if ident != id || !strings.HasSuffix(path, ".app") || !filepath.IsAbs(path) {
+			return
+		}
+		p := filepath.Clean(path)
+		if p == keep || seen[p] {
+			return
+		}
+		seen[p] = true
+		out = append(out, p)
+	}
+	sc := bufio.NewScanner(dump)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if isSeparator(line) {
+			flush()
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "path:"); ok && path == "" {
+			path = strings.TrimSpace(hexSuffix.ReplaceAllString(strings.TrimSpace(v), ""))
+		} else if v, ok := strings.CutPrefix(line, "identifier:"); ok && ident == "" {
+			ident = strings.TrimSpace(v)
+		}
+	}
+	flush()
+	return out
+}
+
+func isSeparator(line string) bool {
+	return len(line) >= 20 && strings.Trim(line, "-") == ""
+}

@@ -18,3 +18,9 @@ func SetDefaultHandler(appPath, scheme string) error { return errUnsupported }
 func StartDownload(path string) error {
 	return errors.New("iCloud download is not supported on this system")
 }
+
+// DefaultApp is not supported here.
+func DefaultApp(scheme string) string { return "" }
+
+// BundleVersion is not supported here.
+func BundleVersion(appPath string) (short, build string) { return "", "" }
