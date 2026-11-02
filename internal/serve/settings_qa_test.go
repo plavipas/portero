@@ -171,3 +171,42 @@ func TestSetDefaultNewRequestClearsLast(t *testing.T) {
 	close(release)
 	waitLast(t, r)
 }
+
+// The late answer of an abandoned (stale) attempt must neither clear the newer attempt's pending flag nor
+// overwrite its result.
+func TestSetDefaultStaleAttemptLateResultIsDropped(t *testing.T) {
+	oldRelease, newRelease := make(chan struct{}), make(chan struct{})
+	var calls atomic.Int32
+	r := settingsRig(t, Options{
+		DefaultStatus: okStatus("/x/App.app"), SetDefaultWait: 10 * time.Millisecond, DefaultStale: 30 * time.Millisecond,
+		SetDefault: func() ([]SchemeResult, error) {
+			if calls.Add(1) == 1 {
+				<-oldRelease
+				return nil, errors.New("old attempt: still handled by \"com.example.other\"")
+			}
+			<-newRelease
+			return []SchemeResult{{"http", "dev.example.app", "set now"}}, nil
+		},
+	})
+	if code, _ := r.post("/api/settings/default", map[string]any{}); code != 202 {
+		t.Fatalf("first: %d", code)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if code, _ := r.post("/api/settings/default", map[string]any{}); code != 202 {
+		t.Fatalf("retry after stale: %d", code)
+	}
+	close(oldRelease) // the abandoned attempt answers while the retry still waits
+	time.Sleep(30 * time.Millisecond)
+	_, g := r.get("/api/settings")
+	if def := g["default"].(map[string]any); def["pending"] != true || def["last"] != nil {
+		t.Errorf("the old answer leaked into the new attempt: %v", def)
+	}
+	close(newRelease)
+	last := waitLast(t, r)
+	if _, hasErr := last["error"]; hasErr {
+		t.Errorf("last carries the old attempt's error: %v", last)
+	}
+	if got := last["schemes"].([]any)[0].(map[string]any)["note"]; got != "set now" {
+		t.Errorf("last = %v", last)
+	}
+}
