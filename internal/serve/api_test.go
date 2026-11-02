@@ -284,3 +284,67 @@ func TestDecisionsEndpoint(t *testing.T) {
 		t.Errorf("graph %d %v", code, m)
 	}
 }
+
+func TestApplyReplacesBackupSymlinkWithoutFollowingIt(t *testing.T) {
+	r := newRig(t, goodRules)
+	victim := filepath.Join(r.dir, "victim.txt")
+	os.WriteFile(victim, []byte("keep"), 0o600)
+	if err := os.Symlink(victim, r.rules+".bak"); err != nil {
+		t.Fatal(err)
+	}
+	code, _ := r.post("/api/apply", map[string]any{"yaml": goodRules + "# x\n", "base_hash": sum(goodRules)})
+	if code != 200 {
+		t.Fatalf("apply: %d", code)
+	}
+	if b, _ := os.ReadFile(victim); string(b) != "keep" {
+		t.Errorf("symlink target of the backup was written: %q", b)
+	}
+	if fi, err := os.Lstat(r.rules + ".bak"); err != nil || fi.Mode()&os.ModeSymlink != 0 {
+		t.Errorf("backup is still a symlink: %v %v", fi, err)
+	}
+	if b, _ := os.ReadFile(r.rules + ".bak"); string(b) != goodRules {
+		t.Errorf("backup %q", b)
+	}
+}
+
+func TestApplyKeepsCRLFAndCommentsByteExact(t *testing.T) {
+	r := newRig(t, goodRules)
+	next := strings.ReplaceAll(goodRules, "\n", "\r\n") + "# trailing comment without newline"
+	code, _ := r.post("/api/apply", map[string]any{"yaml": next, "base_hash": sum(goodRules)})
+	if code != 200 {
+		t.Fatalf("apply: %d", code)
+	}
+	if b, _ := os.ReadFile(r.rules); string(b) != next {
+		t.Errorf("written %q", b)
+	}
+}
+
+func TestDecisionsEndpointMissingLogAndGarbage(t *testing.T) {
+	r := newRig(t, goodRules)
+	code, m := r.get("/api/decisions?offset=0")
+	if code != 200 || len(m["decisions"].([]any)) != 0 || m["truncated"] != false {
+		t.Fatalf("missing log: %d %v", code, m)
+	}
+	os.WriteFile(r.log, []byte("garbage\n"+okLine(1)+"x\ty\n"), 0o600)
+	_, m = r.get("/api/decisions?offset=0")
+	if len(m["decisions"].([]any)) != 1 || m["skipped"].(float64) != 2 {
+		t.Errorf("garbage: %v", m)
+	}
+	_, m = r.get("/api/state")
+	if m["log_skipped"].(float64) != 2 {
+		t.Errorf("state log_skipped %v", m["log_skipped"])
+	}
+}
+
+func TestDecisionsEndpointLimitIsCapped(t *testing.T) {
+	r := newRig(t, goodRules)
+	var b strings.Builder
+	for i := 0; i < 1500; i++ {
+		b.WriteString(okLine(i))
+	}
+	os.WriteFile(r.log, []byte(b.String()), 0o600)
+	_, m := r.get("/api/decisions?offset=0&limit=100000")
+	if n := len(m["decisions"].([]any)); n != 1000 {
+		t.Errorf("limit not capped at 1000: %d", n)
+	}
+}
