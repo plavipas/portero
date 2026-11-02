@@ -65,6 +65,8 @@ fi
 
 mkdir -p "$HOME/Applications" "$HOME/.local/bin"
 # Copy next to the target first and swap: a failed copy (disk full, permissions) leaves the old app in place.
+# An interrupted earlier install may have left only the backup: put it back before anything is removed.
+if [ ! -e "$DEST" ] && [ -e "$DEST.old" ]; then mv "$DEST.old" "$DEST"; fi
 rm -rf "$DEST.new" "$DEST.old"
 cp -R "$APP" "$DEST.new"
 # Swap with two renames and a rollback: the old app is only deleted once the new one is in place.
