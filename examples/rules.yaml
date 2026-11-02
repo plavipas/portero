@@ -8,16 +8,30 @@ default:
   profile: Personal     # optional: profile / space / container name
 
 rules:
+  # A group: one target for several conditions. The first child that matches decides; the group's `open`
+  # applies. Children have `match` only. The log and the diagram show "Work / name" and draw one node "Work".
+  - name: Work
+    open: { browser: Dia, profile: Work }
+    rules:
+      - name: GitHub organisation
+        match:
+          host: github.com
+          path: /work-projects                      # /work-projects and /work-projects/..., not /work-projects-2
+      - name: links clicked in Slack
+        match:
+          opener: com.tinyspeck.slackmacgap         # bundle id of the app that opened the link
+      - name: CLI logins from work repositories
+        # Links opened from a shell by gh/gcloud/etc. with BROWSER="portero open"; the handler app has no cwd,
+        # so this never matches links from other apps.
+        match:
+          cwd: ~/Documents/projects/work            # this directory and everything below it
+      - match:                                      # a child without a name is logged as "Work"
+          host: tracker.example.com
+
   - name: work tools
     match:
       host: [git.example.com, "*.example.net"]      # "*.x" also matches the bare "x"
     open: { browser: Zen }
-
-  - name: work repositories on GitHub
-    match:
-      host: github.com
-      path: /work-projects                          # /work-projects and /work-projects/..., not /work-projects-2
-    open: { browser: Dia, profile: Work }
 
   - name: team wiki in a Firefox container
     match:
@@ -26,19 +40,7 @@ rules:
     # the container is created on first use if it does not exist. `portero rules check` warns when it is missing.
     open: { browser: Zen, container: Work }
 
-  - name: links clicked in Slack
-    match:
-      opener: com.tinyspeck.slackmacgap             # bundle id of the app that opened the link
-    open: { browser: Dia, profile: Work }
-
   - name: docs mirrors
     match:
       host: "docs-*.example.org"                    # plain glob, "*" anywhere
     open: { browser: Safari }
-
-  # Links opened from a shell by gh/gcloud/etc. with BROWSER="portero open"; the handler app has no cwd,
-  # so this never matches links from other apps.
-  - name: CLI logins from work repositories
-    match:
-      cwd: ~/Documents/projects/work                # this directory and everything below it
-    open: { browser: Google Chrome, profile: Work }

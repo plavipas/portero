@@ -26,7 +26,8 @@ type Request struct {
 // Decision is the result of routing one link.
 type Decision struct {
 	Target Target
-	Rule   string // name or "#n" of the matched rule; "" when the default applied
+	Rule   string // label of the matched rule: "name", "#n" or "Group / name"; "" when the default applied
+	Group  string // name of the matched group; "" for a plain rule and for the default
 }
 
 // String renders "Browser/Profile  (rule: name)".
@@ -38,15 +39,20 @@ func (d Decision) String() string {
 	return fmt.Sprintf("%s  (rule: %s)", d.Target, rule)
 }
 
-// Route returns the first matching rule's target, else the default.
+// Route returns the first matching rule's target, else the default. A group is walked in order; its first
+// matching child decides and the group's target is used.
 func (r *Rules) Route(req Request) Decision {
 	for i, rule := range r.Rules {
-		if rule.Match.matches(req) {
-			name := rule.Name
-			if name == "" {
-				name = fmt.Sprintf("#%d", i+1)
+		if rule.IsGroup() {
+			for _, c := range rule.Rules {
+				if c.Match.matches(req) {
+					return Decision{Target: rule.Open, Rule: ChildLabel(rule, c), Group: rule.Name}
+				}
 			}
-			return Decision{Target: rule.Open, Rule: name}
+			continue
+		}
+		if rule.Match.matches(req) {
+			return Decision{Target: rule.Open, Rule: Label(i, rule)}
 		}
 	}
 	return Decision{Target: r.Default}

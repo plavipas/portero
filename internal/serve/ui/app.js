@@ -459,7 +459,14 @@ async function loadState() {
   $("rules-path").textContent = data.rules_path;
   $("rules-place").textContent = data.rules_place === "icloud" ? "iCloud Drive" : "local";
   const sum = $("summary");
-  if (data.rules) sum.textContent = data.rules.rules.length + " rule(s), default " + data.rules.default;
+  if (data.rules) {
+    let plain = 0, grouped = 0, groups = 0;
+    for (const r of data.rules.rules) {
+      if (r.group) { groups++; grouped += (r.rules || []).length; } else plain++;
+    }
+    const counts = groups ? (plain + grouped) + " rule(s): " + plain + " plain, " + grouped + " in " + groups + " group(s)" : plain + " rule(s)";
+    sum.textContent = counts + ", default " + data.rules.default;
+  }
   else if (!data.exists) sum.textContent = "There is no rules file yet. Write one and press Apply.";
   else sum.textContent = "The rules file has an error; links go to Safari until it is fixed.";
   S.valid = !!data.rules;
