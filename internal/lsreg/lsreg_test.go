@@ -59,3 +59,16 @@ func TestOthersFailsOnAnOversizedLine(t *testing.T) {
 		t.Fatal("an oversized line must be an error, not an empty result")
 	}
 }
+
+func TestOthersStripsBothRecordSuffixForms(t *testing.T) {
+	sep := strings.Repeat("-", 30) + "\n"
+	dump := sep + "path:  /a/Portero.app (0x405c)\nidentifier:  dev.example.app\n" +
+		sep + "path:  /b/Portero.app (0x0-0x1a2b3c)\nidentifier:  dev.example.app\n"
+	got, err := Others(strings.NewReader(dump), "dev.example.app", "/keep/Portero.app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"/a/Portero.app", "/b/Portero.app"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
