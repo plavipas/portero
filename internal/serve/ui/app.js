@@ -60,6 +60,7 @@ const S = {
   valid: false,      // last validation of the editor text: no error
   stale: false,
   checking: 0,
+  selected: null,    // pinned diagram node (click); hover is ignored while set
 };
 
 // ---- diagram ----
@@ -111,13 +112,106 @@ function drawGraph(g) {
     if (n.stale) tip += " (not in the rules file any more)";
     if (n.kind === "target" && !n.installed) tip += " (not installed on this Mac)";
     grp.append(svg("title", {}, tip));
-    grp.addEventListener("mouseenter", () => hoverNode(n.id));
-    grp.addEventListener("mouseleave", clearHover);
+    grp.addEventListener("mouseenter", () => { if (!S.selected) hoverNode(n.id); });
+    grp.addEventListener("mouseleave", () => { if (!S.selected) clearHover(); });
+    grp.addEventListener("click", () => selectNode(n.id));
     root.append(grp);
   }));
   $("no-decisions").hidden = (g.total || 0) > 0;
   const last = S.decisions[S.decisions.length - 1];
   if (last) highlightPath(last.path, false);
+  if (S.selected) {
+    if (nodeById(S.selected)) { applySelection(); drawNodeDetails(S.selected); } else selectNode(null);
+  }
+}
+
+function nodeById(id) {
+  const g = S.graph;
+  if (!g) return null;
+  for (const col of [g.openers || [], g.rules || [], g.targets || []]) {
+    const n = col.find((x) => x.id === id);
+    if (n) return n;
+  }
+  return null;
+}
+
+function labelOf(id) { const n = nodeById(id); return n ? n.label : id; }
+
+// selectNode pins a node: every logged path through it is highlighted and listed with its rule and target.
+// Clicking the pinned node again, the close button or Escape clears it.
+function selectNode(id) {
+  if (!id || S.selected === id) {
+    S.selected = null;
+    clearHover();
+    $("diagram").querySelectorAll(".node.sel").forEach((n) => n.classList.remove("sel"));
+    $("node-details").hidden = true;
+    const last = S.decisions[S.decisions.length - 1];
+    if (last) highlightPath(last.path, false);
+    return;
+  }
+  S.selected = id;
+  applySelection();
+  drawNodeDetails(id);
+}
+
+function pathsThrough(id) { return S.decisions.filter((d) => Array.isArray(d.path) && d.path.length === 3 && d.path.includes(id)); }
+
+function applySelection() {
+  const id = S.selected, root = $("diagram");
+  clearHover();
+  root.querySelectorAll(".flow").forEach((e) => e.classList.remove("flow"));
+  root.querySelectorAll(".node.last").forEach((n) => n.classList.remove("last"));
+  const through = pathsThrough(id);
+  if (through.length === 0) { hoverNode(id); } else {
+    root.classList.add("dim");
+    const near = new Set(), pairs = new Set();
+    for (const d of through) {
+      d.path.forEach((x) => near.add(x));
+      pairs.add(d.path[0] + ">" + d.path[1]);
+      pairs.add(d.path[1] + ">" + d.path[2]);
+    }
+    root.querySelectorAll(".edge").forEach((e) => { if (pairs.has(e.dataset.from + ">" + e.dataset.to)) e.classList.add("hl"); });
+    root.querySelectorAll(".node").forEach((n) => { if (near.has(n.dataset.id)) n.classList.add("hl"); });
+  }
+  root.querySelectorAll(".node.sel").forEach((n) => n.classList.remove("sel"));
+  root.querySelectorAll(".node").forEach((n) => { if (n.dataset.id === id) n.classList.add("sel"); });
+}
+
+// drawNodeDetails lists, for the pinned node, the other two steps of every path through it with counts.
+function drawNodeDetails(id) {
+  const n = nodeById(id);
+  if (!n) return;
+  const box = $("node-details");
+  box.hidden = false;
+  $("nd-title").textContent = n.label;
+  const kinds = { opener: "opened by", target: "opens in" };
+  $("nd-sub").textContent = kinds[n.kind] || "rule";
+  const colIdx = n.kind === "opener" ? 0 : n.kind === "target" ? 2 : 1;
+  const others = [0, 1, 2].filter((i) => i !== colIdx);
+  const heads = ["Opened by", "Rule", "Opened in"];
+  $("nd-head-row").replaceChildren(
+    ...others.map((i) => el("th", { text: heads[i] })), el("th", { text: "Links" }), el("th", { text: "Last" }), el("th", {}));
+  const groups = new Map();
+  for (const d of pathsThrough(id)) {
+    const key = others.map((i) => d.path[i]).join("\u0000");
+    const g = groups.get(key) || { ids: others.map((i) => d.path[i]), count: 0, last: d };
+    g.count++;
+    g.last = d;
+    groups.set(key, g);
+  }
+  const rows = [...groups.values()].sort((a, b) => b.count - a.count);
+  const body = $("nd-body");
+  body.replaceChildren();
+  $("nd-empty").hidden = rows.length > 0;
+  for (const g of rows) {
+    const replay = el("button", { type: "button", class: "ghost", text: "show", title: "Show this link's path on the diagram" });
+    replay.addEventListener("click", () => replayDecision(g.last));
+    body.append(el("tr", {},
+      ...g.ids.map((x) => el("td", { text: labelOf(x), title: x })),
+      el("td", { text: String(g.count) }),
+      el("td", { text: fmtTime(g.last.time) }),
+      el("td", {}, replay)));
+  }
 }
 
 function hoverNode(id) {
@@ -162,7 +256,7 @@ function drawDecisions() {
   body.replaceChildren();
   const last = S.decisions.slice(-20).reverse();
   for (const d of last) {
-    const replay = el("button", { type: "button", class: "ghost", text: "replay" });
+    const replay = el("button", { type: "button", class: "ghost", text: "show", title: "Show this link's path on the diagram" });
     replay.addEventListener("click", () => replayDecision(d));
     const target = d.kind === "error" ? "ERROR: " + d.target : d.target;
     const tr = el("tr", { class: d.kind === "error" ? "err" : "" },
@@ -177,10 +271,14 @@ function drawDecisions() {
 }
 
 function replayDecision(d) {
-  $("m-url").value = d.url;
-  $("m-opener").value = d.opener === "-" ? "" : d.opener;
   highlightPath(d.path, true);
 }
+
+$("nd-close").addEventListener("click", () => selectNode(null));
+document.addEventListener("keydown", (e) => {
+  const tag = e.target && e.target.tagName;
+  if (e.key === "Escape" && S.selected && tag !== "INPUT" && tag !== "TEXTAREA") selectNode(null);
+});
 
 async function poll() {
   try {

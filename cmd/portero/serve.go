@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -111,8 +114,15 @@ func serveCmd(args []string) error {
 		}
 		return p, "local"
 	}
+	session := "" // empty: serve.New makes a per-run secret
+	if f := sessionFile(); f != "" {
+		var err error
+		if session, err = sessionSecret(f); err != nil {
+			return err
+		}
+	}
 	s := serve.New(serve.Options{
-		Rules: rulesNow, LogFile: config.LogFile(),
+		Rules: rulesNow, LogFile: config.LogFile(), Session: session,
 		Env: check.RealEnv(), Browsers: browserList, Plan: servePlan(),
 	})
 	s.SetAddr(ln.Addr().String())
@@ -126,7 +136,7 @@ func serveCmd(args []string) error {
 	// The nonce in the link works once (see internal/serve/guard.go): it is printed and handed to the browser,
 	// never logged. The session secret behind the cookie is never printed.
 	link, authLink := uiLinks(ln.Addr().String(), s.Nonce())
-	fmt.Printf("Portero UI: %s  (Ctrl-C stops it)\n", authLink)
+	fmt.Print(announce(authLink))
 	if !*noOpen {
 		if err := openUI(link, authLink, launch.Open); err != nil {
 			fmt.Fprintln(os.Stderr, "portero: could not open the UI:", strings.ReplaceAll(err.Error(), s.Nonce(), "<nonce>"))
@@ -179,3 +189,88 @@ func uiLinks(addr, nonce string) (bare, auth string) {
 	bare = "http://" + addr + "/"
 	return bare, bare + "auth/" + nonce
 }
+
+// sessionSecret returns the per-user secret behind the UI session cookie: 32 random bytes, hex, in a 0600 file
+// under the config directory. Keeping it across runs lets a page opened earlier survive a server restart on the
+// same port with a plain reload; the one-time nonce in the link stays per run. The secret is reused only when
+// the file is a plain file (no symlink), readable by nobody else, well-formed and younger than sessionTTL;
+// otherwise a fresh one replaces it. Deleting the file resets every session.
+const sessionTTL = 7 * 24 * time.Hour
+
+// sessionSecret holds an exclusive lock on a sibling lock file while it checks and, when needed, replaces the
+// secret, so two portero serve processes starting at once always end up with the same secret.
+func sessionSecret(path string) (string, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil { // an existing directory keeps its mode
+		return "", err
+	}
+	lock, err := os.OpenFile(path+".lock", os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return "", err
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		return "", err
+	}
+	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	if v, ok := validSession(path); ok {
+		return v, nil
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	v := hex.EncodeToString(raw)
+	// A complete private temp file renamed over the name: no reader sees half a secret, and rename replaces a
+	// symlink or a bad file instead of following or keeping it.
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".ui-session-*") // 0600
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(v + "\n"); err != nil {
+		tmp.Close()
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return "", err
+	}
+	return v, nil
+}
+
+// validSession returns the secret in path when the file is a plain file (no symlink), readable by nobody
+// else, 64 hex characters and younger than sessionTTL.
+func validSession(path string) (string, bool) {
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o077 != 0 {
+		return "", false
+	}
+	if age := time.Since(fi.ModTime()); age < -time.Minute || age >= sessionTTL { // future mtime counts as invalid
+		return "", false
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	v := strings.TrimSpace(string(b))
+	if _, err := hex.DecodeString(v); err != nil || len(v) != 64 {
+		return "", false
+	}
+	return v, true
+}
+
+// sessionFile is where the session secret lives: the user's cache directory, which no dotfiles repo or
+// folder sync is expected to carry (the config directory often is). Losing it only means a new link.
+func sessionFile() string {
+	dir, err := os.UserCacheDir()
+	if err != nil || dir == "" {
+		return "" // no cache directory: a per-run secret, never one under the config directory
+	}
+	return filepath.Join(dir, "portero", "ui-session")
+}
+
+// announce is the one line serve prints: the single-use link. It takes the link only, so the session secret
+// cannot end up in it (TestServeAnnouncesLinkOnly).
+func announce(authLink string) string { return "Portero UI: " + authLink + "  (Ctrl-C stops it)\n" }
