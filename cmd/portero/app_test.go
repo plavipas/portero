@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -178,5 +180,94 @@ func TestEnsureDefaultAnnouncesOnTheWriter(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "asking macOS to make Portero the handler of http") {
 		t.Errorf("output %q", buf.String())
+	}
+}
+
+func TestDefaultReport(t *testing.T) {
+	ours := map[string]string{"http": BundleID, "https": BundleID}
+	other := map[string]string{"http": "com.example.browser", "https": "com.example.browser"}
+	const inst = "/h/Applications/Portero.app"
+	tests := []struct {
+		name                                      string
+		cur                                       map[string]string
+		resolved, resolvedVer, installed, running string
+		want                                      []string
+		ok                                        bool
+	}{
+		{"all match", ours, inst, "1.2.3", inst, "1.2.3", []string{"resolved: " + inst + " (1.2.3)"}, true},
+		{"other path", ours, "/tmp/x/Portero.app", "1.2.3", inst, "1.2.3", []string{
+			"resolved: /tmp/x/Portero.app (1.2.3)",
+			"warning: macOS opens links with /tmp/x/Portero.app, not " + inst + "; run make install"}, false},
+		{"other version", ours, inst, "1.0.0", inst, "1.2.3", []string{
+			"resolved: " + inst + " (1.0.0)",
+			"warning: resolved app is 1.0.0, this binary is 1.2.3"}, false},
+		{"empty resolved", ours, "", "", inst, "1.2.3", []string{"resolved: none (macOS has no app for links)"}, false},
+		{"bare CLI uses the standard path", ours, inst, "1.2.3", inst, "1.2.3", []string{"resolved: " + inst + " (1.2.3)"}, true},
+		{"dev binary", ours, inst, "1.2.3", inst, "dev", []string{"resolved: " + inst + " (1.2.3)", "note: dev binary, version not compared"}, true},
+		{"not the default", other, "/Applications/Other.app", "9", inst, "1.2.3", []string{"resolved: /Applications/Other.app (9)"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := defaultReport(tt.cur, tt.resolved, tt.resolvedVer, tt.installed, tt.running)
+			if ok != tt.ok || strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Errorf("got %q ok=%v, want %q ok=%v", got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
+func TestLsregOthersCmd(t *testing.T) {
+	dump := strings.Repeat("-", 30) + "\npath:  /a/Portero.app (0x405c)\nidentifier:  " + BundleID + "\n" +
+		strings.Repeat("-", 30) + "\npath:  /b c/Portero.app (0x405c)\nidentifier:  " + BundleID + "\n"
+	var out bytes.Buffer
+	if err := lsregOthersCmd([]string{BundleID, "/a/Portero.app"}, strings.NewReader(dump), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "/b c/Portero.app\n" {
+		t.Errorf("got %q", out.String())
+	}
+	if err := lsregOthersCmd([]string{BundleID}, strings.NewReader(""), &out); err == nil {
+		t.Error("missing argument accepted")
+	}
+}
+
+func TestInstalledAppFallsBackToHomeApplicationsForABareCLI(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if appBundle() != "" {
+		t.Skip("test binary runs inside an app bundle")
+	}
+	want := filepath.Join(home, "Applications", "Portero.app")
+	if got := installedApp(); got != want {
+		t.Errorf("installedApp() = %q, want %q", got, want)
+	}
+}
+
+func TestSchemeMismatch(t *testing.T) {
+	same := map[string]string{"http": "/a/Portero.app", "https": "/a/Portero.app/"}
+	if w := schemeMismatch(same); w != "" {
+		t.Errorf("same app reported as mismatch: %q", w)
+	}
+	diff := map[string]string{"http": "/a/Portero.app", "https": "/old/Portero.app"}
+	if w := schemeMismatch(diff); !strings.Contains(w, "/old/Portero.app") {
+		t.Errorf("mismatch not reported: %q", w)
+	}
+}
+
+func TestSamePathFollowsSymlinks(t *testing.T) {
+	dir := t.TempDir()
+	app := filepath.Join(dir, "Portero.app")
+	if err := os.Mkdir(app, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "home")
+	if err := os.Symlink(dir, link); err != nil {
+		t.Fatal(err)
+	}
+	if !samePath(app, filepath.Join(link, "Portero.app")) {
+		t.Error("symlinked path not recognized as the same app")
+	}
+	if samePath(app, filepath.Join(dir, "Other.app")) {
+		t.Error("different paths reported as the same")
 	}
 }

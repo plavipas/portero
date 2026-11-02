@@ -222,6 +222,9 @@ func defaultCmd(args []string) error {
 	switch sub {
 	case "status":
 		printDefaultStatus(os.Stdout, nil)
+		if !printResolution(os.Stdout) {
+			return exitCode(2)
+		}
 	case "set":
 		app := appBundle()
 		if app == "" {
@@ -230,6 +233,7 @@ func defaultCmd(args []string) error {
 		states, err := ensureDefault(os.Stdout, app, handler.DefaultHandler, handler.SetDefaultHandler, 100*time.Millisecond, 1500*time.Millisecond)
 		notes := stateNotes(states)
 		printDefaultStatus(os.Stdout, func(s string) string { return notes[s] })
+		printResolution(os.Stdout)
 		if err != nil {
 			return err
 		}
@@ -237,4 +241,104 @@ func defaultCmd(args []string) error {
 		return fmt.Errorf("unknown default command %q", sub)
 	}
 	return nil
+}
+
+// exitCode is an error that makes main exit with that code without printing a message.
+type exitCode int
+
+func (e exitCode) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
+
+// installedApp is the canonical install location, whichever copy is running: a stale copy elsewhere that
+// Launch Services picked must show up as a mismatch, not as "healthy".
+func installedApp() string {
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, "Applications", "Portero.app")
+	}
+	return ""
+}
+
+// printResolution prints which app macOS really uses for links and reports whether that looks healthy.
+func printResolution(w io.Writer) bool {
+	cur := map[string]string{}
+	for _, s := range handler.Schemes {
+		cur[s] = handler.DefaultHandler(s)
+	}
+	resolvedBy := map[string]string{}
+	for _, s := range handler.Schemes {
+		resolvedBy[s] = handler.DefaultApp(s)
+	}
+	resolved := resolvedBy[handler.Schemes[0]]
+	var ver string
+	if resolved != "" {
+		short, build := handler.BundleVersion(resolved)
+		if ver = short; ver == "" {
+			ver = build
+		}
+	}
+	lines, ok := defaultReport(cur, resolved, ver, installedApp(), version)
+	if w := schemeMismatch(resolvedBy); w != "" {
+		lines, ok = append(lines, w), false
+	}
+	for _, l := range lines {
+		fmt.Fprintln(w, l)
+	}
+	return ok
+}
+
+// defaultReport compares the app Launch Services resolves for links with the installed one and with this binary.
+// ok is false when no app resolves, or (Portero being the default) the resolved app is not the installed one
+// or has another version than this binary. When Portero is not the default, only the resolved app is shown.
+func defaultReport(cur map[string]string, resolved, resolvedVer, installed, running string) (lines []string, ok bool) {
+	if resolved == "" {
+		return []string{"resolved: none (macOS has no app for links)"}, false
+	}
+	if resolvedVer != "" {
+		lines = append(lines, fmt.Sprintf("resolved: %s (%s)", resolved, resolvedVer))
+	} else {
+		lines = append(lines, "resolved: "+resolved)
+	}
+	for _, s := range handler.Schemes {
+		if cur[s] != BundleID {
+			return lines, true
+		}
+	}
+	ok = true
+	if installed != "" && !samePath(resolved, installed) {
+		lines = append(lines, fmt.Sprintf("warning: macOS opens links with %s, not %s; run make install", resolved, installed))
+		ok = false
+	}
+	if running == "dev" {
+		return append(lines, "note: dev binary, version not compared"), ok
+	}
+	if resolvedVer != "" && resolvedVer != running {
+		lines = append(lines, fmt.Sprintf("warning: resolved app is %s, this binary is %s", resolvedVer, running))
+		ok = false
+	}
+	return lines, ok
+}
+
+// schemeMismatch is a warning when the schemes resolve to different apps (an http link and an https link would
+// open different copies), else "".
+func schemeMismatch(resolvedBy map[string]string) string {
+	first := handler.Schemes[0]
+	for _, s := range handler.Schemes[1:] {
+		if !samePath(resolvedBy[s], resolvedBy[first]) {
+			return fmt.Sprintf("warning: %s links open %s, %s links open %s; run make install", first, resolvedBy[first], s, resolvedBy[s])
+		}
+	}
+	return ""
+}
+
+// samePath reports whether a and b name the same file: the same file on disk when both exist (symlinked HOME,
+// another letter case on a case-insensitive volume), else the same cleaned path.
+func samePath(a, b string) bool {
+	if a == "" || b == "" {
+		return a == b
+	}
+	if fa, err := os.Stat(a); err == nil {
+		if fb, err := os.Stat(b); err == nil {
+			return os.SameFile(fa, fb)
+		}
+	}
+	return filepath.Clean(a) == filepath.Clean(b)
 }

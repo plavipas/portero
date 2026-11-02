@@ -14,6 +14,7 @@ import "C"
 
 import (
 	"errors"
+	"strings"
 	"unsafe"
 )
 
@@ -50,6 +51,25 @@ func DefaultHandler(scheme string) string {
 	out := C.porteroDefaultHandler(cs)
 	defer C.free(unsafe.Pointer(out))
 	return C.GoString(out)
+}
+
+// DefaultApp returns the path of the app that opens scheme links now ("" when none).
+func DefaultApp(scheme string) string {
+	cs := C.CString(scheme)
+	defer C.free(unsafe.Pointer(cs))
+	out := C.porteroDefaultAppPath(cs)
+	defer C.free(unsafe.Pointer(out))
+	return C.GoString(out)
+}
+
+// BundleVersion returns CFBundleShortVersionString and CFBundleVersion of the app bundle at appPath.
+func BundleVersion(appPath string) (short, build string) {
+	cp := C.CString(appPath)
+	defer C.free(unsafe.Pointer(cp))
+	out := C.porteroBundleVersion(cp)
+	defer C.free(unsafe.Pointer(out))
+	short, build, _ = strings.Cut(C.GoString(out), "\n")
+	return short, build
 }
 
 // SetDefaultHandler makes the app bundle at appPath the handler for scheme (macOS asks the user).
