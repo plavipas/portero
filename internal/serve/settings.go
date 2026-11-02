@@ -38,6 +38,8 @@ type SyncFuncs struct {
 	ICloudAvailable func() bool
 	// ICloudExists reports a synced rules.yaml already in the iCloud folder (it is adopted when syncing is on).
 	ICloudExists func() bool
+	// ICloudOffloaded reports that file as removed from this Mac by iCloud (it is downloaded when syncing is on).
+	ICloudOffloaded func() bool
 	// LocalPath is the local rules file that switching syncing off copies back to.
 	LocalPath func() string
 	// Pinned reports that the rules file is fixed from outside (PORTERO_RULES), so it cannot be moved.
@@ -72,6 +74,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
 		}
 		sy["icloud_available"] = f.ICloudAvailable != nil && f.ICloudAvailable()
 		sy["icloud_exists"] = f.ICloudExists != nil && f.ICloudExists()
+		sy["icloud_offloaded"] = f.ICloudOffloaded != nil && f.ICloudOffloaded()
 		if f.LocalPath != nil {
 			sy["local_path"] = f.LocalPath()
 		}

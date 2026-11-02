@@ -5,4 +5,5 @@ void porteroExitAfter(int ms);
 void porteroDone(void);
 char *porteroDefaultHandler(const char *scheme);
 char *porteroSetDefaultHandler(const char *appPath, const char *scheme);
+char *porteroStartDownload(const char *path);
 #endif
