@@ -219,7 +219,11 @@ func rulesCmd(args []string) error {
 		fmt.Println(config.RulesFile())
 	case "init":
 		p := config.RulesFile()
-		if _, err := os.Stat(p); err == nil {
+		if sync.Offloaded(p) { // a synced file iCloud removed from this Mac: never replace it with the example
+			_ = startDownload(p)
+			return fmt.Errorf("rules file offloaded by iCloud, not replaced: %s; the download was requested, run `portero rules check` in a few seconds", p)
+		}
+		if _, err := os.Lstat(p); err == nil {
 			fmt.Println("exists:", p)
 			return nil
 		}

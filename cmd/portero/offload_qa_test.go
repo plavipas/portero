@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -106,5 +107,33 @@ func TestRouteLinkOffloadedRefusesNonURLFirst(t *testing.T) {
 	}
 	if opened || len(*calls) != 0 {
 		t.Errorf("opened=%v downloads=%v", opened, *calls)
+	}
+}
+
+func TestRulesInitRefusesOffloadedPlaceholder(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg"))
+	dir := filepath.Join(home, "rules")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, "rules.yaml")
+	t.Setenv("PORTERO_RULES", p)
+	if err := os.WriteFile(filepath.Join(dir, ".rules.yaml.icloud"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	called := 0
+	old := startDownload
+	startDownload = func(string) error { called++; return nil }
+	defer func() { startDownload = old }()
+	if err := rulesCmd([]string{"init"}); err == nil || !strings.Contains(err.Error(), "not replaced") {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := os.Lstat(p); err == nil {
+		t.Error("init wrote the example next to the placeholder")
+	}
+	if called != 1 {
+		t.Errorf("download requested %d times", called)
 	}
 }
