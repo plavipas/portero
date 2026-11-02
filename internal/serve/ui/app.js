@@ -204,7 +204,7 @@ function drawNodeDetails(id) {
   body.replaceChildren();
   $("nd-empty").hidden = rows.length > 0;
   for (const g of rows) {
-    const replay = el("button", { type: "button", class: "ghost", text: "show", title: "Show this link's path on the diagram and put it into the Match form" });
+    const replay = el("button", { type: "button", class: "ghost", text: "show", title: "Show this link's path on the diagram" });
     replay.addEventListener("click", () => replayDecision(g.last));
     body.append(el("tr", {},
       ...g.ids.map((x) => el("td", { text: labelOf(x), title: x })),
@@ -256,7 +256,7 @@ function drawDecisions() {
   body.replaceChildren();
   const last = S.decisions.slice(-20).reverse();
   for (const d of last) {
-    const replay = el("button", { type: "button", class: "ghost", text: "show", title: "Show this link's path on the diagram and put it into the Match form" });
+    const replay = el("button", { type: "button", class: "ghost", text: "show", title: "Show this link's path on the diagram" });
     replay.addEventListener("click", () => replayDecision(d));
     const target = d.kind === "error" ? "ERROR: " + d.target : d.target;
     const tr = el("tr", { class: d.kind === "error" ? "err" : "" },
@@ -271,8 +271,6 @@ function drawDecisions() {
 }
 
 function replayDecision(d) {
-  $("m-url").value = d.url;
-  $("m-opener").value = d.opener === "-" ? "" : d.opener;
   highlightPath(d.path, true);
 }
 

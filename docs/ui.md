@@ -31,7 +31,7 @@ Left side:
   animated. Hovering a node highlights its edges. A rule that the log mentions but the file no longer has is
   marked as stale; a target whose browser is not installed is marked too.
 - The last decisions (up to 20, newest first): time, opener, rule, target, URL. An `ERROR` line is highlighted.
-  `show` animates that decision's path in the diagram and copies its URL and opener into the Match form.
+  `show` animates that decision's path in the diagram.
 - The browsers Portero sees on this Mac, with their profiles.
 - A theme toggle (dark / light) in the header; the choice is kept in the browser's local storage. Without a stored
   choice the page follows the system setting.
