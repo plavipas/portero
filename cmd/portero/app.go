@@ -249,10 +249,9 @@ type exitCode int
 func (e exitCode) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
 
 // installedApp is the app `make install` maintains: the running bundle, or the standard path for a bare CLI.
+// installedApp is the canonical install location, whichever copy is running: a stale copy elsewhere that
+// Launch Services picked must show up as a mismatch, not as "healthy".
 func installedApp() string {
-	if app := appBundle(); app != "" {
-		return app
-	}
 	if home, err := os.UserHomeDir(); err == nil {
 		return filepath.Join(home, "Applications", "Portero.app")
 	}
