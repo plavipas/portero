@@ -8,14 +8,15 @@ cd "$(dirname "$0")/.."
 ROOT=$(pwd -P)
 VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}
 OUT=${PORTERO_BUILD_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/portero-build.XXXXXX")}
-mkdir -p "$OUT"
-OUT=$(cd "$OUT" && pwd -P)
+case "$OUT" in /*) ;; *) OUT=$PWD/$OUT ;; esac
 case "$OUT/" in
 "$ROOT"/*)
 	echo "error: build directory $OUT is inside the repository; a .app there gets registered with Launch Services" >&2
 	exit 1
 	;;
 esac
+mkdir -p "$OUT"
+OUT=$(cd "$OUT" && pwd -P)
 APP=$OUT/Portero.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

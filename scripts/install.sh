@@ -1,6 +1,6 @@
 #!/bin/sh
 # Installs Portero.app into ~/Applications, links the CLI into ~/.local/bin and leaves exactly one copy
-# registered with Launch Services: the build copy and every other registered Portero.app are unregistered.
+# registered with Launch Services: every other registered Portero.app is unregistered.
 # Does NOT change the default browser: run `portero default set`.
 # INSTALL_DRY_RUN=1 builds in a temp directory and only prints what would happen.
 set -eu
@@ -10,7 +10,13 @@ ID=dev.plavipas.portero
 DEST="$HOME/Applications/Portero.app"
 DRY=${INSTALL_DRY_RUN:-}
 
-APP=$(sh scripts/build-app.sh | tail -1)
+# Capture first: a pipe into tail would hide a failed build and an empty APP would reach rm -rf "$DEST".
+built=$(sh scripts/build-app.sh) || { echo "error: build failed; nothing was changed" >&2; exit 1; }
+APP=$(printf '%s\n' "$built" | tail -1)
+if [ -z "$APP" ] || [ ! -d "$APP/Contents/MacOS" ]; then
+	echo "error: build produced no app ($APP); nothing was changed" >&2
+	exit 1
+fi
 BUILD_DIR=$(dirname "$APP")
 
 # unreg PATH: lsregister -u with a 10 s watchdog; a hang or failure only warns.
@@ -35,7 +41,6 @@ others() { "$LSR" -dump | "$APP/Contents/MacOS/portero" lsreg-others "$ID" "$DES
 
 if [ -n "$DRY" ]; then
 	echo "would copy $APP to $DEST"
-	echo "would unregister $APP"
 	others | while IFS= read -r p; do
 		case "$p" in /*.app) echo "would unregister $p" ;; esac
 	done
@@ -49,7 +54,6 @@ fi
 mkdir -p "$HOME/Applications" "$HOME/.local/bin"
 rm -rf "$DEST"
 cp -R "$APP" "$DEST"
-unreg "$APP"
 # The sweep uses the freshly installed binary; the dump may list the build copy too, it is already gone.
 others_list=$("$LSR" -dump | "$DEST/Contents/MacOS/portero" lsreg-others "$ID" "$DEST" || true)
 printf '%s\n' "$others_list" | while IFS= read -r p; do

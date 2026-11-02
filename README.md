@@ -113,8 +113,8 @@ The app icon comes from `packaging/Portero.icns`; `make icon` (`scripts/make-ico
 ### Troubleshooting: links open an old Portero
 
 `portero default status` prints `resolved: <path> (<version>)`, the app macOS really starts for links, and warns
-when it is not the installed `~/Applications/Portero.app` or its version differs from the binary. Without any
-resolved app the command exits 2. `make install` unregisters every other registered copy; if links still go to an
+when it is not the installed `~/Applications/Portero.app` or its version differs from the binary. The command exits 2
+when Portero is the default but the resolved app is another path or version, or when nothing resolves. `make install` unregisters every other registered copy; if links still go to an
 old one, run `lsregister -f ~/Applications/Portero.app` (the tool lives in
 `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/`) and check
 `portero default status` again.

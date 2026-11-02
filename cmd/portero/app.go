@@ -281,7 +281,8 @@ func printResolution(w io.Writer) bool {
 }
 
 // defaultReport compares the app Launch Services resolves for links with the installed one and with this binary.
-// ok is false when no app resolves at all. When Portero is not the default, only the resolved app is shown.
+// ok is false when no app resolves, or (Portero being the default) the resolved app is not the installed one
+// or has another version than this binary. When Portero is not the default, only the resolved app is shown.
 func defaultReport(cur map[string]string, resolved, resolvedVer, installed, running string) (lines []string, ok bool) {
 	if resolved == "" {
 		return []string{"resolved: none (macOS has no app for links)"}, false
@@ -296,14 +297,17 @@ func defaultReport(cur map[string]string, resolved, resolvedVer, installed, runn
 			return lines, true
 		}
 	}
+	ok = true
 	if installed != "" && filepath.Clean(resolved) != filepath.Clean(installed) {
 		lines = append(lines, fmt.Sprintf("warning: macOS opens links with %s, not %s; run make install", resolved, installed))
+		ok = false
 	}
 	if running == "dev" {
-		return append(lines, "note: dev binary, version not compared"), true
+		return append(lines, "note: dev binary, version not compared"), ok
 	}
 	if resolvedVer != "" && resolvedVer != running {
 		lines = append(lines, fmt.Sprintf("warning: resolved app is %s, this binary is %s", resolvedVer, running))
+		ok = false
 	}
-	return lines, true
+	return lines, ok
 }
