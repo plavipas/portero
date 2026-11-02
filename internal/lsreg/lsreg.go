@@ -1,4 +1,4 @@
-// Package lsreg reads the output of `lsregister -dump`. It is portable and never touches the file system.
+// Package lsreg reads the output of `lsregister -dump`. It is portable; it only stats paths to recognize the kept app.
 package lsreg
 
 import (
