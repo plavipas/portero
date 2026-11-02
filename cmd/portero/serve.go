@@ -244,7 +244,10 @@ func sessionSecret(path string) (string, error) {
 // else, 64 hex characters and younger than sessionTTL.
 func validSession(path string) (string, bool) {
 	fi, err := os.Lstat(path)
-	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o077 != 0 || time.Since(fi.ModTime()) >= sessionTTL {
+	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o077 != 0 {
+		return "", false
+	}
+	if age := time.Since(fi.ModTime()); age < -time.Minute || age >= sessionTTL { // future mtime counts as invalid
 		return "", false
 	}
 	b, err := os.ReadFile(path)
