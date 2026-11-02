@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -195,7 +194,48 @@ func uiLinks(addr, nonce string) (bare, auth string) {
 // otherwise a fresh one replaces it. Deleting the file resets every session.
 const sessionTTL = 7 * 24 * time.Hour
 
-func sessionSecret(path string) (string, error) { return sessionSecretOnce(path, false) }
+// sessionSecret holds an exclusive lock on a sibling lock file while it checks and, when needed, replaces the
+// secret, so two portero serve processes starting at once always end up with the same secret.
+func sessionSecret(path string) (string, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil { // an existing directory keeps its mode
+		return "", err
+	}
+	lock, err := os.OpenFile(path+".lock", os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return "", err
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		return "", err
+	}
+	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	if v, ok := validSession(path); ok {
+		return v, nil
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	v := hex.EncodeToString(raw)
+	// A complete private temp file renamed over the name: no reader sees half a secret, and rename replaces a
+	// symlink or a bad file instead of following or keeping it.
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".ui-session-*") // 0600
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(v + "\n"); err != nil {
+		tmp.Close()
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return "", err
+	}
+	return v, nil
+}
 
 // validSession returns the secret in path when the file is a plain file (no symlink), readable by nobody
 // else, 64 hex characters and younger than sessionTTL.
@@ -213,51 +253,6 @@ func validSession(path string) (string, bool) {
 		return "", false
 	}
 	return v, true
-}
-
-func sessionSecretOnce(path string, retry bool) (string, error) {
-	if v, ok := validSession(path); ok {
-		return v, nil
-	}
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
-	}
-	v := hex.EncodeToString(raw)
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil { // an existing directory keeps its mode
-		return "", err
-	}
-	// Write the secret to a private temp file first, then publish it with link(2), which fails when the
-	// name exists: a reader never sees a half-written file, and of two servers starting at once the loser
-	// reads the winner's complete secret. A file that exists but is not valid (symlink, wrong mode, expired,
-	// garbage) is removed once and publishing retried.
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".ui-session-*") // 0600
-	if err != nil {
-		return "", err
-	}
-	defer os.Remove(tmp.Name())
-	if _, err := tmp.WriteString(v + "\n"); err != nil {
-		tmp.Close()
-		return "", err
-	}
-	if err := tmp.Close(); err != nil {
-		return "", err
-	}
-	err = os.Link(tmp.Name(), path)
-	if errors.Is(err, fs.ErrExist) {
-		if v2, ok := validSession(path); ok {
-			return v2, nil
-		}
-		if retry {
-			return "", fmt.Errorf("%s: cannot replace the session file", path)
-		}
-		_ = os.Remove(path)
-		return sessionSecretOnce(path, true)
-	}
-	if err != nil {
-		return "", err
-	}
-	return v, nil
 }
 
 // sessionFile is where the session secret lives: the user's cache directory, which no dotfiles repo or
