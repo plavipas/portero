@@ -82,11 +82,36 @@ func TestUILinkCarriesNonceOnly(t *testing.T) {
 	if bare != "http://127.0.0.1:5555/" || auth != "http://127.0.0.1:5555/auth/nonce123" {
 		t.Errorf("%q %q", bare, auth)
 	}
+	// The session secret is read from its file and handed to the server only; it must never be printed,
+	// so the only place serve.go may name it is the Options field and the loader.
 	src, err := os.ReadFile("serve.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(src), "Session") {
-		t.Error("serve.go must neither set, read nor print the session secret")
+	for _, line := range strings.Split(string(src), "\n") {
+		if strings.Contains(line, "session") && (strings.Contains(line, "Print") || strings.Contains(line, "Fprint") || strings.Contains(line, "log.")) {
+			t.Errorf("serve.go prints the session secret: %s", strings.TrimSpace(line))
+		}
+	}
+}
+
+func TestSessionSecretPersists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ui-session")
+	a, err := sessionSecret(path)
+	if err != nil || len(a) != 64 {
+		t.Fatalf("first: %q %v", a, err)
+	}
+	fi, _ := os.Stat(path)
+	if fi.Mode().Perm() != 0o600 {
+		t.Errorf("mode %v", fi.Mode().Perm())
+	}
+	b, err := sessionSecret(path)
+	if err != nil || b != a {
+		t.Errorf("second: %q %v (want the same secret)", b, err)
+	}
+	os.WriteFile(path, []byte("short\n"), 0o600)
+	c, err := sessionSecret(path)
+	if err != nil || c == a || len(c) != 64 {
+		t.Errorf("replaced a bad file: %q %v", c, err)
 	}
 }
