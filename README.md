@@ -91,7 +91,8 @@ applies an update, can be dropped before the extension is ready. Opening the lin
 ## Install (from source, macOS)
 
 ```sh
-make install              # rebuilds build/Portero.app, copies it to ~/Applications, links ~/.local/bin/portero
+make install              # builds the app in $TMPDIR, copies it to ~/Applications, unregisters every other
+                          # Portero.app from Launch Services, links ~/.local/bin/portero
 portero rules init        # writes the example rules to ~/.config/portero/rules.yaml; edit it
 portero browsers          # the browsers and profile names Portero sees on this Mac
 portero open https://example.com/ --dry-run
@@ -108,6 +109,15 @@ The app icon comes from `packaging/Portero.icns`; `make icon` (`scripts/make-ico
 `docs/logo.svg` when the logo changes.
 
 `make build` gives a bare CLI in `bin/portero` (no link handling), `make test` runs vet and tests.
+
+### Troubleshooting: links open an old Portero
+
+`portero default status` prints `resolved: <path> (<version>)`, the app macOS really starts for links, and warns
+when it is not the installed `~/Applications/Portero.app` or its version differs from the binary. Without any
+resolved app the command exits 2. `make install` unregisters every other registered copy; if links still go to an
+old one, run `lsregister -f ~/Applications/Portero.app` (the tool lives in
+`/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/`) and check
+`portero default status` again.
 
 ## Roadmap
 

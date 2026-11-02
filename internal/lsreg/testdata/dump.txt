@@ -1,0 +1,17 @@
+--------------------------------------------------------------------------------
+BundleClass:  kLSBundleClassApplication
+path:  /Users/test/Applications/Portero.app (0x405c)
+name:  Portero
+identifier:  dev.plavipas.portero
+--------------------------------------------------------------------------------
+BundleClass:  kLSBundleClassApplication
+path:  /var/folders/xx/T/portero-build.AbC123/Portero.app (0x405c)
+identifier:  dev.plavipas.portero
+--------------------------------------------------------------------------------
+path:  /Users/test/Library/Mobile Documents/com~apple~CloudDocs/My Apps/Portero.app (0x405c)
+identifier:  dev.plavipas.portero
+--------------------------------------------------------------------------------
+path:  /Applications/Other.app (0x405c)
+identifier:  com.example.other
+all roles:  dev.plavipas.portero
+--------------------------------------------------------------------------------
