@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/plavipas/portero/internal/browsers"
+	"github.com/plavipas/portero/internal/check"
 	"github.com/plavipas/portero/internal/config"
 	"github.com/plavipas/portero/internal/decisionlog"
 	"github.com/plavipas/portero/internal/launch"
@@ -34,6 +35,9 @@ Usage:
   portero browsers                                        Installed browsers Portero knows, with their profiles
   portero default [status|set]                            Show or set Portero as the default browser
   portero sync [status|icloud|off]                        Keep the rules file in iCloud Drive
+  portero serve [--port N | --listen 127.0.0.1:N] [--no-open]
+                                                          Local web UI: routing diagram and rules editor
+                                                          (loopback only; opens in the browser your rules pick)
   portero app                                             Run the link handler (what macOS starts)
   portero version
 `
@@ -56,6 +60,8 @@ func main() {
 	switch os.Args[1] {
 	case "app":
 		runApp()
+	case "serve":
+		err = serveCmd(os.Args[2:])
 	case "default":
 		err = defaultCmd(os.Args[2:])
 	case "sync":
@@ -227,11 +233,10 @@ func rulesCmd(args []string) error {
 		if err != nil {
 			return err
 		}
-		warnings, err := checkTargets(r, realCheckEnv())
+		warnings, err := check.All(r, check.RealEnv())
 		if err != nil {
 			return err
 		}
-		warnings = append(warnings, checkCwd(r, realCheckEnv())...)
 		for _, w := range warnings {
 			fmt.Println(w)
 		}

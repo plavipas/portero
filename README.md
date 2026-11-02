@@ -20,7 +20,9 @@ scripts, `$BROWSER`) in the browser and profile that a rule picks. One link, one
 - Opens local HTML files too (Open With, drag onto the icon): they go to the default browser and profile.
 - Logs every routing decision. A missing or broken rules file never swallows a link: it opens in Safari and the
   error is logged.
-- Ships a CLI: `portero open <url>`, `portero rules`, `portero sync`, usable as `$BROWSER`.
+- Ships a CLI: `portero open <url>`, `portero rules`, `portero sync`, `portero serve`, usable as `$BROWSER`.
+- `portero serve` runs a local web UI on a loopback address: a live diagram of where links went and an editor for
+  the rules file with validation, a test match and a backup of the previous file. See [docs/ui.md](docs/ui.md). Access needs the single-use link printed by the command (loopback is reachable by other local users and containers).
 
 ## How it works
 
@@ -84,6 +86,7 @@ portero open https://example.com/ --dry-run
 portero default set       # macOS asks to confirm Portero as the default browser
 export BROWSER="portero open"   # optional: links from shell tools go through Portero, cwd rules apply
 portero sync icloud       # optional: keep rules.yaml in iCloud Drive, shared between your Macs
+portero serve             # optional: the local UI (diagram and rules editor); Ctrl-C stops it
 ```
 
 `portero default set` is safe to run again: it prints `already set` for each scheme Portero already handles and
@@ -97,7 +100,7 @@ The app icon comes from `packaging/Portero.icns`; `make icon` (`scripts/make-ico
 ## Roadmap
 
 - A companion browser extension, so links clicked inside a browser are routed too.
-- A local UI: an interactive diagram of where links go, upload and edit of the rules file, settings.
+- A settings page and a native Mac window for the local UI.
 - More sync backends for the rules file (a private git repository, Google Drive).
 - Other operating systems.
 

@@ -17,7 +17,8 @@ Read README.md first. Everything in the repository in English: code, comments, d
 - `brief` (sonnet) - explains the task, asks ONE question per reply with a recommendation until "Вопросов нет". Read-only.
 - `architect` (fable) - the planning pass: inspects the repository and the installed app, returns the plan with
   acceptance criteria; designs and ADRs. Read-only.
-- `go-developer` (sonnet) - rules, browsers, launchers, CLI, sync, the cgo/Objective-C handler; unit tests; local commits only.
+- `go-developer` (sonnet) - rules, browsers, launchers, CLI, sync, the cgo/Objective-C handler, the local web UI
+  (internal/serve, embedded HTML/JS); unit tests; local commits only.
 - `qa-engineer` (opus) - adversarial verification of the acceptance criteria: unit tests, `--dry-run`, the installed
   app on this Mac (closes every tab it opens, never sets the default browser). PASS/FAIL.
 - `security-reviewer` (opus) - read-only review of the branch diff: argv/AppleScript injection, lost or misrouted links,
@@ -68,3 +69,4 @@ positive is reported with the evidence. The loop never replies on GitHub.
 `make install` refreshes `~/Applications/Portero.app` and `~/.local/bin/portero`. A link can be sent to the app
 without making it the default browser: `open -a Portero <url>`. Agents close every tab they open and never run
 `portero default set`; the user does that once and confirms the macOS dialog.
+`portero serve --no-open` with a temporary `XDG_CONFIG_HOME` (and `PORTERO_RULES` unset) for UI checks; never point it at the real config in tests.
