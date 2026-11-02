@@ -187,15 +187,19 @@ func uiLinks(addr, nonce string) (bare, auth string) {
 	return bare, bare + "auth/" + nonce
 }
 
-// sessionSecret returns the per-user secret behind the UI session cookie, created once (32 random bytes, hex)
-// in a 0600 file under the config directory. Keeping it across runs lets a page opened earlier survive a server
-// restart on the same port with a plain reload, while the one-time nonce in the link stays per run.
+// sessionSecret returns the per-user secret behind the UI session cookie: 32 random bytes, hex, in a 0600 file
+// under the config directory. Keeping it across runs lets a page opened earlier survive a server restart on the
+// same port with a plain reload; the one-time nonce in the link stays per run. The secret is reused only when
+// the file is a plain file (no symlink), readable by nobody else, well-formed and younger than sessionTTL;
+// otherwise a fresh one replaces it. Deleting the file resets every session.
+const sessionTTL = 7 * 24 * time.Hour
+
 func sessionSecret(path string) (string, error) {
-	// An existing secret is reused only when nobody else could have read it: a file that is not 0600
-	// (restored from a backup, copied by hand) is replaced by a fresh secret.
-	if fi, err := os.Stat(path); err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o077 == 0 {
+	if fi, err := os.Lstat(path); err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o077 == 0 &&
+		time.Since(fi.ModTime()) < sessionTTL {
 		if b, err := os.ReadFile(path); err == nil {
-			if v := strings.TrimSpace(string(b)); len(v) == 64 {
+			v := strings.TrimSpace(string(b))
+			if _, err := hex.DecodeString(v); err == nil && len(v) == 64 {
 				return v, nil
 			}
 		}
@@ -205,12 +209,17 @@ func sessionSecret(path string) (string, error) {
 		return "", err
 	}
 	v := hex.EncodeToString(raw)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil { // an existing directory keeps its mode
 		return "", err
 	}
-	_ = os.Remove(path) // WriteFile keeps the mode of an existing file; start from a fresh 0600 one
-	if err := os.WriteFile(path, []byte(v+"\n"), 0o600); err != nil {
+	_ = os.Remove(path) // never write through a symlink or into a file with the wrong mode
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
 		return "", err
 	}
-	return v, nil
+	if _, err := f.WriteString(v + "\n"); err != nil {
+		f.Close()
+		return "", err
+	}
+	return v, f.Close()
 }
