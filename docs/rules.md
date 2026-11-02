@@ -18,17 +18,34 @@ saving and keeps the previous file as `rules.yaml.bak`.
 - a Firefox-family profile where the container extension is not active;
 - a container rule whose extension state cannot be read (profile not found, `extensions.json` unreadable): such links open without a container;
 - a rule none of whose `cwd` directories exist on this Mac (`none of its cwd directories exist on this Mac (...)`).
-  One existing directory is enough, so a file shared between Macs can list the paths of each Mac.
+  One existing directory is enough, so a file shared between Macs can list the paths of each Mac. Inside a
+  group the warning names the group and the rule: `group "Work", rule "CLI logins": ...`;
+- a name used twice in the top-level list, by two plain rules, two groups or a group and a plain rule
+  (`name "Work" is used twice; the diagram and the log merge them`);
+- a rule name used twice inside one group (`group "Work": rule name "x" is used twice; the log merges them`).
+
+The target of a group is checked once, as `group "Work": ...`, not once per rule in it.
 
 Warnings do not fail the check (exit 0). A `container` on a browser outside the Firefox family is an error
 (exit 1), and so is a `cwd` prefix that is not absolute and does not start with `~/`.
 
+The last line counts the rules. Without groups it is `<path>: 3 rule(s), default Dia/Personal`. With groups the
+rules inside them are counted one by one:
+
+```text
+/Users/me/.config/portero/rules.yaml: 7 rule(s): 2 plain, 5 in 1 group(s), default Dia/Personal
+```
+
 ## Format
+
+The file has `version: 1`, a `default` target and an ordered `rules` list. An element of the list is either a
+plain rule or a group.
 
 ```yaml
 version: 1
 default: { browser: Dia, profile: Personal }
 rules:
+  # A plain rule: its own conditions and its own target.
   - name: optional label, shown in the log
     match:
       host: example.com | [a.com, b.com]   # exact; "*.a.com" = any subdomain and a.com; "*" elsewhere = glob
@@ -36,6 +53,14 @@ rules:
       opener: com.vendor.app | [...]       # bundle id of the app that opened the link
       cwd: ~/dir | [/abs/dir, ...]         # working directory of a shell command; see "Working directory"
     open: { browser: <app name or bundle id>, profile: <optional>, container: <optional, Firefox family> }
+
+  # A group: one target for several conditions.
+  - name: required for a group
+    open: { browser: ..., profile: ..., container: ... }
+    rules:
+      - name: optional
+        match: { ... }                     # the same keys as above; no open here
+      - match: { ... }
 ```
 
 - Rules are tried top to bottom; the first match wins; `default` applies when none does.
@@ -43,7 +68,93 @@ rules:
 - Host matching is case-insensitive; path matching is case-sensitive.
 - `profile` means whatever the browser calls it: profile (Dia, Chrome, Firefox) or space (Arc). Name them the way
   you split your life, e.g. Personal and Work.
-- `profile` and `container` must not contain a tab or a line break.
+- `browser`, `profile` and `container` must not contain a tab or a line break and must not start or end with a
+  space.
+
+### Groups
+
+A group collects several conditions that send links to the same place. Groups are optional; a file with plain
+rules only is complete.
+
+- A group has a `name`, one `open` target and a `rules` list. It has no `match` of its own.
+- Each rule in the group has a `match` and an optional `name`, and no `open`. Any of them that matches sends the
+  link to the group's target.
+- A group stands at its position in the list. When the walk reaches it, its rules are tried top to bottom; the
+  first one that matches decides. If none matches, the walk continues with the element after the group.
+- Groups cannot contain groups.
+
+### Names and labels
+
+The log, `portero rules match`, `portero open --dry-run` and the UI name the rule that decided:
+
+| Rule | Label |
+|---|---|
+| plain rule with a name | its name |
+| plain rule without a name | `#n`, its position in the top-level list (groups count as one position each) |
+| rule in a group, with a name | `Group / name` |
+| rule in a group, without a name | the group name |
+| no rule matched | `default` |
+
+A name must not contain a tab or a line break, must not start or end with a space and must not contain ` / `
+(space, slash, space), which separates the group from the rule. A slash without the spaces is fine.
+
+### Errors
+
+`portero rules check` fails (exit 1) and names the element when a group is malformed:
+
+- `group #2 has no name`
+- `group "Work" has an empty browser`
+- `group "Work" has match; conditions go into its rules`
+- `group "Work" has no rules`
+- `group "Work", rule "GitHub organisation": open is set on the group only`
+- `group "Work", rule "inner": groups cannot contain groups`
+- `group "Work", rule #4 has no match conditions (host, path, opener or cwd)`
+
+A rule inside a group without a name is `#n` in these messages, counted inside the group.
+
+### Example
+
+```yaml
+version: 1
+default: { browser: Dia, profile: Personal }
+rules:
+  - name: personal repositories          # before the group: wins for github.com/personal-account
+    match: { host: github.com, path: /personal-account }
+    open: { browser: Dia, profile: Personal }
+
+  - name: Work
+    open: { browser: Dia, profile: Work }
+    rules:
+      - name: hosts
+        match: { host: ["*.example.com", tracker.example.net] }
+      - name: GitHub organisation
+        match: { host: github.com, path: /work-org }
+      - name: Slack
+        match: { opener: com.tinyspeck.slackmacgap }
+      - name: CLI logins
+        match: { cwd: ~/Documents/projects/work }
+      - match: { host: chat.example.org }    # no name: logged as "Work"
+
+  - match: { host: github.com }            # after the group: the rest of github.com
+    open: { browser: Safari }
+```
+
+```text
+$ portero rules match https://github.com/personal-account/x
+Dia/Personal  (rule: personal repositories)
+$ portero rules match https://github.com/work-org/x
+Dia/Work  (rule: Work / GitHub organisation)
+$ portero rules match https://github.com/other
+Safari  (rule: #3)
+$ portero rules match https://chat.example.org/
+Dia/Work  (rule: Work)
+$ portero rules match https://example.com/a --opener com.tinyspeck.slackmacgap
+Dia/Work  (rule: Work / hosts)
+```
+
+The last link comes from Slack, but `hosts` stands above `Slack` in the group and matches first; the target is
+the same either way. The plain rule without a name after the group is `#3`: the group takes position 2.
+When the rules file has a `cwd` rule, as here, each answer is preceded by a `cwd: <dir>` line.
 
 ## Working directory
 
@@ -77,8 +188,6 @@ rules:
 - When the working directory cannot be determined, `cwd` rules are skipped and the link still opens;
   `portero open` prints `portero: cwd: unknown (...); cwd rules skipped` to stderr.
 - `decisions.log` does not record the working directory; the rule name shows which rule won.
-- A Portero build without `cwd` support rejects the whole rules file (unknown key). Update Portero on every Mac
-  that reads the file before adding the first `cwd` rule.
 
 ## Containers (Firefox, Firefox Developer Edition, Zen)
 
@@ -130,5 +239,6 @@ no host and no opener, so rules are not consulted: it opens in `default`, logged
 ## Log
 
 Every routed link appends one tab-separated line to `~/.config/portero/decisions.log`:
-time, opener, rule, target, url. The target is `Browser`, `Browser/Profile`, `Browser:Container` or
+time, opener, rule, target, url. The rule is the label from "Names and labels" (`Work / GitHub organisation`
+for a rule in a group). The target is `Browser`, `Browser/Profile`, `Browser:Container` or
 `Browser/Profile:Container`, written as in the rule (also when the container was skipped at launch).

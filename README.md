@@ -29,7 +29,7 @@ scripts, `$BROWSER`) in the browser and profile that a rule picks. One link, one
 macOS hands every `http`/`https` link from another app to Portero.app as an Apple event, together with the
 sender's process, from which Portero reads the opener's bundle id. The first rule that matches the host, path and
 opener picks the browser and profile; a launcher opens the link there and the decision goes to
-`~/.config/portero/decisions.log`. When the rules file cannot be read, the link opens in Safari and an `ERROR`
+`~/.config/portero/decisions.log` with the rule's name (`Work / GitHub organisation` for a rule inside a group). When the rules file cannot be read, the link opens in Safari and an `ERROR`
 line is logged.
 
 ![How Portero works](docs/diagrams/how-it-works.png)
@@ -59,14 +59,26 @@ placeholder hosts only: [docs/rules.md](docs/rules.md) and [examples/rules.yaml]
 - name: team wiki
   match: { host: wiki.example.com }
   open: { browser: Zen, container: Work }   # Firefox family only; in Zen the container picks the Space
+
+- name: Work                                # a group: one target, several conditions
+  open: { browser: Dia, profile: Work }
+  rules:
+    - name: GitHub organisation
+      match: { host: github.com, path: /work-org }
+    - name: Slack
+      match: { opener: com.tinyspeck.slackmacgap }
 ```
+
+The first match from the top wins. Any rule inside a group that matches opens the link in the group's target;
+the log names it `Work / Slack`.
 
 A `cwd` condition routes links that command-line tools open from a shell by the directory they run in, for
 example `match: { cwd: ~/Documents/projects/work }`. It needs `$BROWSER` set to `portero open`; links from other
 apps never match it.
 
-`portero rules check` validates the file and warns about browsers, containers, the container extension or `cwd`
-directories that are missing on this Mac.
+`portero rules check` validates the file, warns about browsers, containers, the container extension or `cwd`
+directories that are missing on this Mac and about names used twice, and ends with a count such as
+`7 rule(s): 2 plain, 5 in 1 group(s), default Dia/Personal`.
 
 ## Known limit
 

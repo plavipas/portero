@@ -44,6 +44,9 @@ type RuleSummary struct {
 	Open  []string `json:"opener,omitempty"`
 	Cwd   []string `json:"cwd,omitempty"`
 	Brief string   `json:"open"`
+	// Group: the element is a group; Rules are its children (match only, Brief is the group's target).
+	Group bool          `json:"group,omitempty"`
+	Rules []RuleSummary `json:"rules,omitempty"`
 }
 
 func summarize(r *rules.Rules) *Summary {
@@ -52,12 +55,17 @@ func summarize(r *rules.Rules) *Summary {
 	}
 	sum := &Summary{Default: r.Default.String(), Rules: []RuleSummary{}}
 	for i, rule := range r.Rules {
-		name := rule.Name
-		if name == "" {
-			name = fmt.Sprintf("#%d", i+1)
+		rs := RuleSummary{Name: rules.Label(i, rule), Host: rule.Match.Host, Path: rule.Match.Path,
+			Open: rule.Match.Opener, Cwd: rule.Match.Cwd, Brief: rule.Open.String()}
+		if rule.IsGroup() {
+			rs.Group = true
+			rs.Rules = []RuleSummary{}
+			for j, c := range rule.Rules {
+				rs.Rules = append(rs.Rules, RuleSummary{Name: rules.Label(j, c), Host: c.Match.Host, Path: c.Match.Path,
+					Open: c.Match.Opener, Cwd: c.Match.Cwd, Brief: rule.Open.String()})
+			}
 		}
-		sum.Rules = append(sum.Rules, RuleSummary{Name: name, Host: rule.Match.Host, Path: rule.Match.Path,
-			Open: rule.Match.Opener, Cwd: rule.Match.Cwd, Brief: rule.Open.String()})
+		sum.Rules = append(sum.Rules, rs)
 	}
 	return sum
 }
@@ -334,7 +342,7 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		"rule": rule, "target": d.Target.String(), "browser": d.Target.Browser,
 		"profile": d.Target.Profile, "container": d.Target.Container,
 		"cwd_used": cwd, "cwd_note": note,
-		"path": [3]string{openerID(oid), matchRuleID(d.Rule, rule), targetID(d.Target.String())},
+		"path": [3]string{openerID(oid), matchRuleID(d, rule), targetID(d.Target.String())},
 	}
 	if s.opts.Plan != nil {
 		if plan, err := s.opts.Plan(u, d.Target); err != nil {
@@ -444,10 +452,13 @@ func resolveWhatIf(dir string) (string, error) {
 }
 
 // matchRuleID is the node of the rule Route picked: Route returns "" when the default applied, so a user rule
-// named "default" is told apart here (unlike in the log).
-func matchRuleID(routed, shown string) string {
-	if routed == "" {
+// named "default" is told apart here (unlike in the log). A rule inside a group is drawn as the group.
+func matchRuleID(d rules.Decision, shown string) string {
+	switch {
+	case d.Rule == "":
 		return "s:default"
+	case d.Group != "":
+		return ruleID(d.Group)
 	}
 	return ruleID(shown)
 }

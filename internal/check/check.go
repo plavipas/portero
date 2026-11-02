@@ -79,12 +79,16 @@ func firefoxFamily() string {
 // browser that cannot take one is an error; everything else is a warning.
 func Targets(r *rules.Rules, env Env) (warnings []string, err error) {
 	type item struct {
-		where string // `default` or `rule "x"`
+		where string // `default`, `rule "x"` or `group "x"`
 		t     rules.Target
 	}
 	items := []item{{"default", r.Default}}
 	for i, rule := range r.Rules {
-		items = append(items, item{"rule " + RuleLabel(i, rule.Name), rule.Open})
+		if rule.IsGroup() {
+			items = append(items, item{fmt.Sprintf("group %q", rule.Name), rule.Open})
+			continue
+		}
+		items = append(items, item{"rule " + quoted(i, rule.Name), rule.Open})
 	}
 	for _, it := range items {
 		b, known := browsers.Lookup(it.t.Browser)
@@ -135,27 +139,60 @@ func Targets(r *rules.Rules, env Env) (warnings []string, err error) {
 
 // Cwd warns about rules whose cwd directories all do not exist on this Mac.
 func Cwd(r *rules.Rules, env Env) (warnings []string) {
-	for i, rule := range r.Rules {
-		if len(rule.Match.Cwd) == 0 {
-			continue
+	warn := func(where string, m rules.Match) {
+		if len(m.Cwd) == 0 {
+			return
 		}
-		found := false
-		for _, p := range rule.Match.Cwd {
+		for _, p := range m.Cwd {
 			if env.DirExists(p) {
-				found = true
-				break
+				return
 			}
 		}
-		if !found {
-			warnings = append(warnings, fmt.Sprintf("warning: rule %s: none of its cwd directories exist on this Mac (%s)",
-				RuleLabel(i, rule.Name), strings.Join(rule.Match.Cwd, ", ")))
+		warnings = append(warnings, fmt.Sprintf("warning: %s: none of its cwd directories exist on this Mac (%s)",
+			where, strings.Join(m.Cwd, ", ")))
+	}
+	for i, rule := range r.Rules {
+		if rule.IsGroup() {
+			for j, c := range rule.Rules {
+				warn(fmt.Sprintf("group %q, rule %s", rule.Name, quoted(j, c.Name)), c.Match)
+			}
+			continue
+		}
+		warn("rule "+quoted(i, rule.Name), rule.Match)
+	}
+	return warnings
+}
+
+// Names warns about names used twice among groups and plain rules: the diagram and the log merge them.
+func Names(r *rules.Rules) (warnings []string) {
+	seen := map[string]bool{}
+	warned := map[string]bool{}
+	for i, rule := range r.Rules {
+		name := rules.Label(i, rule)
+		if seen[name] && !warned[name] {
+			warned[name] = true
+			warnings = append(warnings, fmt.Sprintf("warning: name %q is used twice; the diagram and the log merge them", name))
+		}
+		seen[name] = true
+		if rule.IsGroup() {
+			inner := map[string]bool{}
+			for _, c := range rule.Rules {
+				if c.Name == "" {
+					continue
+				}
+				if inner[c.Name] && !warned[rule.Name+" / "+c.Name] {
+					warned[rule.Name+" / "+c.Name] = true
+					warnings = append(warnings, fmt.Sprintf("warning: group %q: rule name %q is used twice; the log merges them", rule.Name, c.Name))
+				}
+				inner[c.Name] = true
+			}
 		}
 	}
 	return warnings
 }
 
-// RuleLabel renders a rule name quoted, or #n for an unnamed rule.
-func RuleLabel(i int, name string) string {
+// quoted renders a name quoted, or #n (1-based position) for an unnamed rule.
+func quoted(i int, name string) string {
 	if name != "" {
 		return fmt.Sprintf("%q", name)
 	}
@@ -168,5 +205,5 @@ func All(r *rules.Rules, env Env) ([]string, error) {
 	if err != nil {
 		return warnings, err
 	}
-	return append(warnings, Cwd(r, env)...), nil
+	return append(append(warnings, Cwd(r, env)...), Names(r)...), nil
 }
