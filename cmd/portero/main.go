@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/plavipas/portero/internal/decisionlog"
 	"github.com/plavipas/portero/internal/handler"
 	"github.com/plavipas/portero/internal/launch"
+	"github.com/plavipas/portero/internal/lsreg"
 	"github.com/plavipas/portero/internal/rules"
 	"github.com/plavipas/portero/internal/sync"
 )
@@ -75,6 +77,8 @@ func main() {
 		err = rulesCmd(os.Args[2:])
 	case "browsers":
 		err = browsersCmd()
+	case "lsreg-others": // hidden helper of scripts/install.sh
+		err = lsregOthersCmd(os.Args[2:], os.Stdin, os.Stdout)
 	case "version":
 		fmt.Println("portero", version)
 	case "-h", "--help", "help":
@@ -84,6 +88,10 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
+		var ec exitCode
+		if errors.As(err, &ec) {
+			os.Exit(int(ec))
+		}
 		fmt.Fprintln(os.Stderr, "portero:", err)
 		os.Exit(1)
 	}
@@ -322,4 +330,20 @@ func ruleCounts(r *rules.Rules) string {
 		return fmt.Sprintf("%d rule(s)", plain)
 	}
 	return fmt.Sprintf("%d rule(s): %d plain, %d in %d group(s)", plain+grouped, plain, grouped, groups)
+}
+
+// lsregOthersCmd reads an `lsregister -dump` from in and prints, one per line, the registered copies of the
+// bundle id that are not at keep.
+func lsregOthersCmd(args []string, in io.Reader, out io.Writer) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: portero lsreg-others <bundle-id> <keep-path>")
+	}
+	others, err := lsreg.Others(in, args[0], args[1])
+	if err != nil {
+		return fmt.Errorf("reading the Launch Services dump: %w", err)
+	}
+	for _, p := range others {
+		fmt.Fprintln(out, p)
+	}
+	return nil
 }
