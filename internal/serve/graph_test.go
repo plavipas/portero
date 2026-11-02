@@ -16,7 +16,7 @@ func TestBuildGraph(t *testing.T) {
 		mk("com.example.app", "work", "Safari/Work"),
 		mk("-", "default", "Safari"),
 		mk("-", "old rule", "Zen:Work"),
-		{Opener: "-", Rule: "ERROR", Kind: "error", Path: [3]string{"o:-", "r:ERROR", "t:Safari"}},
+		{Opener: "-", Rule: "ERROR", Kind: "error", Path: [3]string{"o:-", "s:error", "t:Safari"}},
 	}
 	g := BuildGraph(r, ds)
 	if g.Total != 5 {
@@ -29,7 +29,7 @@ func TestBuildGraph(t *testing.T) {
 	for _, n := range g.Rules {
 		ids[n.ID] = n
 	}
-	for _, id := range []string{"r:work", "r:default", "r:file", "r:ERROR", "r:old rule"} {
+	for _, id := range []string{"r:work", "s:default", "s:file", "s:error", "r:old rule"} {
 		if _, ok := ids[id]; !ok {
 			t.Errorf("missing rule node %s", id)
 		}
@@ -47,7 +47,7 @@ func TestBuildGraph(t *testing.T) {
 	if count[[2]string{"o:com.example.app", "r:work"}] != 2 || count[[2]string{"r:work", "t:Safari/Work"}] != 2 {
 		t.Errorf("counts %v", count)
 	}
-	if c, ok := count[[2]string{"r:file", "t:Safari"}]; !ok || c != 0 {
+	if c, ok := count[[2]string{"s:file", "t:Safari"}]; !ok || c != 0 {
 		t.Errorf("static edge missing: %v", count)
 	}
 	var zen Node
@@ -103,5 +103,31 @@ func TestBuildGraphKeepsHostileLabelsAsData(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("rule node from the log missing: %+v", g.Rules)
+	}
+}
+
+func TestBuildGraphUserRuleNamedDefault(t *testing.T) {
+	r, err := rules.Parse([]byte("version: 1\ndefault: {browser: Safari}\nrules:\n  - name: default\n    match: {host: example.com}\n    open: {browser: Safari, profile: Work}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ds := []Decision{mk("-", "default", "Safari/Work")}
+	g := BuildGraph(r, ds)
+	ids := map[string]Node{}
+	for _, n := range g.Rules {
+		ids[n.ID] = n
+	}
+	if ids["r:default"].Kind != "rule" || ids["s:default"].Kind != "default" {
+		t.Errorf("user rule and built-in default must be two nodes: %+v", g.Rules)
+	}
+	if ds[0].Path[1] != "r:default" {
+		t.Errorf("a log line named like a user rule goes to the user rule: %v", ds[0].Path)
+	}
+	// without such a rule in the file the same log line is the built-in default
+	g = BuildGraph(nil, []Decision{mk("-", "default", "Safari")})
+	for _, n := range g.Rules {
+		if n.ID == "r:default" {
+			t.Errorf("unexpected user node: %+v", g.Rules)
+		}
 	}
 }

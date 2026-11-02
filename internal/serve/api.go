@@ -224,6 +224,11 @@ func (s *Server) handleDecisions(w http.ResponseWriter, r *http.Request) {
 	if page.Decisions == nil {
 		page.Decisions = []Decision{}
 	}
+	var rs *rules.Rules
+	if data, exists, err := s.readRules(); err == nil && exists {
+		rs, _ = rules.Parse(data)
+	}
+	ResolvePaths(rs, page.Decisions)
 	writeJSON(w, http.StatusOK, map[string]any{"decisions": page.Decisions, "offset": page.Offset,
 		"truncated": page.Truncated, "skipped": page.Skipped})
 }
@@ -323,7 +328,7 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		"rule": rule, "target": d.Target.String(), "browser": d.Target.Browser,
 		"profile": d.Target.Profile, "container": d.Target.Container,
 		"cwd_used": cwd, "cwd_note": note,
-		"path": [3]string{openerID(oid), ruleID(rule), targetID(d.Target.String())},
+		"path": [3]string{openerID(oid), matchRuleID(d.Rule, rule), targetID(d.Target.String())},
 	}
 	if s.opts.Plan != nil {
 		if plan, err := s.opts.Plan(u, d.Target); err != nil {
@@ -430,4 +435,13 @@ func resolveWhatIf(dir string) (string, error) {
 		}
 		rest = filepath.Join(filepath.Base(p), rest)
 	}
+}
+
+// matchRuleID is the node of the rule Route picked: Route returns "" when the default applied, so a user rule
+// named "default" is told apart here (unlike in the log).
+func matchRuleID(routed, shown string) string {
+	if routed == "" {
+		return "s:default"
+	}
+	return ruleID(shown)
 }
