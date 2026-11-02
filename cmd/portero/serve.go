@@ -114,9 +114,12 @@ func serveCmd(args []string) error {
 		}
 		return p, "local"
 	}
-	session, err := sessionSecret(sessionFile())
-	if err != nil {
-		return err
+	session := "" // empty: serve.New makes a per-run secret
+	if f := sessionFile(); f != "" {
+		var err error
+		if session, err = sessionSecret(f); err != nil {
+			return err
+		}
 	}
 	s := serve.New(serve.Options{
 		Rules: rulesNow, LogFile: config.LogFile(), Session: session,
@@ -260,7 +263,7 @@ func validSession(path string) (string, bool) {
 func sessionFile() string {
 	dir, err := os.UserCacheDir()
 	if err != nil || dir == "" {
-		dir = filepath.Join(config.Dir(), "cache")
+		return "" // no cache directory: a per-run secret, never one under the config directory
 	}
 	return filepath.Join(dir, "portero", "ui-session")
 }
