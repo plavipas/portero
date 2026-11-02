@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -413,5 +415,32 @@ func TestSetDefaultStalePending(t *testing.T) {
 	_, g = r.get("/api/settings")
 	if def := g["default"].(map[string]any); def["pending"] != false || def["last"] == nil {
 		t.Errorf("after retry: %v", def)
+	}
+}
+
+func TestSyncRefusesSymlinkedLocalRules(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "elsewhere.yaml")
+	if err := os.WriteFile(target, []byte("keep me\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	local := filepath.Join(dir, "rules.yaml")
+	if err := os.Symlink(target, local); err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	r := newRig(t, goodRules)
+	r.srv.opts.Rules = func() (string, string) { return filepath.Join(dir, "icloud", "rules.yaml"), "icloud" }
+	r.srv.opts.Sync = &SyncFuncs{
+		Enable:    func() (string, error) { called = true; return "", nil },
+		Disable:   func() (string, error) { called = true; return local, nil },
+		LocalPath: func() string { return local },
+	}
+	w := r.do("POST", "/api/settings/sync", `{"mode":"off"}`)
+	if w.Code != 422 || called {
+		t.Fatalf("got %d, called=%v: %s", w.Code, called, w.Body.String())
+	}
+	if b, _ := os.ReadFile(target); string(b) != "keep me\n" {
+		t.Error("the symlink target was changed")
 	}
 }
