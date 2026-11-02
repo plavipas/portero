@@ -3,6 +3,7 @@ package main
 
 import (
 	_ "embed"
+	"errors"
 	"flag"
 	"fmt"
 	"net/url"
@@ -14,6 +15,7 @@ import (
 	"github.com/plavipas/portero/internal/check"
 	"github.com/plavipas/portero/internal/config"
 	"github.com/plavipas/portero/internal/decisionlog"
+	"github.com/plavipas/portero/internal/handler"
 	"github.com/plavipas/portero/internal/launch"
 	"github.com/plavipas/portero/internal/rules"
 	"github.com/plavipas/portero/internal/sync"
@@ -48,6 +50,7 @@ var version = "dev"
 var exampleRules []byte
 
 func main() {
+	sync.Download = handler.StartDownload
 	if len(os.Args) < 2 {
 		if appBundle() != "" { // started by macOS (Launch Services) to handle a link
 			runApp()
@@ -229,6 +232,14 @@ func rulesCmd(args []string) error {
 		fmt.Println("written:", p)
 	case "check":
 		p := config.RulesFile()
+		if sync.Offloaded(p) {
+			dlErr := startDownload(p)
+			msg := fmt.Sprintf("rules file offloaded by iCloud, download started: %s; run again in a few seconds", p)
+			if dlErr != nil {
+				msg = fmt.Sprintf("rules file offloaded by iCloud, download not started (%v): %s; try again in a minute", dlErr, p)
+			}
+			return errors.New(msg)
+		}
 		r, err := rules.Load(p)
 		if err != nil {
 			return err

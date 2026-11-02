@@ -96,22 +96,39 @@ char *porteroSetDefaultHandler(const char *appPath, const char *scheme) {
     @autoreleasepool {
         NSURL *appURL = [NSURL fileURLWithPath:[NSString stringWithUTF8String:appPath]];
         dispatch_semaphore_t done = dispatch_semaphore_create(0);
-        __block NSString *message = @"";
+        // The completion block may run after a timeout: its state is an object the block retains, so a late
+        // write never touches freed stack memory.
+        NSMutableString *message = [NSMutableString string];
         [[NSWorkspace sharedWorkspace] setDefaultApplicationAtURL:appURL
                                               toOpenURLsWithScheme:[NSString stringWithUTF8String:scheme]
                                                  completionHandler:^(NSError *error) {
-            if (error) message = error.localizedDescription;
+            if (error) {
+                @synchronized (message) { [message setString:error.localizedDescription ?: @"unknown error"]; }
+            }
             dispatch_semaphore_signal(done);
         }];
         // The completion runs on a background queue. On the main thread (the CLI) pump the main run loop while
-        // waiting; on any other thread (portero serve) the main thread is not ours to pump, so just wait.
+        // waiting; on any other thread (portero serve) the main thread is not ours to pump, so just wait,
+        // but not forever.
         if ([NSThread isMainThread]) {
             while (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC))) {
                 [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
             }
-        } else {
-            dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
+        } else if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 300LL * NSEC_PER_SEC)) != 0) {
+            return strdup("macOS did not answer within 5 minutes");
         }
-        return strdup(message.UTF8String);
+        @synchronized (message) { return strdup(message.UTF8String); }
+    }
+}
+
+// Ask iCloud to download the file at path; returns at once. Returns an error message or "".
+char *porteroStartDownload(const char *path) {
+    @autoreleasepool {
+        NSURL *u = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path]];
+        NSError *e = nil;
+        if (![[NSFileManager defaultManager] startDownloadingUbiquitousItemAtURL:u error:&e]) {
+            return strdup((e.localizedDescription ?: @"download not started").UTF8String);
+        }
+        return strdup("");
     }
 }

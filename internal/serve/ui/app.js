@@ -589,19 +589,23 @@ $("sync-switch").addEventListener("change", async () => {
   const d = SET.data && SET.data.sync ? SET.data.sync : {};
   const cloud = (d.icloud_dir || "iCloud Drive");
   let paras;
-  if (toICloud && d.icloud_exists) {
+  if (toICloud && d.icloud_exists && d.icloud_offloaded) {
+    paras = ["A synced rules file exists in " + cloud + " but is not downloaded to this Mac yet. It will be downloaded (up to 30 s) and used as is; the local file " +
+      (d.rules_path || "") + " is kept only as rules.yaml.local-backup, replacing any earlier backup."];
+  } else if (toICloud && d.icloud_exists) {
     paras = ["A synced rules file already exists in " + cloud + " and will be used as is. The local file " + (d.rules_path || "") +
       " is kept only as rules.yaml.local-backup, replacing any earlier backup."];
   } else if (toICloud) {
     paras = ["The rules file moves from " + (d.rules_path || "the local folder") + " to " + cloud + ". The local file is kept as rules.yaml.local-backup."];
   } else {
-    paras = ["The rules file in " + cloud + " is copied to " + (d.local_path || "the local folder") + ", replacing the file there, and Portero stops syncing it."];
+    paras = ["The rules file in " + cloud + " is copied to " + (d.local_path || "the local folder") + ", replacing the file there (the current local file is kept as rules.yaml.icloud-backup), and Portero stops syncing it."];
   }
   paras.push("Current file: " + (d.rules_path || ""));
   if (dirty) paras.push("Unsaved editor changes will be discarded.");
   const ok = await ask(toICloud ? "Sync rules through iCloud Drive?" : "Stop syncing rules?", paras);
   if (!ok) { sw.checked = !toICloud; return; }
   sw.disabled = true;
+  setHint("sync-hint", "Working...", false);
   const { status, data } = await api("/api/settings/sync", { mode: toICloud ? "icloud" : "off" });
   if (status === 200) {
     await loadState();
