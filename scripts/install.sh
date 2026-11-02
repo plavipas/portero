@@ -43,18 +43,24 @@ rmbuild() {
 	esac
 }
 
-others() { "$LSR" -dump | "$APP/Contents/MacOS/portero" lsreg-others "$ID" "$DEST"; }
-
 if [ -n "$DRY" ]; then
 	echo "would copy $APP to $DEST"
-	others | while IFS= read -r p; do
-		case "$p" in /*.app) echo "would unregister $p" ;; esac
-	done
+	dry_failed=0
+	dump=$(mktemp "${TMPDIR:-/tmp}/portero-lsdump.XXXXXX")
+	if "$LSR" -dump > "$dump" 2>/dev/null && list=$("$APP/Contents/MacOS/portero" lsreg-others "$ID" "$DEST" < "$dump"); then
+		printf '%s\n' "$list" | while IFS= read -r p; do
+			case "$p" in /*.app) echo "would unregister $p" ;; esac
+		done
+	else
+		echo "error: could not list the registered Portero copies" >&2
+		dry_failed=1
+	fi
+	rm -f "$dump"
 	echo "would register $DEST"
 	echo "would link $HOME/.local/bin/portero"
 	[ -n "${PORTERO_BUILD_DIR:-}" ] || echo "would remove $BUILD_DIR"
 	rmbuild
-	exit 0
+	exit "$dry_failed"
 fi
 
 mkdir -p "$HOME/Applications" "$HOME/.local/bin"
