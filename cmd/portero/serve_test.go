@@ -182,3 +182,27 @@ func TestSessionDirIsPrivate(t *testing.T) {
 		}
 	}
 }
+
+func TestSessionSecretConcurrentStarts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "portero", "ui-session")
+	const n = 16
+	got := make(chan string, n)
+	for i := 0; i < n; i++ {
+		go func() {
+			v, err := sessionSecret(path)
+			if err != nil {
+				v = "error: " + err.Error()
+			}
+			got <- v
+		}()
+	}
+	first := <-got
+	for i := 1; i < n; i++ {
+		if v := <-got; v != first {
+			t.Fatalf("servers disagree on the secret: %q vs %q", first, v)
+		}
+	}
+	if strings.HasPrefix(first, "error") || len(first) != 64 {
+		t.Fatalf("bad secret %q", first)
+	}
+}
