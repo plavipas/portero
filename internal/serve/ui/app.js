@@ -486,4 +486,125 @@ $("btn-reload").addEventListener("click", () => {
   loadState();
 });
 
+// ---- settings ----
+const SET = { data: null, timer: 0 };
+
+// ask shows the shared confirmation dialog and resolves true on Continue; Cancel and Esc resolve false.
+function ask(title, paragraphs) {
+  const dlg = $("confirm");
+  $("confirm-title").textContent = title;
+  $("confirm-body").replaceChildren(...paragraphs.map((t) => el("p", { text: t })));
+  return new Promise((resolve) => {
+    dlg.returnValue = "";
+    dlg.addEventListener("close", () => resolve(dlg.returnValue === "ok"), { once: true });
+    dlg.showModal();
+    $("confirm-cancel").focus();
+  });
+}
+$("confirm-ok").addEventListener("click", () => $("confirm").close("ok"));
+$("confirm-cancel").addEventListener("click", () => $("confirm").close("cancel"));
+
+function setHint(id, text, isError) {
+  const h = $(id);
+  h.textContent = text;
+  h.classList.toggle("error", !!isError);
+}
+
+function drawSettings(d) {
+  SET.data = d;
+  const def = d.default || {};
+  $("set-default").hidden = !def.supported && !(def.schemes && def.schemes.length);
+  const rows = $("default-rows");
+  rows.replaceChildren();
+  for (const sc of def.schemes || []) {
+    const who = sc.portero ? "Portero" : (sc.handler || "no handler");
+    rows.append(el("li", {},
+      el("span", { class: "scheme", text: sc.scheme }),
+      el("span", { class: sc.portero ? "yes" : "no", text: (sc.portero ? "\u2713 " : "") + who })));
+  }
+  const btn = $("btn-default");
+  btn.hidden = !def.supported;
+  const allOurs = (def.schemes || []).length > 0 && def.schemes.every((sc) => sc.portero);
+  btn.disabled = !!def.pending || !def.app || allOurs;
+  if (def.pending) setHint("default-hint", "Waiting for macOS. Confirm the dialog it shows.", false);
+  else if (!def.app) setHint("default-hint", "Run portero serve from Portero.app to change this.", false);
+  else if (def.last && def.last.error) setHint("default-hint", def.last.error, true);
+  else if (def.last) setHint("default-hint", "Done.", false);
+  else setHint("default-hint", allOurs ? "Portero is the default browser." : "", false);
+
+  const sy = d.sync || {};
+  $("set-sync").hidden = !sy.supported;
+  const icloud = sy.mode === "icloud";
+  $("sync-mode").textContent = icloud ? "synced through iCloud Drive" : "local";
+  $("sync-path").textContent = sy.rules_path || "";
+  $("sync-dir").textContent = sy.icloud_dir || "";
+  const sw = $("sync-switch");
+  sw.checked = icloud;
+  sw.disabled = !!sy.pinned || (!icloud && !sy.icloud_available);
+  if (sy.pinned) setHint("sync-hint", "The rules file is fixed by PORTERO_RULES; unset it to change syncing.", false);
+  else if (!icloud && !sy.icloud_available) setHint("sync-hint", "iCloud Drive is not available on this Mac.", false);
+  else setHint("sync-hint", "", false);
+
+  $("file-rules").textContent = sy.rules_path || "";
+  $("file-log").textContent = d.log_file || "";
+  $("file-config").textContent = d.config_file || "";
+
+  clearTimeout(SET.timer);
+  if (def.pending && !$("settings").hidden) SET.timer = setTimeout(loadSettings, 2000);
+}
+
+async function loadSettings() {
+  const { status, data } = await api("/api/settings");
+  if (status === 200 && data) drawSettings(data);
+}
+
+function showSettings(on) {
+  $("settings").hidden = !on;
+  $("routing").hidden = on;
+  $("btn-settings").setAttribute("aria-expanded", String(on));
+  $("btn-settings").textContent = on ? "Back" : "Settings";
+  clearTimeout(SET.timer);
+  if (on) loadSettings();
+}
+$("btn-settings").addEventListener("click", () => showSettings($("settings").hidden));
+
+$("btn-default").addEventListener("click", async () => {
+  const ok = await ask("Make Portero the default browser?", [
+    "macOS will ask you to confirm. Portero becomes the browser for http and https links.",
+  ]);
+  if (!ok) return;
+  $("btn-default").disabled = true;
+  setHint("default-hint", "Asking macOS...", false);
+  const { status, data } = await api("/api/settings/default", {});
+  if (status === 202) setHint("default-hint", "Waiting for macOS. Confirm the dialog it shows.", false);
+  else if (status !== 200) setHint("default-hint", data && data.error ? data.error.message : "Request failed (" + status + ").", true);
+  await loadSettings();
+});
+
+$("sync-switch").addEventListener("change", async () => {
+  const sw = $("sync-switch");
+  const toICloud = sw.checked;
+  const dirty = editor.value !== S.text;
+  const d = SET.data && SET.data.sync ? SET.data.sync : {};
+  const paras = toICloud ? [
+    "The rules file moves from the local folder to " + (d.icloud_dir || "iCloud Drive") + ". The local file is kept as rules.yaml.local-backup.",
+  ] : [
+    "The rules file in " + (d.icloud_dir || "iCloud Drive") + " is copied back to the local folder, and Portero stops syncing it.",
+  ];
+  paras.push("Current file: " + (d.rules_path || ""));
+  if (dirty) paras.push("Unsaved editor changes will be discarded.");
+  const ok = await ask(toICloud ? "Sync rules through iCloud Drive?" : "Stop syncing rules?", paras);
+  if (!ok) { sw.checked = !toICloud; return; }
+  sw.disabled = true;
+  const { status, data } = await api("/api/settings/sync", { mode: toICloud ? "icloud" : "off" });
+  if (status === 200) {
+    setHint("sync-hint", data.changed ? "Done." : "Nothing to change.", false);
+    await loadState();
+    await loadSettings();
+  } else {
+    await loadSettings();
+    setHint("sync-hint", data && data.error ? data.error.message : "Request failed (" + status + ").", true);
+  }
+});
+
 loadState().then(poll);
