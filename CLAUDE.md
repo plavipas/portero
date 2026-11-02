@@ -21,10 +21,11 @@ Read README.md first. Everything in the repository in English: code, comments, d
   (internal/serve, embedded HTML/JS); unit tests; local commits only.
 - `qa-engineer` (opus) - adversarial verification of the acceptance criteria: unit tests, `--dry-run`, the installed
   app on this Mac (closes every tab it opens, never sets the default browser). PASS/FAIL.
-- `security-reviewer` (opus) - read-only review of the branch diff: argv/AppleScript injection, lost or misrouted links,
+- `security-reviewer` (fable) - read-only review of the branch diff: argv/AppleScript injection, lost or misrouted links,
   files and permissions, install scripts, leaked personal data. APPROVE / CHANGES NEEDED.
 - `tech-writer` (opus) - README, docs/, ADRs, archify diagrams; runs after qa PASS when documented behaviour changed
   (step 5a). Docs-only commits, never pushes.
+- Agents on fable (`architect`, `security-reviewer`): when a run fails on Fable (usage limit reached, model unavailable), the session reruns the same agent at once with the model override `opus` and the same input, and tells the user in one line that this step ran on Opus.
 
 ## Task flow
 Tasks are Linear issues of the personal workspace (project Portero); the key is `DEV-<n>` / `DEVOPS-<n>` (teams
