@@ -525,8 +525,9 @@ function drawSettings(d) {
   const btn = $("btn-default");
   btn.hidden = !def.supported;
   const allOurs = (def.schemes || []).length > 0 && def.schemes.every((sc) => sc.portero);
-  btn.disabled = !!def.pending || !def.app || allOurs;
-  if (def.pending) setHint("default-hint", "Waiting for macOS. Confirm the dialog it shows.", false);
+  btn.disabled = (!!def.pending && !def.stale) || !def.app || allOurs;
+  if (def.pending && def.stale) setHint("default-hint", "No answer from macOS for a while. Try again.", false);
+  else if (def.pending) setHint("default-hint", "Waiting for macOS. Confirm the dialog it shows.", false);
   else if (!def.app) setHint("default-hint", "Run portero serve from Portero.app to change this.", false);
   else if (def.last && def.last.error) setHint("default-hint", def.last.error, true);
   else if (def.last) setHint("default-hint", "Done.", false);
@@ -586,11 +587,16 @@ $("sync-switch").addEventListener("change", async () => {
   const toICloud = sw.checked;
   const dirty = editor.value !== S.text;
   const d = SET.data && SET.data.sync ? SET.data.sync : {};
-  const paras = toICloud ? [
-    "The rules file moves from the local folder to " + (d.icloud_dir || "iCloud Drive") + ". The local file is kept as rules.yaml.local-backup.",
-  ] : [
-    "The rules file in " + (d.icloud_dir || "iCloud Drive") + " is copied back to the local folder, and Portero stops syncing it.",
-  ];
+  const cloud = (d.icloud_dir || "iCloud Drive");
+  let paras;
+  if (toICloud && d.icloud_exists) {
+    paras = ["A synced rules file already exists in " + cloud + " and will be used as is. The local file " + (d.rules_path || "") +
+      " is kept only as rules.yaml.local-backup, replacing any earlier backup."];
+  } else if (toICloud) {
+    paras = ["The rules file moves from " + (d.rules_path || "the local folder") + " to " + cloud + ". The local file is kept as rules.yaml.local-backup."];
+  } else {
+    paras = ["The rules file in " + cloud + " is copied to " + (d.local_path || "the local folder") + ", replacing the file there, and Portero stops syncing it."];
+  }
   paras.push("Current file: " + (d.rules_path || ""));
   if (dirty) paras.push("Unsaved editor changes will be discarded.");
   const ok = await ask(toICloud ? "Sync rules through iCloud Drive?" : "Stop syncing rules?", paras);
@@ -598,9 +604,9 @@ $("sync-switch").addEventListener("change", async () => {
   sw.disabled = true;
   const { status, data } = await api("/api/settings/sync", { mode: toICloud ? "icloud" : "off" });
   if (status === 200) {
-    setHint("sync-hint", data.changed ? "Done." : "Nothing to change.", false);
     await loadState();
     await loadSettings();
+    setHint("sync-hint", data.changed ? "Done." : "Nothing to change.", false);
   } else {
     await loadSettings();
     setHint("sync-hint", data && data.error ? data.error.message : "Request failed (" + status + ").", true);

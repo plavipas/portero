@@ -284,6 +284,8 @@ func serveSync() *serve.SyncFuncs {
 	return &serve.SyncFuncs{
 		Enable: sync.EnableICloud, Disable: sync.Disable, ICloudDir: sync.ICloudDir,
 		ICloudAvailable: func() bool { _, err := os.Stat(filepath.Dir(sync.ICloudDir())); return err == nil },
+		ICloudExists:    func() bool { _, err := os.Stat(filepath.Join(sync.ICloudDir(), "rules.yaml")); return err == nil },
+		LocalPath:       func() string { return filepath.Join(config.Dir(), "rules.yaml") },
 		Pinned:          func() bool { return os.Getenv("PORTERO_RULES") != "" },
 	}
 }

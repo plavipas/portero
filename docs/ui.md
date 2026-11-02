@@ -69,12 +69,14 @@ The rules editor on the right stays where it is.
 - **Default browser** (macOS only): one row per scheme (`http`, `https`) with a check mark and `Portero`, or the
   bundle id of the app that handles it now. **Make Portero the default browser** asks for a confirmation in the
   page, then asks macOS, which shows its own dialog. The request waits up to 60 seconds for the answer; after that
-  the page keeps polling every 2 seconds and shows the result when it arrives. The button is disabled with a hint
+  the page keeps polling every 2 seconds and shows the result when it arrives. If the macOS dialog was dismissed or never shown, try again after 3 minutes (a request older than that no longer blocks a new one) or restart `portero serve`. The button is disabled with a hint
   when `portero serve` was not started from `Portero.app` (a bare binary cannot be registered), and hidden on
   systems without this setting.
 - **Sync**: whether the rules file is local or in iCloud Drive, its path, the iCloud folder, and the switch
-  **Sync rules through iCloud Drive**. The confirmation names both paths: switching on keeps the local file as
-  `rules.yaml.local-backup`, switching off copies the iCloud file back. Unsaved editor changes are discarded
+  **Sync rules through iCloud Drive**. The confirmation names both paths: switching on moves the local file and keeps it as
+  `rules.yaml.local-backup`; when a synced file already exists in the iCloud folder it is used as is and the local
+  file only becomes the backup (replacing an earlier one); switching off copies the iCloud file to the local path
+  (`local_path`), replacing the file there. Unsaved editor changes are discarded
   (the confirmation says so when there are any). The switch is disabled while `PORTERO_RULES` is set or when
   iCloud Drive is missing. After a switch the editor and the diagram load the new file.
 - **Files**: the paths of the rules file, `decisions.log` and the config file.
@@ -94,8 +96,8 @@ works on the rules file that `portero rules path` resolves and on `decisions.log
 | `POST /api/apply` | `{"yaml", "base_hash"}` | `hash`, `warnings`, `backup`; 422 on a parse error or a symlinked rules path, 409 when the file on disk changed |
 | `GET /api/decisions` | - | without `offset`: the tail of the log; with `offset=N`: the decisions that follow byte offset N. `limit` (default 200, at most 1000). Returns `decisions`, `offset`, `truncated`, `skipped` |
 | `GET /api/graph` | - | the diagram: openers, rules, targets, edges with counts |
-| `GET /api/settings` | - | `default` (`supported`, `app`, `bundle_id`, `schemes` with `scheme` / `handler` / `portero`, `pending`, `last`), `sync` (`supported`, `mode`, `pinned`, `rules_path`, `icloud_dir`, `icloud_available`), `log_file`, `config_file` |
-| `POST /api/settings/default` | `{}` | `schemes` with `scheme`, `handler`, `note` (`already set` / `set now`), or `error.message` when a scheme is still handled by another app. 202 `{"pending": true}` when macOS has not been answered within 60 seconds (the result then appears as `default.last`), 409 while a request is pending, 412 when not run from `Portero.app`, 501 where unsupported |
+| `GET /api/settings` | - | `default` (`supported`, `app`, `bundle_id`, `schemes` with `scheme` / `handler` / `portero`, `pending`, `stale` (pending for over 3 minutes), `last`), `sync` (`supported`, `mode`, `pinned`, `rules_path`, `local_path`, `icloud_dir`, `icloud_available`, `icloud_exists`), `log_file`, `config_file` |
+| `POST /api/settings/default` | `{}` | `schemes` with `scheme`, `handler`, `note` (`already set` / `set now`), or `error.message` when a scheme is still handled by another app. 202 `{"pending": true}` when macOS has not been answered within 60 seconds (the result then appears as `default.last`), 409 while a request is pending (less than 3 minutes old), 412 when not run from `Portero.app`, 501 where unsupported |
 | `POST /api/settings/sync` | `{"mode": "icloud" \| "off"}` | `mode` (`icloud` / `local`), `rules_path`, `changed`. 400 for another mode or an unknown field, 409 when `PORTERO_RULES` is set, 422 without iCloud Drive or when the move fails, 501 where unsupported. Same mode: 200 with `changed: false` |
 
 ## Write protection

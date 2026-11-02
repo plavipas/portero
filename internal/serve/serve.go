@@ -56,6 +56,8 @@ type Options struct {
 	SetDefault func() ([]SchemeResult, error)
 	// SetDefaultWait is how long a request waits for SetDefault before it answers 202; zero means 60 s.
 	SetDefaultWait time.Duration
+	// DefaultStale is how long a SetDefault call counts as pending; zero means 3 minutes.
+	DefaultStale time.Duration
 	// Sync switches the rules file between the local folder and iCloud Drive; nil where unsupported.
 	Sync *SyncFuncs
 }
@@ -72,6 +74,8 @@ type Server struct {
 	smu          sync.Mutex // guards pending and last
 	pending      bool       // a SetDefault call is running
 	last         *defaultResult
+	since        time.Time // when the pending call started
+	attempt      int
 }
 
 // New builds a server; call SetAddr with the bound address before serving.
@@ -108,6 +112,9 @@ func New(opts Options) *Server {
 	}
 	if opts.SetDefaultWait <= 0 {
 		opts.SetDefaultWait = 60 * time.Second
+	}
+	if opts.DefaultStale <= 0 {
+		opts.DefaultStale = 3 * time.Minute
 	}
 	return &Server{opts: opts, hosts: map[string]bool{}}
 }
