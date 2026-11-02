@@ -10,10 +10,12 @@ built end to end by someone who does: you can run Portero live on GNOME or KDE; 
 - The core is already portable and builds on Linux today: `internal/rules` (format, groups, matching on
   host/path/opener/cwd), `internal/config`, `internal/decisionlog`, `internal/check`, `internal/serve` (the local
   web UI), the `cmd/portero` CLI. `GOOS=linux go build ./...` and `go test ./...` pass.
-- macOS-only today, behind build tags: `internal/handler` (cgo/Objective-C Apple-event URL handler and the
-  default-browser setter), `internal/launch/launch_darwin.go` (`open -a/-b`, AppleScript for Dia/Arc),
-  `internal/browsers/installed.go` (looks in /Applications), `cmd/portero/serve_darwin.go`, `cmd/portero/app.go`
-  (the .app bundle). The `_other` files return "not supported".
+- macOS-only today, behind build tags (`_darwin` / `_other` pairs; the `_other` side returns "not supported"):
+  `internal/handler` (cgo/Objective-C Apple-event URL handler and the default-browser setter),
+  `internal/launch/launch_darwin.go` (`open -a/-b`, AppleScript for Dia/Arc), `cmd/portero/serve_darwin.go`.
+- macOS assumptions WITHOUT build tags (they compile everywhere but do macOS things): `internal/browsers/installed.go`
+  (looks in /Applications) and `cmd/portero/app.go` (the .app bundle and the handler app). Split them into
+  `_darwin` / `_linux` variants.
 
 ## Goal
 
@@ -23,7 +25,7 @@ line per link.
 
 ## What to build
 
-1. **Registration.** A `portero.desktop` entry (`Exec=portero open %u`,
+1. **Registration.** A `portero.desktop` entry (`Exec=portero open -- %u`,
    `MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;`, `NoDisplay=true`) installed to
    `~/.local/share/applications`. `portero default status|set` on Linux via
    `xdg-settings get/set default-web-browser portero.desktop` (fall back to `xdg-mime default` per scheme);
@@ -45,7 +47,11 @@ line per link.
    - Dia, Arc, Safari and the macOS-only browsers do not exist on Linux: `rules check` warns "not available on
      Linux" and `open` falls back to the default target with a note.
    - Never pass URLs or names through a shell: `exec.Command` with argv only (see the macOS code for the pattern
-     and the `ext+container` encoder).
+     and the `ext+container` encoder). Put the URL after `--` (or otherwise stop option parsing) so a URL starting
+     with `-` is never read as a flag; validate profile and browser names from the rules file before they become
+     argv elements.
+   - A browser launched directly must never resolve back to `portero.desktop` (no fallback through the default
+     browser), or links loop.
 4. **`portero browsers`** on Linux: installed browsers from PATH and desktop entries, with profiles and
    containers.
 5. **`portero serve`** works as is. In `serve_linux.go` wire the Settings default-browser button to the xdg path
@@ -53,7 +59,7 @@ line per link.
 6. **Install.** `make install-linux`: binary to `~/.local/bin/portero`, the desktop entry,
    `update-desktop-database ~/.local/share/applications`. No root.
 7. **CI.** A GitHub Actions job on `ubuntu-latest` running `go vet ./... && go test ./...` (pin actions to commit
-   SHAs like the existing workflows).
+   SHAs like the existing workflows); also run `GOOS=darwin go vet ./...` there so the build tags stay honest.
 8. **Docs.** A platform section in README (macOS / Linux), notes in `docs/rules.md` (opener is macOS-only;
    profiles per platform), a Linux install section.
 
