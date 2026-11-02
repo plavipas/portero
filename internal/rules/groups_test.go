@@ -193,3 +193,21 @@ func TestOldFlatExampleStillWorks(t *testing.T) {
 		t.Errorf("decision %+v", d)
 	}
 }
+
+func TestRulesKeyPresentButEmpty(t *testing.T) {
+	head := "version: 1\ndefault: {browser: Safari}\nrules:\n"
+	tests := []struct{ name, rules, want string }{
+		{"match and null rules", "  - name: Work\n    open: {browser: Dia}\n    match: {host: a.example.com}\n    rules:\n", `group "Work" has match`},
+		{"null rules only", "  - name: Work\n    open: {browser: Dia}\n    rules:\n", `group "Work" has no rules`},
+		{"null rules without name", "  - match: {host: a.example.com}\n    open: {browser: Dia}\n    rules:\n", `group #1 has no name`},
+		{"null nested rules", "  - name: Work\n    open: {browser: Dia}\n    rules:\n      - name: in\n        rules:\n", `groups cannot contain groups`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Parse([]byte(head + tc.rules))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
