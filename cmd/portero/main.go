@@ -338,7 +338,11 @@ func lsregOthersCmd(args []string, in io.Reader, out io.Writer) error {
 	if len(args) != 2 {
 		return fmt.Errorf("usage: portero lsreg-others <bundle-id> <keep-path>")
 	}
-	for _, p := range lsreg.Others(in, args[0], args[1]) {
+	others, err := lsreg.Others(in, args[0], args[1])
+	if err != nil {
+		return fmt.Errorf("reading the Launch Services dump: %w", err)
+	}
+	for _, p := range others {
 		fmt.Fprintln(out, p)
 	}
 	return nil

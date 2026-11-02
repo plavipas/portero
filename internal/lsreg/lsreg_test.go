@@ -15,7 +15,10 @@ func TestOthers(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	got := Others(f, id, "/Users/test/Applications/Portero.app")
+	got, err := Others(f, id, "/Users/test/Applications/Portero.app")
+	if err != nil {
+		t.Fatal(err)
+	}
 	want := []string{
 		"/var/folders/xx/T/portero-build.AbC123/Portero.app",
 		"/Users/test/Library/Mobile Documents/com~apple~CloudDocs/My Apps/Portero.app",
@@ -43,9 +46,16 @@ func TestOthersTable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Others(strings.NewReader(tt.dump), id, tt.keep); !reflect.DeepEqual(got, tt.want) {
+			if got, _ := Others(strings.NewReader(tt.dump), id, tt.keep); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestOthersFailsOnAnOversizedLine(t *testing.T) {
+	dump := "path: /a/Portero.app\n" + strings.Repeat("x", 5*1024*1024) + "\n"
+	if _, err := Others(strings.NewReader(dump), "dev.example.app", "/keep/Portero.app"); err == nil {
+		t.Fatal("an oversized line must be an error, not an empty result")
 	}
 }
