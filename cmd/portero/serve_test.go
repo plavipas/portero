@@ -206,3 +206,25 @@ func TestSessionSecretConcurrentStarts(t *testing.T) {
 		t.Fatalf("bad secret %q", first)
 	}
 }
+
+func TestSessionSecretConcurrentReplace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "portero", "ui-session")
+	if _, err := sessionSecret(path); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-sessionTTL - time.Hour) // expired: every starter wants to replace it
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	const n = 16
+	got := make(chan string, n)
+	for i := 0; i < n; i++ {
+		go func() { v, _ := sessionSecret(path); got <- v }()
+	}
+	first := <-got
+	for i := 1; i < n; i++ {
+		if v := <-got; v != first || len(v) != 64 {
+			t.Fatalf("servers disagree after replacing an expired secret: %q vs %q", first, v)
+		}
+	}
+}

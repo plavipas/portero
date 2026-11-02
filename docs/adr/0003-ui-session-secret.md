@@ -1,6 +1,6 @@
 # ADR 0003: The UI session secret outlives one `portero serve` run
 
-Status: proposed, 2026-11-02 (fix-ui-node-details); accepted with the user's "да".
+Status: accepted, 2026-11-02 (fix-ui-node-details).
 
 Refines ADR 0002, decision 3. The one-time link (`/auth/<nonce>`) stays per run. The secret behind the session
 cookie no longer does.
@@ -13,7 +13,7 @@ cookie no longer does.
    carry it; a cache directory is never expected to be synced, and losing the file only costs a new link.
 2. **Reused only when safe**: the file must be a plain file (no symlink), readable by nobody else, 64 hex
    characters, and younger than seven days; anything else is replaced by a fresh secret. Two servers starting
-   at once share the secret (`O_EXCL` plus a re-read on `EEXIST`). Deleting the file resets every session.
+   at once share the secret (an exclusive lock on `ui-session.lock` around the check and the replacement). Deleting the file resets every session.
 3. **Why**: the user restarts the server often while the page is open and wants a plain reload to keep working
    (`--port N --no-open`), instead of a new tab for every restart. With a per-run secret every restart invalidated
    the cookie.
