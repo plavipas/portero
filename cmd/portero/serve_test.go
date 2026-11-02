@@ -1,6 +1,16 @@
 package main
 
-import "testing"
+import (
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/plavipas/portero/internal/config"
+	"github.com/plavipas/portero/internal/launch"
+	"github.com/plavipas/portero/internal/rules"
+)
 
 func TestListenAddr(t *testing.T) {
 	tests := []struct {
@@ -31,6 +41,38 @@ func TestListenAddr(t *testing.T) {
 		got, err := listenAddr(tc.port, tc.listen, tc.portSet, tc.listenSet)
 		if (err != nil) != tc.wantErr || got != tc.want {
 			t.Errorf("%s: %q, %v", tc.name, got, err)
+		}
+	}
+}
+
+func TestOpenUILogsNoToken(t *testing.T) {
+	const token = "secrettoken"
+	link := "http://127.0.0.1:5555/"
+	for _, name := range []string{"valid rules", "broken rules"} {
+		dir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", dir)
+		t.Setenv("PORTERO_RULES", "")
+		text := "version: 1\ndefault: {browser: Safari}\n"
+		if name == "broken rules" {
+			text = "version: 9\n"
+		}
+		if err := os.MkdirAll(filepath.Join(dir, "portero"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(config.RulesFile(), []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		var opened string
+		err := openUI(link, link+"auth/"+token, func(u *url.URL, _ rules.Target) (launch.Plan, error) {
+			opened = u.String()
+			return launch.Plan{}, nil
+		})
+		if err != nil || opened != link+"auth/"+token {
+			t.Errorf("%s: browser got %q, %v", name, opened, err)
+		}
+		logged, err := os.ReadFile(config.LogFile())
+		if err != nil || strings.Contains(string(logged), token) || !strings.Contains(string(logged), link) {
+			t.Errorf("%s: log %q, %v", name, logged, err)
 		}
 	}
 }

@@ -92,6 +92,10 @@ func Targets(r *rules.Rules, env Env) (warnings []string, err error) {
 			return warnings, fmt.Errorf("rules: %s: container %q needs a Firefox-family browser (%s); %s does not take one",
 				it.where, it.t.Container, firefoxFamily(), b.Name)
 		}
+		if !known && strings.Contains(b.Name, "/") {
+			warnings = append(warnings, fmt.Sprintf("warning: %s: browser %q is a path; Portero opens it with open -a", it.where, b.Name))
+			continue
+		}
 		if !known && strings.Contains(b.Name, ".") {
 			continue // a bundle id outside the table: nothing to look up without Launch Services
 		}

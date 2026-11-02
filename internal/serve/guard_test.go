@@ -38,6 +38,7 @@ func TestGuard(t *testing.T) {
 	}
 	for _, tc := range tests {
 		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+		req.AddCookie(&http.Cookie{Name: cookieName, Value: testToken})
 		req.Host = tc.host
 		if tc.origin != "" {
 			req.Header.Set("Origin", tc.origin)
@@ -67,6 +68,7 @@ func TestGuard(t *testing.T) {
 func TestGuardBeforeSetAddr(t *testing.T) {
 	s := New(Options{})
 	req := httptest.NewRequest("GET", "/api/state", nil)
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: testToken})
 	w := httptest.NewRecorder()
 	s.Handler().ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
@@ -89,6 +91,7 @@ func TestGuardOriginMustNameThisServer(t *testing.T) {
 	}
 	for _, tc := range tests {
 		req := httptest.NewRequest(http.MethodPost, "/api/validate", strings.NewReader(`{}`))
+		req.AddCookie(&http.Cookie{Name: cookieName, Value: testToken})
 		req.Host = testAddr
 		req.Header.Set("Origin", tc.origin)
 		req.Header.Set("Content-Type", "application/json")
@@ -103,6 +106,7 @@ func TestGuardOriginMustNameThisServer(t *testing.T) {
 func TestGuardHeadAllowedWithoutOrigin(t *testing.T) {
 	r := newRig(t, goodRules)
 	req := httptest.NewRequest(http.MethodHead, "/api/state", nil)
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: testToken})
 	req.Host = "LOCALHOST:7777"
 	w := httptest.NewRecorder()
 	r.srv.Handler().ServeHTTP(w, req)
@@ -114,6 +118,7 @@ func TestGuardHeadAllowedWithoutOrigin(t *testing.T) {
 func TestGuardRejectedPostDoesNotWrite(t *testing.T) {
 	r := newRig(t, goodRules)
 	req := httptest.NewRequest(http.MethodPost, "/api/apply", strings.NewReader(`{"yaml":"version: 1\ndefault: {browser: Safari}\n","base_hash":"`+sum(goodRules)+`"}`))
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: testToken})
 	req.Host = testAddr
 	req.Header.Set("Origin", "http://evil.example.com")
 	req.Header.Set("Content-Type", "application/json")

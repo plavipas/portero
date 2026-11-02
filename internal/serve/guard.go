@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"crypto/subtle"
 	"errors"
 	"mime"
 	"net"
@@ -44,6 +45,14 @@ func (s *Server) guard(next http.Handler) http.Handler {
 			http.Error(w, "forbidden host", http.StatusForbidden)
 			return
 		}
+		if t, ok := strings.CutPrefix(r.URL.Path, "/auth/"); ok && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+			s.auth(w, r, t)
+			return
+		}
+		if !s.cookieOK(r) {
+			http.Error(w, "open the URL printed by portero serve", http.StatusForbidden)
+			return
+		}
 		switch r.Method {
 		case http.MethodGet, http.MethodHead:
 		case http.MethodPost:
@@ -70,4 +79,26 @@ func (s *Server) guard(next http.Handler) http.Handler {
 func isJSON(ct string) bool {
 	mt, _, err := mime.ParseMediaType(ct)
 	return err == nil && mt == "application/json"
+}
+
+const cookieName = "portero_ui"
+
+// equal compares secrets in constant time.
+func equal(a, b string) bool { return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1 }
+
+// auth trades the per-run token for the session cookie. Loopback is reachable by every local process, other
+// macOS users and containers, so Host and Origin alone are not enough: only whoever read the printed URL gets in.
+func (s *Server) auth(w http.ResponseWriter, _ *http.Request, token string) {
+	if !equal(token, s.opts.Token) {
+		http.Error(w, "open the URL printed by portero serve", http.StatusForbidden)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: s.opts.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+	w.Header().Set("Location", "/")
+	w.WriteHeader(http.StatusSeeOther)
+}
+
+func (s *Server) cookieOK(r *http.Request) bool {
+	c, err := r.Cookie(cookieName)
+	return err == nil && equal(c.Value, s.opts.Token)
 }

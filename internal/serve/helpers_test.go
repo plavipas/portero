@@ -11,7 +11,10 @@ import (
 	"testing"
 )
 
-const testAddr = "127.0.0.1:7777"
+const (
+	testAddr  = "127.0.0.1:7777"
+	testToken = "test-token"
+)
 
 const goodRules = `# my rules
 version: 1
@@ -39,7 +42,7 @@ func newRig(t *testing.T, rulesText string) *rig {
 			t.Fatal(err)
 		}
 	}
-	r.srv = New(Options{RulesFile: r.rules, LogFile: r.log})
+	r.srv = New(Options{RulesFile: r.rules, LogFile: r.log, Token: testToken})
 	r.srv.SetAddr(testAddr)
 	return r
 }
@@ -47,6 +50,7 @@ func newRig(t *testing.T, rulesText string) *rig {
 func (r *rig) do(method, path, body string) *httptest.ResponseRecorder {
 	r.t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: testToken})
 	req.Host = testAddr
 	if method == http.MethodPost {
 		req.Header.Set("Origin", "http://"+testAddr)

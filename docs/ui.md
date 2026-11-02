@@ -13,7 +13,7 @@ portero serve --listen 127.0.0.1:8765  # same, as an address; localhost is accep
 portero serve --no-open                # only print the URL
 ```
 
-The server prints `Portero UI: http://127.0.0.1:<port>/  (Ctrl-C stops it)`. Ctrl-C (or `SIGTERM`) stops it.
+The server prints `Portero UI: http://127.0.0.1:<port>/auth/<token>  (Ctrl-C stops it)`; the token is per run (see Write protection). Ctrl-C (or `SIGTERM`) stops it.
 
 - Only loopback addresses are accepted. `--listen 0.0.0.0:8765` or any other non-loopback address is refused
   with an error. `--port` and `--listen` cannot be used together.
@@ -71,8 +71,15 @@ works on the rules file that `portero rules path` resolves and on `decisions.log
 
 ## Write protection
 
-The server has no login, so it relies on these checks (`internal/serve/guard.go`):
+Loopback is reachable by every local process, by other macOS users on this Mac and by containers and VMs, so
+checking `Host` and `Origin` is not enough. The server therefore has a per-run token and these checks
+(`internal/serve/guard.go`):
 
+- A random token (32 bytes, hex) is generated on every start and printed as
+  `http://127.0.0.1:<port>/auth/<token>`. Opening it sets the cookie `portero_ui` (`HttpOnly`, `SameSite=Strict`)
+  and redirects to `/`. Every `/api/*` request and every page file needs that cookie, compared in constant time;
+  without it the answer is 403 ("open the URL printed by portero serve"). The token is not written to the log.
+  The browser that `portero serve` opens gets the tokenized URL; the decision log records the bare address.
 - It listens on a loopback address only.
 - `Host` must be the bound address, or `localhost` / `127.0.0.1` with the same port. Anything else gets 403, which
   stops DNS rebinding.
