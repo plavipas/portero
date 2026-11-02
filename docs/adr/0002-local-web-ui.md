@@ -1,6 +1,6 @@
 # ADR 0002: Local web UI (`portero serve`)
 
-Status: accepted, 2026-11-02 (DEV-24)
+Status: accepted, 2026-11-02 (DEV-24); decision 3 refined by ADR 0003 (persistent session secret)
 
 Refines ADR 0001, decision 2 ("edited by hand in v1"): the rules file can also be edited through a local web
 page. Everything else in ADR 0001 stands: one local YAML file, no service, no account, portable core.

@@ -63,8 +63,8 @@ input { font: inherit; color: var(--text); background: var(--panel); border: 1px
 .edge.static { opacity: .3; stroke-dasharray: 3 4; }
 .edge.flow { stroke: var(--arrow-emphasis); opacity: 1; stroke-dasharray: 8 6; animation: dash 1s linear infinite; }
 .edge.hl { stroke: var(--arrow-emphasis); opacity: 1; }
-.dim .edge:not(.hl) { opacity: .08; }
-.dim .node:not(.hl) { opacity: .35; }
+.dim .edge:not(.hl):not(.flow) { opacity: .08; }
+.dim .node:not(.hl):not(.last) { opacity: .35; }
 @keyframes dash { to { stroke-dashoffset: -28; } }
 @media (prefers-reduced-motion: reduce) { .edge.flow { animation: none; } }
 .table-wrap { overflow-x: auto; border: 1px solid var(--panel-border); border-radius: 8px; }
@@ -100,3 +100,11 @@ tr.err td { color: var(--security-stroke); }
 .diff .add { background: var(--add-bg); }
 .diff .del { background: var(--del-bg); }
 .diff .same { color: var(--text-muted); }
+
+/* node details: click a node to pin it and list the paths through it */
+.node { cursor: pointer; }
+.node.sel rect { stroke-width: 3; }
+.node-details { margin: 8px 0 4px; padding: 8px 10px; border: 1px solid var(--backend-stroke); border-radius: 8px; }
+.nd-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 6px; }
+.nd-head .muted { color: var(--text-muted); font-size: 12px; flex: 1; }
+.nd-empty { margin: 4px 0 0; font-size: 12px; }

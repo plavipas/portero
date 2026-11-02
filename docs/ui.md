@@ -31,7 +31,7 @@ Left side:
   animated. Hovering a node highlights its edges. A rule that the log mentions but the file no longer has is
   marked as stale; a target whose browser is not installed is marked too.
 - The last decisions (up to 20, newest first): time, opener, rule, target, URL. An `ERROR` line is highlighted.
-  `replay` copies the URL and opener into the Match form and animates that decision's path in the diagram.
+  `show` animates that decision's path in the diagram.
 - The browsers Portero sees on this Mac, with their profiles.
 - A theme toggle (dark / light) in the header; the choice is kept in the browser's local storage. Without a stored
   choice the page follows the system setting.
@@ -78,7 +78,7 @@ checking `Host` and `Origin` is not enough. The server therefore has a single-us
 - **A single-use link.** On every start the server makes a one-time nonce (32 random bytes, hex) and prints
   `http://127.0.0.1:<port>/auth/<nonce>`; the browser that `portero serve` opens gets the same link. The first
   `GET /auth/<nonce>` (constant-time compare) sets the session cookie `portero_ui_<port>` (`HttpOnly`,
-  `SameSite=Strict`, `Path=/`) and redirects to `/`. The cookie carries a different random secret that is never in
+  `SameSite=Strict`, `Path=/`) and redirects to `/`. The cookie carries a different random secret, kept per user in the cache directory (`~/Library/Caches/portero/ui-session` on macOS; mode 0600, created on the first run, rotated after seven days, never under the config directory so dotfiles repositories and folder sync do not carry it; delete the file to reset every session, see ADR 0003) so that a page opened earlier survives a server restart on the same `--port` with a plain reload; the secret is never in
   a URL, a log line or a process's argv. The link works once: a second use, or a wrong nonce, gets 403, and a
   second use of the right nonce prints `portero serve: the UI link was used again; if that was not you, stop the
   server` once, so a link taken from `ps` or the browser history shows up. After use the link in the browser
