@@ -1,6 +1,6 @@
 # ADR 0004: The UI can set the default browser and switch sync
 
-Status: proposed, 2026-11-02 (DEV-39); accepted with the user's "да" on the DEV-39 plan.
+Status: accepted, 2026-11-02 (DEV-39).
 
 Refines ADR 0002, decision 4 ("the server writes exactly one file"). The rules editor keeps that rule. The new
 Settings section of `portero serve` adds two more writes, each only on an explicit, confirmed click.

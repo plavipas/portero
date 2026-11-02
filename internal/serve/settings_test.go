@@ -355,3 +355,63 @@ func TestSettingsSyncIgnoresRequestPaths(t *testing.T) {
 		t.Errorf("%v", m)
 	}
 }
+
+func TestSettingsGetSyncExtras(t *testing.T) {
+	f := &syncFake{avail: true}
+	sf := f.funcs("/x")
+	sf.ICloudExists = func() bool { return true }
+	sf.LocalPath = func() string { return "/cfg/rules.yaml" }
+	r := settingsRig(t, Options{Sync: sf})
+	_, m := r.get("/api/settings")
+	sy := m["sync"].(map[string]any)
+	if sy["icloud_exists"] != true || sy["local_path"] != "/cfg/rules.yaml" {
+		t.Errorf("sync = %v", sy)
+	}
+}
+
+func TestSettingsBodyTooLargeIs413(t *testing.T) {
+	f := &syncFake{avail: true}
+	r := settingsRig(t, Options{Sync: f.funcs("/x")})
+	body := `{"mode":"` + strings.Repeat("a", maxBody+10) + `"}`
+	if w := r.do(http.MethodPost, "/api/settings/sync", body); w.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("%d", w.Code)
+	}
+}
+
+func TestSetDefaultStalePending(t *testing.T) {
+	release := make(chan struct{})
+	defer close(release)
+	var calls atomic.Int32
+	r := settingsRig(t, Options{
+		DefaultStatus: okStatus("/x/App.app"), SetDefaultWait: 10 * time.Millisecond, DefaultStale: 40 * time.Millisecond,
+		SetDefault: func() ([]SchemeResult, error) {
+			if calls.Add(1) == 1 {
+				<-release // the first attempt never gets an answer
+			}
+			return []SchemeResult{{"http", "dev.example.app", "set now"}}, nil
+		},
+	})
+	if code, _ := r.post("/api/settings/default", map[string]any{}); code != 202 {
+		t.Fatalf("first: %d", code)
+	}
+	if code, _ := r.post("/api/settings/default", map[string]any{}); code != 409 {
+		t.Errorf("fresh pending: %d", code)
+	}
+	_, g := r.get("/api/settings")
+	if def := g["default"].(map[string]any); def["pending"] != true || def["stale"] != false {
+		t.Errorf("fresh: %v", def)
+	}
+	time.Sleep(60 * time.Millisecond)
+	_, g = r.get("/api/settings")
+	if def := g["default"].(map[string]any); def["pending"] != true || def["stale"] != true {
+		t.Errorf("stale: %v", def)
+	}
+	code, m := r.post("/api/settings/default", map[string]any{})
+	if code != 200 || m["schemes"].([]any)[0].(map[string]any)["note"] != "set now" {
+		t.Fatalf("retry: %d %v", code, m)
+	}
+	_, g = r.get("/api/settings")
+	if def := g["default"].(map[string]any); def["pending"] != false || def["last"] == nil {
+		t.Errorf("after retry: %v", def)
+	}
+}

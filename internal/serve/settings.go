@@ -2,6 +2,7 @@ package serve
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -33,6 +34,10 @@ type SyncFuncs struct {
 	Enable, Disable func() (string, error)
 	ICloudDir       func() string
 	ICloudAvailable func() bool
+	// ICloudExists reports a synced rules.yaml already in the iCloud folder (it is adopted when syncing is on).
+	ICloudExists func() bool
+	// LocalPath is the local rules file that switching syncing off copies back to.
+	LocalPath func() string
 	// Pinned reports that the rules file is fixed from outside (PORTERO_RULES), so it cannot be moved.
 	Pinned func() bool
 }
@@ -51,8 +56,9 @@ func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
 			info.Schemes = []SchemeHandler{}
 		}
 		s.smu.Lock()
+		stale := s.pending && time.Since(s.since) > s.opts.DefaultStale
 		def = map[string]any{"supported": s.opts.SetDefault != nil, "app": info.App, "bundle_id": info.BundleID,
-			"schemes": info.Schemes, "pending": s.pending, "last": s.last}
+			"schemes": info.Schemes, "pending": s.pending, "stale": stale, "last": s.last}
 		s.smu.Unlock()
 	}
 	sy := map[string]any{"supported": false, "mode": s.rulesPlace(), "rules_path": s.rulesPath()}
@@ -63,6 +69,10 @@ func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
 			sy["icloud_dir"] = f.ICloudDir()
 		}
 		sy["icloud_available"] = f.ICloudAvailable != nil && f.ICloudAvailable()
+		sy["icloud_exists"] = f.ICloudExists != nil && f.ICloudExists()
+		if f.LocalPath != nil {
+			sy["local_path"] = f.LocalPath()
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"default": def, "sync": sy, "log_file": s.opts.LogFile, "config_file": s.opts.ConfigFile})
 }
@@ -81,12 +91,17 @@ func (s *Server) handleSetDefault(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.smu.Lock()
-	if s.pending {
+	// A pending call older than DefaultStale is given up on: its goroutine may still be blocked on a macOS
+	// dialog that was dismissed or never shown, and must not lock the button forever. Its late result is
+	// dropped (attempt numbers), so it cannot overwrite the newer attempt.
+	if s.pending && time.Since(s.since) <= s.opts.DefaultStale {
 		s.smu.Unlock()
 		fail(w, http.StatusConflict, "a request to macOS is already waiting for an answer")
 		return
 	}
-	s.pending, s.last = true, nil
+	s.attempt++
+	me := s.attempt
+	s.pending, s.last, s.since = true, nil, time.Now()
 	s.smu.Unlock()
 
 	done := make(chan *defaultResult, 1)
@@ -100,7 +115,9 @@ func (s *Server) handleSetDefault(w http.ResponseWriter, r *http.Request) {
 			res.Error = err.Error()
 		}
 		s.smu.Lock()
-		s.pending, s.last = false, res
+		if s.attempt == me {
+			s.pending, s.last = false, res
+		}
 		s.smu.Unlock()
 		done <- res
 	}()
@@ -172,6 +189,11 @@ func readStrict(w http.ResponseWriter, r *http.Request, v any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			fail(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return false
+		}
 		fail(w, http.StatusBadRequest, "bad JSON: "+err.Error())
 		return false
 	}
