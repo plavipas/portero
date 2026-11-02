@@ -2,8 +2,11 @@
 # Checks that a failing build leaves the installed app intact (fake HOME, nothing real is touched).
 set -eu
 cd "$(dirname "$0")/.."
+# Keep Go's real caches: with HOME=$T Go would download modules into $T (read-only files, a cold build).
+GOMODCACHE=$(go env GOMODCACHE) GOCACHE=$(go env GOCACHE) GOPATH=$(go env GOPATH)
+export GOMODCACHE GOCACHE GOPATH
 T=$(mktemp -d "${TMPDIR:-/tmp}/portero-installtest.XXXXXX")
-trap 'rm -rf "$T"' EXIT
+trap 'chmod -R u+w "$T" 2>/dev/null; rm -rf "$T"' EXIT
 mkdir -p "$T/Applications/Portero.app"
 echo keep > "$T/Applications/Portero.app/marker"
 for dry in "" 1; do
@@ -34,3 +37,11 @@ if PORTERO_BUILD_DIR="$T/inrepo/$probe" sh scripts/build-app.sh >/dev/null 2>&1;
 fi
 [ ! -e "internal/$probe" ] || { rm -rf "internal/$probe"; echo "FAIL: build-app.sh left internal/$probe" >&2; exit 1; }
 echo "ok: a symlinked build directory inside the repository is refused"
+
+# Building straight into the install target would let install delete its own build: refused before any change.
+if HOME=$T PORTERO_BUILD_DIR="$T/Applications" sh scripts/install.sh >/dev/null 2>&1; then
+	echo "FAIL: install.sh accepted a build directory equal to ~/Applications" >&2
+	exit 1
+fi
+[ "$(cat "$T/Applications/Portero.app/marker" 2>/dev/null)" = keep ] || { echo "FAIL: installed app was touched by a build into ~/Applications" >&2; exit 1; }
+echo "ok: a build directory equal to ~/Applications is refused"

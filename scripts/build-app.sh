@@ -19,6 +19,13 @@ existed=0
 [ -d "$OUT" ] && existed=1
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd -P)
+# Never build over the installed app: install would then delete its own build.
+APPS=$(cd "$HOME/Applications" 2>/dev/null && pwd -P || true)
+if [ -n "$APPS" ] && [ "$OUT" = "$APPS" ]; then
+	[ "$existed" = 1 ] || rmdir "$OUT" 2>/dev/null || true
+	echo "error: build directory $OUT is ~/Applications; build elsewhere and let make install copy it" >&2
+	exit 1
+fi
 # Again on the resolved path: a symlink outside the repository may point inside it.
 case "$OUT/" in
 "$ROOT"/*)
