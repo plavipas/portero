@@ -35,6 +35,9 @@ Usage:
   portero browsers                                        Installed browsers Portero knows, with their profiles
   portero default [status|set]                            Show or set Portero as the default browser
   portero sync [status|icloud|off]                        Keep the rules file in iCloud Drive
+  portero serve [--port N | --listen 127.0.0.1:N] [--no-open]
+                                                          Local web UI: routing diagram and rules editor
+                                                          (loopback only; opens in the browser your rules pick)
   portero app                                             Run the link handler (what macOS starts)
   portero version
 `
@@ -57,6 +60,8 @@ func main() {
 	switch os.Args[1] {
 	case "app":
 		runApp()
+	case "serve":
+		err = serveCmd(os.Args[2:])
 	case "default":
 		err = defaultCmd(os.Args[2:])
 	case "sync":
