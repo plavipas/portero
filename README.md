@@ -112,9 +112,9 @@ The app icon comes from `packaging/Portero.icns`; `make icon` (`scripts/make-ico
 ## Roadmap
 
 - A companion browser extension, so links clicked inside a browser are routed too.
-- A settings page and a native Mac window for the local UI.
+- A native Mac window for the local UI.
 - More sync backends for the rules file (a private git repository, Google Drive).
-- Other operating systems.
+- Linux: the task for a contributor on a Linux desktop is in [docs/linux.md](docs/linux.md).
 
 ## Status
 
