@@ -76,7 +76,7 @@ checking `Host` and `Origin` is not enough. The server therefore has a per-run t
 (`internal/serve/guard.go`):
 
 - A random token (32 bytes, hex) is generated on every start and printed as
-  `http://127.0.0.1:<port>/auth/<token>`. Opening it sets the cookie `portero_ui` (`HttpOnly`, `SameSite=Strict`)
+  `http://127.0.0.1:<port>/auth/<token>`. Opening it sets the cookie `portero_ui_<port>` (`HttpOnly`, `SameSite=Strict`; the port in the name keeps two servers apart)
   and redirects to `/`. Every `/api/*` request and every page file needs that cookie, compared in constant time;
   without it the answer is 403 ("open the URL printed by portero serve"). The token is not written to the log.
   The browser that `portero serve` opens gets the tokenized URL; the decision log records the bare address.

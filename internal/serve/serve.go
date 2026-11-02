@@ -48,6 +48,7 @@ type Server struct {
 	mu    sync.Mutex // serializes Apply
 	gmu   sync.RWMutex
 	hosts map[string]bool
+	port  string // from SetAddr; part of the session cookie name
 }
 
 // New builds a server; call SetAddr with the bound address before serving.

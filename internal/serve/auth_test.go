@@ -17,7 +17,7 @@ func rawReq(r *rig, method, path, cookie, body string) *httptest.ResponseRecorde
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if cookie != "" {
-		req.AddCookie(&http.Cookie{Name: cookieName, Value: cookie})
+		req.AddCookie(&http.Cookie{Name: r.srv.cookieName(), Value: cookie})
 	}
 	w := httptest.NewRecorder()
 	r.srv.Handler().ServeHTTP(w, req)
@@ -33,7 +33,7 @@ func TestAuthRedirectSetsCookie(t *testing.T) {
 		t.Fatalf("%d %q %v", w.Code, loc, cs)
 	}
 	c := cs[0]
-	if c.Name != "portero_ui" || c.Value != testToken || !c.HttpOnly || c.SameSite != http.SameSiteStrictMode || c.Path != "/" || c.Secure {
+	if c.Name != r.srv.cookieName() || c.Value != testToken || !c.HttpOnly || c.SameSite != http.SameSiteStrictMode || c.Path != "/" || c.Secure {
 		t.Errorf("cookie %+v", c)
 	}
 	// the cookie it hands out opens the page and the API

@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	testAddr  = "127.0.0.1:7777"
-	testToken = "test-token"
+	testAddr = "127.0.0.1:7777"
+	// cookieName is what a server bound to testAddr calls its session cookie (see Server.cookieName).
+	cookieName = "portero_ui_7777"
+	testToken  = "test-token"
 )
 
 const goodRules = `# my rules
