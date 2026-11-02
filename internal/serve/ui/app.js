@@ -286,7 +286,16 @@ async function validate() {
 }
 
 async function apply() {
-  const { status, data } = await api("/api/apply", { yaml: editor.value, base_hash: S.hash });
+  // The editor is read-only while the request is in flight: a successful Apply reloads the saved file into
+  // the editor, and an edit typed meanwhile would be lost.
+  editor.readOnly = true;
+  $("btn-apply").disabled = true;
+  let status, data;
+  try {
+    ({ status, data } = await api("/api/apply", { yaml: editor.value, base_hash: S.hash }));
+  } finally {
+    editor.readOnly = false;
+  }
   if (status === 200) {
     await loadState();
     const box = $("problems");
