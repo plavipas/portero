@@ -15,8 +15,18 @@ case "$OUT/" in
 	exit 1
 	;;
 esac
+existed=0
+[ -d "$OUT" ] && existed=1
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd -P)
+# Again on the resolved path: a symlink outside the repository may point inside it.
+case "$OUT/" in
+"$ROOT"/*)
+	[ "$existed" = 1 ] || rmdir "$OUT" 2>/dev/null || true
+	echo "error: build directory $OUT is inside the repository; a .app there gets registered with Launch Services" >&2
+	exit 1
+	;;
+esac
 APP=$OUT/Portero.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
