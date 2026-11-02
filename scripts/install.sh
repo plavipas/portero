@@ -57,7 +57,16 @@ mkdir -p "$HOME/Applications" "$HOME/.local/bin"
 rm -rf "$DEST"
 cp -R "$APP" "$DEST"
 # The sweep uses the freshly installed binary; the dump may list the build copy too, it is already gone.
-others_list=$("$LSR" -dump | "$DEST/Contents/MacOS/portero" lsreg-others "$ID" "$DEST" || true)
+# A failed enumeration does not stop the install (the new app must still be registered) but is reported
+# and makes the install exit non-zero, so a stale copy cannot stay registered unnoticed.
+sweep_failed=0
+dump=$(mktemp "${TMPDIR:-/tmp}/portero-lsdump.XXXXXX")
+if "$LSR" -dump > "$dump" 2>/dev/null && others_list=$("$DEST/Contents/MacOS/portero" lsreg-others "$ID" "$DEST" < "$dump"); then :; else
+	echo "error: could not list the registered Portero copies; other copies were not unregistered" >&2
+	others_list=""
+	sweep_failed=1
+fi
+rm -f "$dump"
 printf '%s\n' "$others_list" | while IFS= read -r p; do
 	case "$p" in /*.app) echo "unregistering $p"; unreg "$p" ;; esac
 done
@@ -68,4 +77,7 @@ mdfind "kMDItemCFBundleIdentifier == '$ID'" 2>/dev/null | while IFS= read -r p; 
 	[ -n "$p" ] && [ "$p" != "$DEST" ] && echo "stale copy on disk (not deleted): $p"
 done || true
 echo "installed $DEST; CLI: ~/.local/bin/portero"
-"$DEST/Contents/MacOS/portero" default status
+status=0
+"$DEST/Contents/MacOS/portero" default status || status=$?
+[ "$sweep_failed" = 0 ] || exit 1
+exit "$status"

@@ -26,9 +26,11 @@ echo "ok: a caller-provided build directory is kept"
 
 # A symlink outside the repository that points inside it is refused as well.
 ln -s "$PWD/internal" "$T/inrepo"
-if PORTERO_BUILD_DIR="$T/inrepo/x" sh scripts/build-app.sh >/dev/null 2>&1; then
+probe="portero-symlink-probe-$$"
+[ ! -e "internal/$probe" ] || { echo "FAIL: internal/$probe already exists" >&2; exit 1; }
+if PORTERO_BUILD_DIR="$T/inrepo/$probe" sh scripts/build-app.sh >/dev/null 2>&1; then
 	echo "FAIL: build-app.sh built through a symlink into the repository" >&2
 	exit 1
 fi
-[ ! -e internal/x ] || { rm -rf internal/x; echo "FAIL: build-app.sh left internal/x" >&2; exit 1; }
+[ ! -e "internal/$probe" ] || { rm -rf "internal/$probe"; echo "FAIL: build-app.sh left internal/$probe" >&2; exit 1; }
 echo "ok: a symlinked build directory inside the repository is refused"
