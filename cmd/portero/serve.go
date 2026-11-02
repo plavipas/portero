@@ -191,9 +191,13 @@ func uiLinks(addr, nonce string) (bare, auth string) {
 // in a 0600 file under the config directory. Keeping it across runs lets a page opened earlier survive a server
 // restart on the same port with a plain reload, while the one-time nonce in the link stays per run.
 func sessionSecret(path string) (string, error) {
-	if b, err := os.ReadFile(path); err == nil {
-		if v := strings.TrimSpace(string(b)); len(v) == 64 {
-			return v, nil
+	// An existing secret is reused only when nobody else could have read it: a file that is not 0600
+	// (restored from a backup, copied by hand) is replaced by a fresh secret.
+	if fi, err := os.Stat(path); err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o077 == 0 {
+		if b, err := os.ReadFile(path); err == nil {
+			if v := strings.TrimSpace(string(b)); len(v) == 64 {
+				return v, nil
+			}
 		}
 	}
 	raw := make([]byte, 32)
@@ -204,6 +208,7 @@ func sessionSecret(path string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
+	_ = os.Remove(path) // WriteFile keeps the mode of an existing file; start from a fresh 0600 one
 	if err := os.WriteFile(path, []byte(v+"\n"), 0o600); err != nil {
 		return "", err
 	}
