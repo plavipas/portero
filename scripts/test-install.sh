@@ -53,4 +53,10 @@ if HOME=$T PORTERO_BUILD_DIR="$T/Applications/Portero.app/sub" sh scripts/instal
 	exit 1
 fi
 [ "$(cat "$T/Applications/Portero.app/marker" 2>/dev/null)" = keep ] || { echo "FAIL: installed app was touched by a build inside it" >&2; exit 1; }
+H2="$T/fresh-home"
+mkdir -p "$H2"
+if HOME=$H2 PORTERO_BUILD_DIR="$H2/Applications/sub" sh scripts/build-app.sh >/dev/null 2>&1; then
+	echo "FAIL: build-app.sh built inside ~/Applications when the folder did not exist yet" >&2
+	exit 1
+fi
 echo "ok: a build directory equal to or inside ~/Applications is refused"
