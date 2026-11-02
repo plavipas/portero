@@ -23,7 +23,7 @@ var (
 )
 
 // ErrNotDownloaded means an offloaded synced file did not arrive in time; nothing was changed.
-var ErrNotDownloaded = errors.New("the synced rules file in iCloud Drive is not downloaded yet (download started); nothing changed, try again in a minute")
+var ErrNotDownloaded = errors.New("the synced rules file in iCloud Drive is not downloaded to this Mac; nothing changed")
 
 // Offloaded reports whether path is a file iCloud Drive removed from this Mac: either the old placeholder
 // ".<name>.icloud" stands in its place, or the file is there under its own name but dataless (macOS with the
@@ -47,10 +47,10 @@ func ensureLocal(path string) error {
 		return nil
 	}
 	if Download == nil {
-		return fmt.Errorf("%w: iCloud download is not supported on this system: %s", ErrNotDownloaded, path)
+		return fmt.Errorf("%w (iCloud download is not supported on this system): %s", ErrNotDownloaded, path)
 	}
 	if err := Download(path); err != nil {
-		return fmt.Errorf("%w: %v: %s", ErrNotDownloaded, err, path)
+		return fmt.Errorf("%w (the download could not start: %v): %s", ErrNotDownloaded, err, path)
 	}
 	deadline := time.Now().Add(DownloadTimeout)
 	for {
@@ -60,7 +60,7 @@ func ensureLocal(path string) error {
 			}
 		}
 		if !time.Now().Before(deadline) {
-			return fmt.Errorf("%w: %s", ErrNotDownloaded, path)
+			return fmt.Errorf("%w (the download started but did not finish in time; try again in a minute): %s", ErrNotDownloaded, path)
 		}
 		time.Sleep(PollEvery)
 	}
