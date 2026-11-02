@@ -80,7 +80,34 @@ func hashOf(b []byte) string {
 
 // readRules returns the bytes of the rules file; exists is false when there is none.
 func (s *Server) readRules() (data []byte, exists bool, err error) {
+	if err := s.offloadedErr(s.rulesPath()); err != nil {
+		return nil, false, err
+	}
 	return readRulesAt(s.rulesPath())
+}
+
+// errOffloaded: the rules file is in iCloud Drive but not on this Mac; reading it would block the request.
+var errOffloaded = errors.New("the rules file is offloaded by iCloud; its download was requested, reload in a few seconds")
+
+// offloadedErr returns errOffloaded (after requesting the download) when path is offloaded, so no handler
+// ever blocks on reading a dataless file.
+func (s *Server) offloadedErr(path string) error {
+	if s.opts.Offloaded == nil || !s.opts.Offloaded(path) {
+		return nil
+	}
+	if s.opts.Download != nil {
+		_ = s.opts.Download(path)
+	}
+	return errOffloaded
+}
+
+// readFail answers a failed rules read: 503 when the file is offloaded (retry later), 500 otherwise.
+func readFail(w http.ResponseWriter, err error) {
+	if errors.Is(err, errOffloaded) {
+		fail(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	fail(w, http.StatusInternalServerError, "cannot read the rules file: "+err.Error())
 }
 
 // readRulesAt reads one resolved rules path; Apply uses it so the symlink check, the read and the write all
@@ -158,7 +185,7 @@ func (s *Server) graph(r *rules.Rules, ds []Decision) Graph {
 func (s *Server) handleState(w http.ResponseWriter, _ *http.Request) {
 	data, exists, err := s.readRules()
 	if err != nil {
-		fail(w, http.StatusInternalServerError, "cannot read the rules file: "+err.Error())
+		readFail(w, err)
 		return
 	}
 	st := map[string]any{
@@ -262,7 +289,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 	cur, exists, err := s.readRules()
 	if err != nil {
-		fail(w, http.StatusInternalServerError, "cannot read the rules file: "+err.Error())
+		readFail(w, err)
 		return
 	}
 	curHash := ""
@@ -309,6 +336,10 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 	text := []byte(req.YAML)
 	if strings.TrimSpace(req.YAML) == "" {
 		data, exists, err := s.readRules()
+		if err != nil && errors.Is(err, errOffloaded) {
+			readFail(w, err)
+			return
+		}
 		if err != nil || !exists {
 			fail(w, http.StatusUnprocessableEntity, "there is no rules file to match against")
 			return
@@ -374,9 +405,13 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, "rules file is a symlink; edit the target by hand")
 		return
 	}
+	if err := s.offloadedErr(path); err != nil {
+		readFail(w, err)
+		return
+	}
 	old, exists, err := readRulesAt(path) // the same path as the symlink check and the write below
 	if err != nil {
-		fail(w, http.StatusInternalServerError, "cannot read the rules file: "+err.Error())
+		readFail(w, err)
 		return
 	}
 	curHash := ""

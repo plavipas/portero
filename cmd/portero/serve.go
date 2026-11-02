@@ -119,6 +119,7 @@ func serveCmd(args []string) error {
 		Rules: rulesNow, LogFile: config.LogFile(), Session: session,
 		Env: check.RealEnv(), Browsers: browserList, Plan: servePlan(), ConfigFile: config.File(),
 		DefaultStatus: defStatus, SetDefault: setDef, Sync: serveSync(),
+		Offloaded: sync.Offloaded, Download: startDownload,
 	})
 	s.SetAddr(ln.Addr().String())
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}

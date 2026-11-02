@@ -31,6 +31,10 @@ type BrowserInfo struct {
 
 // Options wires the server to the files and the Mac. No path is ever taken from a request.
 type Options struct {
+	// Offloaded reports a rules file iCloud removed from this Mac (reading it would block until it is
+	// downloaded); Download requests that download. Both nil: no iCloud handling (tests, other systems).
+	Offloaded  func(path string) bool
+	Download   func(path string) error
 	RulesFile  string
 	RulesPlace string // "local" or "icloud"
 	// Nonce is the one-time secret in the link that opens the UI (see Nonce()); empty means a fresh random one.
