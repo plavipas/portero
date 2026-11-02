@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -114,7 +115,7 @@ func serveCmd(args []string) error {
 		}
 		return p, "local"
 	}
-	session, err := sessionSecret(filepath.Join(config.Dir(), "ui-session"))
+	session, err := sessionSecret(sessionFile())
 	if err != nil {
 		return err
 	}
@@ -133,7 +134,7 @@ func serveCmd(args []string) error {
 	// The nonce in the link works once (see internal/serve/guard.go): it is printed and handed to the browser,
 	// never logged. The session secret behind the cookie is never printed.
 	link, authLink := uiLinks(ln.Addr().String(), s.Nonce())
-	fmt.Printf("Portero UI: %s  (Ctrl-C stops it)\n", authLink)
+	fmt.Print(announce(authLink))
 	if !*noOpen {
 		if err := openUI(link, authLink, launch.Open); err != nil {
 			fmt.Fprintln(os.Stderr, "portero: could not open the UI:", strings.ReplaceAll(err.Error(), s.Nonce(), "<nonce>"))
@@ -194,7 +195,9 @@ func uiLinks(addr, nonce string) (bare, auth string) {
 // otherwise a fresh one replaces it. Deleting the file resets every session.
 const sessionTTL = 7 * 24 * time.Hour
 
-func sessionSecret(path string) (string, error) {
+func sessionSecret(path string) (string, error) { return sessionSecretOnce(path, false) }
+
+func sessionSecretOnce(path string, retry bool) (string, error) {
 	if fi, err := os.Lstat(path); err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o077 == 0 &&
 		time.Since(fi.ModTime()) < sessionTTL {
 		if b, err := os.ReadFile(path); err == nil {
@@ -214,6 +217,9 @@ func sessionSecret(path string) (string, error) {
 	}
 	_ = os.Remove(path) // never write through a symlink or into a file with the wrong mode
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, fs.ErrExist) && !retry {
+		return sessionSecretOnce(path, true) // another portero serve created it between Remove and open: use that one
+	}
 	if err != nil {
 		return "", err
 	}
@@ -223,3 +229,17 @@ func sessionSecret(path string) (string, error) {
 	}
 	return v, f.Close()
 }
+
+// sessionFile is where the session secret lives: the user's cache directory, which no dotfiles repo or
+// folder sync is expected to carry (the config directory often is). Losing it only means a new link.
+func sessionFile() string {
+	dir, err := os.UserCacheDir()
+	if err != nil || dir == "" {
+		dir = filepath.Join(config.Dir(), "cache")
+	}
+	return filepath.Join(dir, "portero", "ui-session")
+}
+
+// announce is the one line serve prints: the single-use link. It takes the link only, so the session secret
+// cannot end up in it (TestServeAnnouncesLinkOnly).
+func announce(authLink string) string { return "Portero UI: " + authLink + "  (Ctrl-C stops it)\n" }

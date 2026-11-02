@@ -1,6 +1,6 @@
 # ADR 0002: Local web UI (`portero serve`)
 
-Status: accepted, 2026-11-02 (DEV-24)
+Status: accepted, 2026-11-02 (DEV-24); decision 3 refined by ADR 0003 (persistent session secret)
 
 Refines ADR 0001, decision 2 ("edited by hand in v1"): the rules file can also be edited through a local web
 page. Everything else in ADR 0001 stands: one local YAML file, no service, no account, portable core.
@@ -17,7 +17,7 @@ page. Everything else in ADR 0001 stands: one local YAML file, no service, no ac
    archify diagrams (shared theme tokens), not by the archify tool at runtime.
 3. **Every request is guarded**. `portero serve` prints (and opens) a single-use link `/auth/<nonce>` (nonce: 32
    random bytes from `crypto/rand`, hex). The first `GET /auth/<nonce>` sets an `HttpOnly; SameSite=Strict`
-   cookie that carries a separate random session secret (kept per user in a 0600 file under the config directory, so a reload survives a restart on the same port), never put in a URL, and redirects to `/`; a second use
+   cookie that carries a separate random session secret, never put in a URL, and redirects to `/`; a second use
    or a wrong nonce is 403, and a second use of the right nonce is reported on stdout, so a link read from the
    argv of the browser start (`ps` shows other users' arguments) cannot be replayed unnoticed. Every API call
    and every UI file needs the cookie (constant-time compare), so a local process, another macOS user or a
