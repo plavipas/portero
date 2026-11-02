@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -58,7 +59,7 @@ func TestEnsureDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fakeHandlers{m: tt.start, onSet: tt.onSet}
-			states, err := ensureDefault("/x/Portero.app", f.current, f.set, time.Millisecond, 20*time.Millisecond)
+			states, err := ensureDefault(io.Discard, "/x/Portero.app", f.current, f.set, time.Millisecond, 20*time.Millisecond)
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -124,7 +125,7 @@ func TestEnsureDefaultPollsStaleReads(t *testing.T) {
 		return BundleID
 	}
 	set := func(string, string) error { return nil }
-	states, err := ensureDefault("/x/Portero.app", current, set, time.Millisecond, time.Second)
+	states, err := ensureDefault(io.Discard, "/x/Portero.app", current, set, time.Millisecond, time.Second)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -134,7 +135,7 @@ func TestEnsureDefaultPollsStaleReads(t *testing.T) {
 
 	start := time.Now()
 	never := func(string) string { return safari }
-	if _, err := ensureDefault("/x/Portero.app", never, set, time.Millisecond, 30*time.Millisecond); err == nil {
+	if _, err := ensureDefault(io.Discard, "/x/Portero.app", never, set, time.Millisecond, 30*time.Millisecond); err == nil {
 		t.Fatal("expected an error when the handler never flips")
 	}
 	if d := time.Since(start); d > time.Second {
@@ -165,5 +166,17 @@ func TestDecideFileURLsUseDefault(t *testing.T) {
 	}
 	if u, err := parseRoutable("https://example.com/x"); err != nil || u.Host != "example.com" {
 		t.Errorf("https: %v %v", u, err)
+	}
+}
+
+func TestEnsureDefaultAnnouncesOnTheWriter(t *testing.T) {
+	f := &fakeHandlers{m: map[string]string{"http": "com.apple.Safari", "https": "com.apple.Safari"},
+		onSet: func(f *fakeHandlers, s string) error { f.m["http"], f.m["https"] = BundleID, BundleID; return nil }}
+	var buf bytes.Buffer
+	if _, err := ensureDefault(&buf, "/x/Portero.app", f.current, f.set, time.Millisecond, 20*time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "asking macOS to make Portero the handler of http") {
+		t.Errorf("output %q", buf.String())
 	}
 }

@@ -103,9 +103,14 @@ char *porteroSetDefaultHandler(const char *appPath, const char *scheme) {
             if (error) message = error.localizedDescription;
             dispatch_semaphore_signal(done);
         }];
-        // The completion runs on another thread; pump the main run loop while waiting.
-        while (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC))) {
-            [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+        // The completion runs on a background queue. On the main thread (the CLI) pump the main run loop while
+        // waiting; on any other thread (portero serve) the main thread is not ours to pump, so just wait.
+        if ([NSThread isMainThread]) {
+            while (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC))) {
+                [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+            }
+        } else {
+            dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
         }
         return strdup(message.UTF8String);
     }
