@@ -7,6 +7,13 @@ set -eu
 cd "$(dirname "$0")/.."
 ROOT=$(pwd -P)
 VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}
+# The version goes into sed and an XML plist: only plain version characters are accepted.
+case "$VERSION" in
+*[!A-Za-z0-9._+-]* | "")
+	echo "error: version $VERSION may only contain letters, digits and . _ + -" >&2
+	exit 1
+	;;
+esac
 OUT=${PORTERO_BUILD_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/portero-build.XXXXXX")}
 case "$OUT" in /*) ;; *) OUT=$PWD/$OUT ;; esac
 case "$OUT/" in
