@@ -19,15 +19,19 @@ if [ -z "$APP" ] || [ ! -d "$APP/Contents/MacOS" ]; then
 fi
 BUILD_DIR=$(dirname "$APP")
 
-# unreg PATH: lsregister -u with a 10 s watchdog; a hang or failure only warns.
+# unreg PATH: lsregister -u with a 10 s watchdog; a hang or a failure is reported and fails the install (exit 1)
+# after the new app is registered.
 unreg() {
 	"$LSR" -u "$1" >/dev/null 2>&1 &
 	pid=$!
 	( sleep 10; kill "$pid" 2>/dev/null ) >/dev/null 2>&1 &
 	wd=$!
-	if wait "$pid" 2>/dev/null; then :; else echo "warning: could not unregister $1" >&2; fi
+	rc=0
+	wait "$pid" 2>/dev/null || rc=1
 	kill "$wd" 2>/dev/null || true
 	wait "$wd" 2>/dev/null || true
+	if [ "$rc" != 0 ]; then echo "error: could not unregister $1" >&2; fi
+	return "$rc"
 }
 
 # rmbuild: remove the temporary build directory, but only when build-app.sh created it with mktemp (no
@@ -67,9 +71,12 @@ if "$LSR" -dump > "$dump" 2>/dev/null && others_list=$("$DEST/Contents/MacOS/por
 	sweep_failed=1
 fi
 rm -f "$dump"
-printf '%s\n' "$others_list" | while IFS= read -r p; do
-	case "$p" in /*.app) echo "unregistering $p"; unreg "$p" ;; esac
-done
+# No pipe into the loop: a failed unregister must reach sweep_failed in this shell, not in a subshell.
+while IFS= read -r p; do
+	case "$p" in /*.app) echo "unregistering $p"; unreg "$p" || sweep_failed=1 ;; esac
+done <<EOF
+$others_list
+EOF
 rmbuild
 "$LSR" -f "$DEST"
 ln -sf "$DEST/Contents/MacOS/portero" "$HOME/.local/bin/portero"
