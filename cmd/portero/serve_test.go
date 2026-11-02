@@ -114,4 +114,10 @@ func TestSessionSecretPersists(t *testing.T) {
 	if err != nil || c == a || len(c) != 64 {
 		t.Errorf("replaced a bad file: %q %v", c, err)
 	}
+	os.Chmod(path, 0o644) // readable by others: the secret counts as leaked and is replaced
+	d, err := sessionSecret(path)
+	fi, _ = os.Stat(path)
+	if err != nil || d == c || len(d) != 64 || fi.Mode().Perm() != 0o600 {
+		t.Errorf("world-readable file kept: %q %v mode %v", d, err, fi.Mode().Perm())
+	}
 }
