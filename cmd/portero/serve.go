@@ -227,10 +227,23 @@ func sessionSecretOnce(path string, retry bool) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil { // an existing directory keeps its mode
 		return "", err
 	}
-	// Create exclusively, never through a symlink. Two servers starting at once both get here: one creates
-	// the file, the other sees EEXIST and reads what the first one wrote. A file that exists but is not valid
-	// (symlink, wrong mode, expired, garbage) is removed once and the creation retried.
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	// Write the secret to a private temp file first, then publish it with link(2), which fails when the
+	// name exists: a reader never sees a half-written file, and of two servers starting at once the loser
+	// reads the winner's complete secret. A file that exists but is not valid (symlink, wrong mode, expired,
+	// garbage) is removed once and publishing retried.
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".ui-session-*") // 0600
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(v + "\n"); err != nil {
+		tmp.Close()
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		return "", err
+	}
+	err = os.Link(tmp.Name(), path)
 	if errors.Is(err, fs.ErrExist) {
 		if v2, ok := validSession(path); ok {
 			return v2, nil
@@ -244,11 +257,7 @@ func sessionSecretOnce(path string, retry bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if _, err := f.WriteString(v + "\n"); err != nil {
-		f.Close()
-		return "", err
-	}
-	return v, f.Close()
+	return v, nil
 }
 
 // sessionFile is where the session secret lives: the user's cache directory, which no dotfiles repo or
