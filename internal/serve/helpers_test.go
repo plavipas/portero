@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,8 +15,9 @@ import (
 const (
 	testAddr = "127.0.0.1:7777"
 	// cookieName is what a server bound to testAddr calls its session cookie (see Server.cookieName).
-	cookieName = "portero_ui_7777"
-	testToken  = "test-token"
+	cookieName  = "portero_ui_7777"
+	testSession = "test-session"
+	testNonce   = "test-nonce"
 )
 
 const goodRules = `# my rules
@@ -28,11 +30,12 @@ rules:
 `
 
 type rig struct {
-	t     *testing.T
-	dir   string
-	rules string
-	log   string
-	srv   *Server
+	t      *testing.T
+	dir    string
+	rules  string
+	log    string
+	srv    *Server
+	notice bytes.Buffer
 }
 
 func newRig(t *testing.T, rulesText string) *rig {
@@ -44,7 +47,7 @@ func newRig(t *testing.T, rulesText string) *rig {
 			t.Fatal(err)
 		}
 	}
-	r.srv = New(Options{RulesFile: r.rules, LogFile: r.log, Token: testToken})
+	r.srv = New(Options{RulesFile: r.rules, LogFile: r.log, Nonce: testNonce, Session: testSession, Notice: &r.notice})
 	r.srv.SetAddr(testAddr)
 	return r
 }
@@ -52,7 +55,7 @@ func newRig(t *testing.T, rulesText string) *rig {
 func (r *rig) do(method, path, body string) *httptest.ResponseRecorder {
 	r.t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
-	req.AddCookie(&http.Cookie{Name: cookieName, Value: testToken})
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: testSession})
 	req.Host = testAddr
 	if method == http.MethodPost {
 		req.Header.Set("Origin", "http://"+testAddr)

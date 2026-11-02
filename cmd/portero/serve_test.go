@@ -76,3 +76,17 @@ func TestOpenUILogsNoToken(t *testing.T) {
 		}
 	}
 }
+
+func TestUILinkCarriesNonceOnly(t *testing.T) {
+	bare, auth := uiLinks("127.0.0.1:5555", "nonce123")
+	if bare != "http://127.0.0.1:5555/" || auth != "http://127.0.0.1:5555/auth/nonce123" {
+		t.Errorf("%q %q", bare, auth)
+	}
+	src, err := os.ReadFile("serve.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(src), "Session") {
+		t.Error("serve.go must neither set, read nor print the session secret")
+	}
+}

@@ -123,13 +123,13 @@ func serveCmd(args []string) error {
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
 
-	// The token opens the UI (see internal/serve/guard.go): it is printed and handed to the browser, never logged.
-	link := "http://" + ln.Addr().String() + "/"
-	authLink := link + "auth/" + s.Token()
+	// The nonce in the link works once (see internal/serve/guard.go): it is printed and handed to the browser,
+	// never logged. The session secret behind the cookie is never printed.
+	link, authLink := uiLinks(ln.Addr().String(), s.Nonce())
 	fmt.Printf("Portero UI: %s  (Ctrl-C stops it)\n", authLink)
 	if !*noOpen {
 		if err := openUI(link, authLink, launch.Open); err != nil {
-			fmt.Fprintln(os.Stderr, "portero: could not open the UI:", strings.ReplaceAll(err.Error(), s.Token(), "<token>"))
+			fmt.Fprintln(os.Stderr, "portero: could not open the UI:", strings.ReplaceAll(err.Error(), s.Nonce(), "<nonce>"))
 		}
 	}
 	select {
@@ -171,4 +171,11 @@ func openUI(link, authLink string, open func(*url.URL, rules.Target) (launch.Pla
 	}
 	_, err = open(launchURL, d.Target)
 	return err
+}
+
+// uiLinks returns the bare address and the one-time link that carries the nonce. The session secret behind the
+// cookie is not known here and never appears in a URL, a log line or argv.
+func uiLinks(addr, nonce string) (bare, auth string) {
+	bare = "http://" + addr + "/"
+	return bare, bare + "auth/" + nonce
 }

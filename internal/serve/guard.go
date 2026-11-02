@@ -3,6 +3,7 @@ package serve
 import (
 	"crypto/subtle"
 	"errors"
+	"fmt"
 	"mime"
 	"net"
 	"net/http"
@@ -29,8 +30,10 @@ func (s *Server) SetAddr(hostport string) {
 	s.port = port
 }
 
-// cookieName carries the port: browsers store cookies per host without the port, so a second portero serve
-// on another port must not overwrite this one's session, and the token must not travel to other local servers.
+// cookieName carries the port. Browsers store cookies per host, not per port: the name only keeps two Portero
+// servers on 127.0.0.1 from overwriting each other's cookie. A browser still sends a 127.0.0.1 cookie to every
+// port, so a local page the user opens on another port can receive it (low risk; a header-based design is a
+// possible follow-up).
 func (s *Server) cookieName() string {
 	s.gmu.Lock()
 	defer s.gmu.Unlock()
@@ -96,19 +99,34 @@ func isJSON(ct string) bool {
 // equal compares secrets in constant time.
 func equal(a, b string) bool { return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1 }
 
-// auth trades the per-run token for the session cookie. Loopback is reachable by every local process, other
-// macOS users and containers, so Host and Origin alone are not enough: only whoever read the printed URL gets in.
-func (s *Server) auth(w http.ResponseWriter, _ *http.Request, token string) {
-	if !equal(token, s.opts.Token) {
+// auth trades the one-time link nonce for the session cookie. Loopback is reachable by every local process,
+// other macOS users and containers, so Host and Origin alone are not enough. The link is visible in the argv of
+// the browser start, so it works once: later it is a dead nonce, and the cookie carries a separate secret that is
+// never in a URL. A second use of the right nonce is reported on the Notice writer, so a stolen link shows.
+func (s *Server) auth(w http.ResponseWriter, _ *http.Request, nonce string) {
+	if !equal(nonce, s.opts.Nonce) {
 		http.Error(w, "open the URL printed by portero serve", http.StatusForbidden)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Value: s.opts.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+	s.amu.Lock()
+	reused := s.used
+	s.used = true
+	warn := reused && !s.warned
+	if warn {
+		s.warned = true
+		fmt.Fprintln(s.opts.Notice, "portero serve: the UI link was used again; if that was not you, stop the server")
+	}
+	s.amu.Unlock()
+	if reused {
+		http.Error(w, "this link was already used; open the URL printed by portero serve", http.StatusForbidden)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Value: s.opts.Session, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
 	w.Header().Set("Location", "/")
 	w.WriteHeader(http.StatusSeeOther)
 }
 
 func (s *Server) cookieOK(r *http.Request) bool {
 	c, err := r.Cookie(s.cookieName())
-	return err == nil && equal(c.Value, s.opts.Token)
+	return err == nil && equal(c.Value, s.opts.Session)
 }
