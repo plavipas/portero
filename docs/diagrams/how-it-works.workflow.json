@@ -71,6 +71,15 @@
       "width": 140
     },
     {
+      "id": "serve",
+      "lane": "outside",
+      "col": 3,
+      "type": "frontend",
+      "label": "portero serve",
+      "sublabel": "local web UI",
+      "width": 140
+    },
+    {
       "id": "ls",
       "lane": "outside",
       "col": 1,
@@ -165,6 +174,22 @@
       "label": "--opener, --cwd",
       "variant": "dashed",
       "role": "branch"
+    },
+    {
+      "id": "ui-edit",
+      "from": "serve",
+      "to": "rules",
+      "label": "read, Apply",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "ui-log",
+      "from": "log",
+      "to": "serve",
+      "label": "tail",
+      "variant": "dashed",
+      "role": "async"
     },
     {
       "id": "target",
