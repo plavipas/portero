@@ -107,3 +107,4 @@ tr.err td { color: var(--security-stroke); }
 .node-details { margin: 8px 0 4px; padding: 8px 10px; border: 1px solid var(--backend-stroke); border-radius: 8px; }
 .nd-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 6px; }
 .nd-head .muted { color: var(--text-muted); font-size: 12px; flex: 1; }
+.nd-empty { margin: 4px 0 0; font-size: 12px; }
