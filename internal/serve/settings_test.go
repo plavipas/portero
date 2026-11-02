@@ -362,11 +362,12 @@ func TestSettingsGetSyncExtras(t *testing.T) {
 	f := &syncFake{avail: true}
 	sf := f.funcs("/x")
 	sf.ICloudExists = func() bool { return true }
+	sf.ICloudOffloaded = func() bool { return true }
 	sf.LocalPath = func() string { return "/cfg/rules.yaml" }
 	r := settingsRig(t, Options{Sync: sf})
 	_, m := r.get("/api/settings")
 	sy := m["sync"].(map[string]any)
-	if sy["icloud_exists"] != true || sy["local_path"] != "/cfg/rules.yaml" {
+	if sy["icloud_exists"] != true || sy["icloud_offloaded"] != true || sy["local_path"] != "/cfg/rules.yaml" {
 		t.Errorf("sync = %v", sy)
 	}
 }

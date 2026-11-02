@@ -64,3 +64,15 @@ func SetDefaultHandler(appPath, scheme string) error {
 	}
 	return nil
 }
+
+// StartDownload asks iCloud to download an offloaded file. It returns at once; the data arrives later.
+func StartDownload(path string) error {
+	cp := C.CString(path)
+	defer C.free(unsafe.Pointer(cp))
+	out := C.porteroStartDownload(cp)
+	defer C.free(unsafe.Pointer(out))
+	if msg := C.GoString(out); msg != "" {
+		return errors.New(msg)
+	}
+	return nil
+}

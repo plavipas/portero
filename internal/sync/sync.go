@@ -29,6 +29,12 @@ func EnableICloud() (string, error) {
 	if err := os.MkdirAll(ICloudDir(), 0o755); err != nil {
 		return "", err
 	}
+	if Offloaded(dst) {
+		// The synced file exists but is not on this Mac: fetch it first; on failure nothing has changed.
+		if err := ensureLocal(dst); err != nil {
+			return "", err
+		}
+	}
 	_, dstErr := os.Stat(dst)
 	_, srcErr := os.Stat(src)
 	switch {
@@ -48,11 +54,20 @@ func EnableICloud() (string, error) {
 	return dst, writeConfig(dst)
 }
 
-// Disable points the config back at the local rules file, copying the synced one there.
+// Disable points the config back at the local rules file, copying the synced one there. A local file that is
+// replaced is kept next to it as rules.yaml.icloud-backup (overwritten each time).
 func Disable() (string, error) {
 	cur := config.RulesFile()
 	dst := filepath.Join(config.Dir(), "rules.yaml")
 	if cur != dst {
+		if err := ensureLocal(cur); err != nil {
+			return "", err
+		}
+		if fi, err := os.Lstat(dst); err == nil && fi.Mode().IsRegular() {
+			if err := copyFile(dst, dst+".icloud-backup"); err != nil {
+				return "", fmt.Errorf("back up the local rules file: %w", err)
+			}
+		}
 		if err := copyFile(cur, dst); err != nil {
 			return "", err
 		}
@@ -84,10 +99,22 @@ func copyFile(src, dst string) error {
 		tmp.Close()
 		return err
 	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), dst)
+	if err := os.Rename(tmp.Name(), dst); err != nil {
+		return err
+	}
+	// Best effort: make the rename itself durable.
+	if d, err := os.Open(filepath.Dir(dst)); err == nil {
+		_ = d.Sync()
+		d.Close()
+	}
+	return nil
 }
 
 // InICloud reports whether path lies inside the Portero folder of iCloud Drive.

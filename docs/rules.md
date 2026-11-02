@@ -236,6 +236,24 @@ read.
 Portero also opens HTML documents handed to it by macOS (Open With, drag onto the icon). A `file://` URL has
 no host and no opener, so rules are not consulted: it opens in `default`, logged with the rule name `file`.
 
+## Sync through iCloud Drive
+
+`portero sync icloud` moves the rules file to `iCloud Drive/Portero/rules.yaml` (or adopts the file already there)
+and `portero sync off` copies it back. iCloud can offload that file: on current macOS it stays in place under its
+own name but without data (reading it would block until it is downloaded); on older systems a placeholder
+`.rules.yaml.icloud` stands in its place.
+
+- `sync icloud` and `sync off` start the download and wait up to 30 seconds. When the file does not arrive they
+  stop with an error and change nothing (the local file and the config stay as they were).
+- `sync off` keeps the local file it replaces as `rules.yaml.icloud-backup` next to it, overwritten on every
+  switch.
+- Files are copied through a temporary file that is flushed to disk before the rename.
+- The link handler never waits for a download: while the rules file is offloaded, a link opens in Safari at once,
+  an `ERROR` line is added to `decisions.log` and the download is started, so later links are routed normally.
+  The same applies to the address `portero serve` opens for the UI.
+- `portero rules check` on an offloaded file starts the download and exits with an error; run it again after a
+  few seconds.
+
 ## Log
 
 Every routed link appends one tab-separated line to `~/.config/portero/decisions.log`:
