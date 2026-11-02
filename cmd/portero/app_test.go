@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -195,10 +196,10 @@ func TestDefaultReport(t *testing.T) {
 		{"all match", ours, inst, "1.2.3", inst, "1.2.3", []string{"resolved: " + inst + " (1.2.3)"}, true},
 		{"other path", ours, "/tmp/x/Portero.app", "1.2.3", inst, "1.2.3", []string{
 			"resolved: /tmp/x/Portero.app (1.2.3)",
-			"warning: macOS opens links with /tmp/x/Portero.app, not " + inst + "; run make install"}, true},
+			"warning: macOS opens links with /tmp/x/Portero.app, not " + inst + "; run make install"}, false},
 		{"other version", ours, inst, "1.0.0", inst, "1.2.3", []string{
 			"resolved: " + inst + " (1.0.0)",
-			"warning: resolved app is 1.0.0, this binary is 1.2.3"}, true},
+			"warning: resolved app is 1.0.0, this binary is 1.2.3"}, false},
 		{"empty resolved", ours, "", "", inst, "1.2.3", []string{"resolved: none (macOS has no app for links)"}, false},
 		{"bare CLI uses the standard path", ours, inst, "1.2.3", inst, "1.2.3", []string{"resolved: " + inst + " (1.2.3)"}, true},
 		{"dev binary", ours, inst, "1.2.3", inst, "dev", []string{"resolved: " + inst + " (1.2.3)", "note: dev binary, version not compared"}, true},
@@ -226,5 +227,17 @@ func TestLsregOthersCmd(t *testing.T) {
 	}
 	if err := lsregOthersCmd([]string{BundleID}, strings.NewReader(""), &out); err == nil {
 		t.Error("missing argument accepted")
+	}
+}
+
+func TestInstalledAppFallsBackToHomeApplicationsForABareCLI(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if appBundle() != "" {
+		t.Skip("test binary runs inside an app bundle")
+	}
+	want := filepath.Join(home, "Applications", "Portero.app")
+	if got := installedApp(); got != want {
+		t.Errorf("installedApp() = %q, want %q", got, want)
 	}
 }
