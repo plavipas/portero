@@ -143,6 +143,7 @@ function selectNode(id) {
   if (!id || S.selected === id) {
     S.selected = null;
     clearHover();
+    $("diagram").querySelectorAll(".node.sel").forEach((n) => n.classList.remove("sel"));
     $("node-details").hidden = true;
     const last = S.decisions[S.decisions.length - 1];
     if (last) highlightPath(last.path, false);
