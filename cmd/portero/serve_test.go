@@ -228,3 +228,19 @@ func TestSessionSecretConcurrentReplace(t *testing.T) {
 		}
 	}
 }
+
+func TestSessionSecretFutureMtimeRotates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "portero", "ui-session")
+	a, err := sessionSecret(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	future := time.Now().Add(30 * 24 * time.Hour)
+	if err := os.Chtimes(path, future, future); err != nil {
+		t.Fatal(err)
+	}
+	b, err := sessionSecret(path)
+	if err != nil || b == a {
+		t.Errorf("a secret with a future mtime was kept: %q %v", b, err)
+	}
+}
