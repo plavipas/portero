@@ -73,3 +73,54 @@ func TestSetUnwrapInvalid(t *testing.T) {
 		t.Errorf("bad skip: %v", err)
 	}
 }
+
+func TestSetUnwrapKeepsComments(t *testing.T) {
+	in := strings.Replace(unwrapBase, "rules:\n", "unwrap: false   # off for now\nunwrap_skip_openers:  # apps\n  # the mail app\n  - com.example.old\n  # indented note\n  - com.example.older\nrules:\n", 1)
+	out, err := SetUnwrap(in, false, []string{"com.example.new"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"unwrap: false  # off for now\n", "unwrap_skip_openers:  # apps\n", "# the mail app\n", "# indented note\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("lost %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "com.example.old") {
+		t.Errorf("old items kept:\n%s", out)
+	}
+	// the key is no longer written: its comment stays as a line of its own
+	out, err = SetUnwrap(in, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "# off for now\n") || strings.Contains(out, "unwrap:") {
+		t.Errorf("default case:\n%s", out)
+	}
+}
+
+func TestSetUnwrapColumnZeroCommentInList(t *testing.T) {
+	in := strings.Replace(unwrapBase, "rules:\n", "unwrap_skip_openers:\n# note\n- com.example.old\nrules:\n", 1)
+	out, err := SetUnwrap(in, true, []string{"com.example.new"})
+	if err != nil || !strings.Contains(out, "com.example.new") || strings.Contains(out, "com.example.old") {
+		t.Errorf("%v\n%s", err, out)
+	}
+}
+
+func TestSetUnwrapCRLF(t *testing.T) {
+	in := strings.ReplaceAll(unwrapBase, "\n", "\r\n")
+	out, err := SetUnwrap(in, false, []string{"com.example.mail"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.ReplaceAll(out, "\r\n", ""), "\n") {
+		t.Errorf("bare LF in a CRLF file: %q", out)
+	}
+	if _, err := rules.Parse([]byte(out)); err != nil {
+		t.Error(err)
+	}
+	// CRLF file without a final newline
+	out, err = SetUnwrap(strings.TrimSuffix(in, "\r\n"), false, nil)
+	if err != nil || strings.Contains(strings.ReplaceAll(out, "\r\n", ""), "\n") {
+		t.Errorf("%v %q", err, out)
+	}
+}
