@@ -250,7 +250,7 @@ func TestOpenCLIAskedUsesDefault(t *testing.T) {
 	req := rules.Request{URL: u}
 	r, _ := rules.Load(config.RulesFile())
 	d := r.Route(req)
-	if err := openCLIAsked(d, req, open); err != nil {
+	if err := openCLIAsked(d, req, u, open); err != nil {
 		t.Fatal(err)
 	}
 	if len(*opened) != 1 || !strings.HasPrefix((*opened)[0], "Dia/Personal ") {

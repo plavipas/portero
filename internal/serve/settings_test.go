@@ -493,3 +493,92 @@ func TestOffloadedRulesAnswer503WithoutReading(t *testing.T) {
 		t.Errorf("download requested %d times, want 4", downloads)
 	}
 }
+
+func TestSettingsUnwrap(t *testing.T) {
+	r := settingsRig(t, Options{})
+	code, m := r.get("/api/settings")
+	u, _ := m["unwrap"].(map[string]any)
+	if code != 200 || u["enabled"] != true || u["editable"] != true || u["hash"] == "" {
+		t.Fatalf("get: %d %v", code, m)
+	}
+	hash := u["hash"].(string)
+	before, _ := os.ReadFile(r.rules)
+
+	// stale hash, bad bundle id, missing field, unknown field: nothing is written
+	for _, body := range []map[string]any{
+		{"unwrap": false, "skip": []string{}, "base_hash": "0000"},
+		{"unwrap": true, "skip": []string{"not a bundle"}, "base_hash": hash},
+		{"skip": []string{}, "base_hash": hash},
+		{"unwrap": true, "extra": 1, "base_hash": hash},
+	} {
+		if code, m := r.post("/api/settings/unwrap", body); code < 400 {
+			t.Errorf("%v accepted: %d %v", body, code, m)
+		}
+	}
+	if now, _ := os.ReadFile(r.rules); string(now) != string(before) {
+		t.Fatal("a rejected request changed the file")
+	}
+
+	code, m = r.post("/api/settings/unwrap", map[string]any{"unwrap": false, "skip": []string{"com.example.mail", "COM.example.mail"}, "base_hash": hash})
+	if code != 200 {
+		t.Fatalf("save: %d %v", code, m)
+	}
+	data, _ := os.ReadFile(r.rules)
+	if !strings.Contains(string(data), "unwrap: false") || strings.Count(string(data), "com.example.mail") != 1 {
+		t.Errorf("file:\n%s", data)
+	}
+	if bak, err := os.ReadFile(r.rules + ".bak"); err != nil || string(bak) != string(before) {
+		t.Errorf("backup: %v", err)
+	}
+	if fi, _ := os.Stat(r.rules); fi.Mode().Perm() != 0o600 {
+		t.Errorf("mode %v", fi.Mode().Perm())
+	}
+	code, m = r.get("/api/settings")
+	u, _ = m["unwrap"].(map[string]any)
+	if u["enabled"] != false || len(u["skip"].([]any)) != 1 {
+		t.Errorf("after: %v", u)
+	}
+	// the old hash is stale now
+	if code, _ := r.post("/api/settings/unwrap", map[string]any{"unwrap": true, "skip": []string{}, "base_hash": hash}); code != 409 {
+		t.Errorf("stale: %d", code)
+	}
+	// match honours the setting
+	code, m = r.post("/api/match", map[string]any{"url": "https://www.google.com/url?q=https%3A%2F%2Fgithub.example.com%2Fx", "opener": "com.example.chat"})
+	if code != 200 || m["unwrap_note"] != "unwrap: off" || m["unwrapped"] != nil {
+		t.Errorf("match with unwrap off: %d %v", code, m)
+	}
+}
+
+func TestSettingsUnwrapGuard(t *testing.T) {
+	r := settingsRig(t, Options{})
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/unwrap", strings.NewReader(`{"unwrap":false,"base_hash":""}`))
+	req.Host = testAddr
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.srv.Handler().ServeHTTP(w, req)
+	if w.Code != 403 {
+		t.Errorf("no cookie/origin: %d", w.Code)
+	}
+}
+
+func TestSettingsUnwrapOffloaded503(t *testing.T) {
+	r := settingsRig(t, Options{})
+	_, m := r.get("/api/settings")
+	hash := m["unwrap"].(map[string]any)["hash"].(string)
+	before, _ := os.ReadFile(r.rules)
+	downloads := 0
+	r.srv.opts.Offloaded = func(string) bool { return true }
+	r.srv.opts.Download = func(string) error { downloads++; return nil }
+	code, _ := r.post("/api/settings/unwrap", map[string]any{"unwrap": false, "skip": []string{}, "base_hash": hash})
+	if code != 503 || downloads == 0 {
+		t.Errorf("code %d, downloads %d", code, downloads)
+	}
+	if now, _ := os.ReadFile(r.rules); string(now) != string(before) {
+		t.Error("the offloaded file was written")
+	}
+	// GET reports the setting as not editable instead of reading the file
+	_, m = r.get("/api/settings")
+	if u := m["unwrap"].(map[string]any); u["editable"] != false {
+		t.Errorf("unwrap info %v", u)
+	}
+}

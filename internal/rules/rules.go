@@ -4,6 +4,7 @@ package rules
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -166,6 +167,48 @@ type Rules struct {
 	Version int    `yaml:"version"`
 	Default Target `yaml:"default"`
 	Rules   []Rule `yaml:"rules"`
+	// Unwrap switches redirect unwrapping (see Unwrap); nil means on.
+	Unwrap *bool `yaml:"unwrap,omitempty"`
+	// UnwrapSkipOpeners lists bundle ids of apps whose links are never unwrapped.
+	UnwrapSkipOpeners []string `yaml:"unwrap_skip_openers,omitempty"`
+}
+
+// UnwrapFor reports whether a link opened by opener is unwrapped. When it is not, why says so for the
+// user: `unwrap: off` or `unwrap: skipped for <opener>`.
+func (r *Rules) UnwrapFor(opener string) (apply bool, why string) {
+	if r == nil {
+		return true, ""
+	}
+	if r.Unwrap != nil && !*r.Unwrap {
+		return false, "unwrap: off"
+	}
+	for _, o := range r.UnwrapSkipOpeners {
+		if opener != "" && strings.EqualFold(o, opener) {
+			return false, "unwrap: skipped for " + opener
+		}
+	}
+	return true, ""
+}
+
+// bundleIDShape is a reverse-DNS bundle id: at least two dot-separated parts of letters, digits, `-` and `_`.
+var bundleIDShape = regexp.MustCompile(`^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$`)
+
+// ValidBundleID reports whether s looks like a bundle id.
+func ValidBundleID(s string) bool { return len(s) <= 255 && bundleIDShape.MatchString(s) }
+
+func (r *Rules) checkUnwrap() error {
+	seen := map[string]bool{}
+	for _, o := range r.UnwrapSkipOpeners {
+		if !ValidBundleID(o) {
+			return fmt.Errorf("rules: unwrap_skip_openers: %q is not a bundle id (like com.example.mail)", o)
+		}
+		k := strings.ToLower(o)
+		if seen[k] {
+			return fmt.Errorf("rules: unwrap_skip_openers lists %q twice", o)
+		}
+		seen[k] = true
+	}
+	return nil
 }
 
 // Parse decodes and validates a rules file.
@@ -209,6 +252,9 @@ func (r *Rules) Validate() error {
 		return fmt.Errorf("rules: default has an empty browser")
 	}
 	if err := checkControl("default", r.Default); err != nil {
+		return err
+	}
+	if err := r.checkUnwrap(); err != nil {
 		return err
 	}
 	for i, rule := range r.Rules {

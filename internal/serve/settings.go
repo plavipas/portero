@@ -6,7 +6,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/plavipas/portero/internal/rules"
+	"github.com/plavipas/portero/internal/rulesfile"
 )
 
 // SchemeHandler is the current handler of one URL scheme.
@@ -79,7 +83,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
 			sy["local_path"] = f.LocalPath()
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"default": def, "sync": sy, "log_file": s.opts.LogFile, "config_file": s.opts.ConfigFile})
+	writeJSON(w, http.StatusOK, map[string]any{"default": def, "sync": sy, "unwrap": s.unwrapInfo(), "log_file": s.opts.LogFile, "config_file": s.opts.ConfigFile})
 }
 
 func (s *Server) handleSetDefault(w http.ResponseWriter, r *http.Request) {
@@ -229,4 +233,114 @@ func icloudRulesOf(f *SyncFuncs) string {
 		return ""
 	}
 	return filepath.Join(f.ICloudDir(), "rules.yaml")
+}
+
+// unwrapInfo is the redirect-unwrapping setting as the rules file has it. editable is false when the file is
+// missing, offloaded or does not parse (the setting then cannot be written); enabled is the effective value.
+func (s *Server) unwrapInfo() map[string]any {
+	info := map[string]any{"enabled": true, "skip": []string{}, "editable": false, "hash": ""}
+	data, exists, err := s.readRules()
+	if err != nil {
+		info["note"] = err.Error()
+		return info
+	}
+	if !exists {
+		info["note"] = "there is no rules file yet"
+		return info
+	}
+	info["hash"] = hashOf(data)
+	r, err := rules.Parse(data)
+	if err != nil {
+		info["note"] = "the rules file is not valid: " + err.Error()
+		return info
+	}
+	info["editable"] = true
+	info["enabled"] = r.Unwrap == nil || *r.Unwrap
+	if r.UnwrapSkipOpeners != nil {
+		info["skip"] = r.UnwrapSkipOpeners
+	}
+	return info
+}
+
+func (s *Server) handleSettingsUnwrap(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Unwrap   *bool    `json:"unwrap"`
+		Skip     []string `json:"skip"`
+		BaseHash string   `json:"base_hash"`
+	}
+	if !readStrict(w, r, &req) {
+		return
+	}
+	if req.Unwrap == nil {
+		fail(w, http.StatusBadRequest, "unwrap (true or false) is required")
+		return
+	}
+	skip := make([]string, 0, len(req.Skip))
+	seen := map[string]bool{}
+	for _, o := range req.Skip {
+		o = strings.TrimSpace(o)
+		if !rules.ValidBundleID(o) {
+			fail(w, http.StatusUnprocessableEntity, "not a bundle id (like com.example.mail): "+o)
+			return
+		}
+		if k := strings.ToLower(o); !seen[k] {
+			seen[k] = true
+			skip = append(skip, o)
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	path := s.rulesPath()
+	if s.opts.LockDir != "" {
+		unlock, err := rulesfile.Lock(s.opts.LockDir)
+		if err != nil {
+			fail(w, http.StatusInternalServerError, "cannot lock the rules file: "+err.Error())
+			return
+		}
+		defer unlock()
+	}
+	if err := s.offloadedErr(path); err != nil {
+		readFail(w, err)
+		return
+	}
+	data, hash, err := rulesfile.Read(path)
+	if err != nil {
+		fail(w, http.StatusInternalServerError, "cannot read the rules file: "+err.Error())
+		return
+	}
+	if hash == "" {
+		fail(w, http.StatusUnprocessableEntity, "there is no rules file to change")
+		return
+	}
+	if hash != req.BaseHash {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error":        map[string]any{"message": rulesfile.ErrStale.Error()},
+			"current_hash": hash})
+		return
+	}
+	text, err := rulesfile.SetUnwrap(string(data), *req.Unwrap, skip)
+	if err != nil {
+		fail(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	res, err := rulesfile.Write(path, text, hash, func(p string) bool { return s.offloadedErr(p) != nil })
+	var stale *rulesfile.StaleError
+	switch {
+	case err == nil:
+	case errors.As(err, &stale):
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error":        map[string]any{"message": stale.Error()},
+			"current_hash": stale.Current})
+		return
+	case errors.Is(err, rulesfile.ErrOffloaded):
+		readFail(w, errOffloaded)
+		return
+	case errors.Is(err, rulesfile.ErrSymlink), errors.Is(err, rulesfile.ErrInvalid):
+		fail(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	default:
+		fail(w, http.StatusInternalServerError, "cannot write the rules file: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"enabled": *req.Unwrap, "skip": skip, "hash": res.Hash, "backup": res.Backup})
 }

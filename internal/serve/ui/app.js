@@ -265,7 +265,7 @@ function drawDecisions() {
       el("td", { text: d.opener === "-" ? "(none)" : d.opener }),
       el("td", { text: d.rule }),
       el("td", { text: d.ask ? target + " (" + d.ask + ")" : target, title: d.ask ? target + " (" + d.ask + ")" : target }),
-      el("td", { text: d.url, title: d.url }),
+      el("td", { text: d.url, title: d.unwrapped ? d.url + " -> " + d.unwrapped : d.url }),
       el("td", {}, replay));
     body.append(tr);
   }
@@ -424,6 +424,9 @@ async function match() {
     out.append(el("div", { class: "error", text: msg }));
     return;
   }
+  if (data.unwrapped) {
+    out.append(el("div", {}, el("span", { class: "k", text: "Unwrapped: " }), el("code", { text: data.unwrapped })));
+  }
   if (data.ask && data.ask.length) {
     out.append(el("div", {}, el("span", { class: "k", text: "Rule: " }), el("code", { text: data.rule }),
       el("span", { class: "k", text: "  Asks: " }), el("code", { text: data.ask.join(" | ") })));
@@ -554,6 +557,8 @@ function drawSettings(d) {
   else if (!icloud && !sy.icloud_available) setHint("sync-hint", "iCloud Drive is not available on this Mac.", false);
   else setHint("sync-hint", "", false);
 
+  drawUnwrap(d.unwrap || {});
+
   $("file-rules").textContent = sy.rules_path || "";
   $("file-log").textContent = d.log_file || "";
   $("file-config").textContent = d.config_file || "";
@@ -561,6 +566,51 @@ function drawSettings(d) {
   clearTimeout(SET.timer);
   if (def.pending && !$("settings").hidden) SET.timer = setTimeout(loadSettings, 2000);
 }
+
+function drawUnwrap(u) {
+  SET.unwrap = u;
+  const sw = $("unwrap-switch");
+  sw.checked = u.enabled !== false;
+  sw.disabled = !u.editable;
+  const list = $("unwrap-skip");
+  list.replaceChildren();
+  const skip = u.skip || [];
+  $("unwrap-skip-none").hidden = skip.length > 0;
+  for (const id of skip) {
+    const rm = el("button", { type: "button", class: "ghost", text: "remove", "aria-label": "Stop skipping " + id });
+    rm.addEventListener("click", () => saveUnwrap(sw.checked, skip.filter((x) => x !== id)));
+    list.append(el("li", {}, el("span", { class: "mono", text: id }), rm));
+  }
+  $("unwrap-add").disabled = !u.editable;
+  $("unwrap-add-btn").disabled = !u.editable;
+  if (!u.editable) setHint("unwrap-hint", u.note || "", false);
+}
+
+async function saveUnwrap(enabled, skip) {
+  if (editor.value !== S.text) {
+    setHint("unwrap-hint", "Save or discard the changes in the rules editor first.", true);
+    drawUnwrap(SET.unwrap || {});
+    return;
+  }
+  setHint("unwrap-hint", "Saving...", false);
+  const { status, data } = await api("/api/settings/unwrap", { unwrap: enabled, skip, base_hash: (SET.unwrap || {}).hash || "" });
+  if (status === 200) {
+    await loadState();
+    await loadSettings();
+    setHint("unwrap-hint", "Saved.", false);
+  } else {
+    await loadSettings();
+    setHint("unwrap-hint", data && data.error ? data.error.message : "Request failed (" + status + ").", true);
+  }
+}
+
+$("unwrap-switch").addEventListener("change", () => saveUnwrap($("unwrap-switch").checked, (SET.unwrap || {}).skip || []));
+$("unwrap-add-btn").addEventListener("click", () => {
+  const v = $("unwrap-add").value.trim();
+  if (!v) return;
+  $("unwrap-add").value = "";
+  saveUnwrap($("unwrap-switch").checked, [...((SET.unwrap || {}).skip || []), v]);
+});
 
 async function loadSettings() {
   const { status, data } = await api("/api/settings");

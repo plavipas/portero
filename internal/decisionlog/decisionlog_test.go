@@ -72,3 +72,18 @@ func TestAppendNote(t *testing.T) {
 		t.Errorf("no note must keep five columns: %q", lines[1])
 	}
 }
+
+func TestAppendLinkUnwrapped(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "log")
+	link, _ := url.Parse("https://www.google.com/url?q=https%3A%2F%2Fgithub.com%2Fx")
+	inner, _ := url.Parse("https://github.com/x")
+	req := rules.Request{URL: inner, Opener: "com.example.mail"}
+	if err := AppendLink(p, rules.Decision{Rule: "Code"}, req, link, "asked -> Dia/Work"); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(p)
+	c := strings.Split(strings.TrimSpace(string(b)), "\t")
+	if len(c) != 6 || c[4] != link.String() || !strings.HasPrefix(c[5], "asked -> Dia/Work; unwrapped https://github.com/x") || strings.Contains(c[5], "\n") {
+		t.Errorf("columns %q", c)
+	}
+}
