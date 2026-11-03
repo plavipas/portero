@@ -113,7 +113,7 @@ func shortHome(p string) string {
 func notifyRememberFailed(host string, rerr error) string {
 	body := "Could not remember " + host + ": " + rerr.Error() + ". Details: " + shortHome(config.LogFile())
 	body = strings.Map(func(r rune) rune {
-		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
 			return ' '
 		}
 		return r
@@ -146,7 +146,7 @@ func askOption(t rules.Target) string {
 // askTitle is what the panel shows about a link: host and path, one line, no control, format or line-separator characters.
 func askTitle(u *url.URL) string {
 	s := strings.Map(func(r rune) rune {
-		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
 			return ' '
 		}
 		return r

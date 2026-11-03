@@ -187,6 +187,16 @@ func unsafeLabel(l string) bool {
 	return false
 }
 
+// asciiMask replaces every character that is not printable ASCII with "?".
+func asciiMask(l string) string {
+	return strings.Map(func(r rune) rune {
+		if r <= 0x20 || r >= 0x7f {
+			return '?'
+		}
+		return r
+	}, l)
+}
+
 func isASCII(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= 0x80 {
@@ -198,10 +208,12 @@ func isASCII(s string) bool {
 
 // HostForms is the host as the "Remember" label and `rules match` show it. An ASCII host stays as is; a host
 // with non-ASCII labels is `<unicode> = <punycode>`; a host with `xn--` labels is `<punycode> = <unicode>`, so
-// a look-alike cannot hide behind either form. A codec error leaves the plain host. The rule written is never
+// a look-alike cannot hide behind either form. When any label fails to convert or holds control, format or
+// empty content, the result is ASCII only (`?` stands for a character that cannot be shown). The rule written is never
 // changed by this.
 func HostForms(host string) string {
-	labels := strings.Split(strings.ToLower(host), ".")
+	host = strings.ToLower(host)
+	labels := strings.Split(host, ".")
 	ace := make([]string, len(labels))
 	uni := make([]string, len(labels))
 	nonASCII, hasACE, unsafe := false, false, false
@@ -210,7 +222,8 @@ func HostForms(host string) string {
 		case !isASCII(l):
 			p, err := punyEncode(l)
 			if err != nil {
-				return host
+				unsafe, ace[i] = true, asciiMask(l)
+				continue
 			}
 			nonASCII = true
 			ace[i], uni[i] = acePrefix+p, l
@@ -218,13 +231,17 @@ func HostForms(host string) string {
 		case strings.HasPrefix(l, acePrefix):
 			u, err := punyDecode(l[len(acePrefix):])
 			if err != nil {
-				return host
+				unsafe, ace[i] = true, asciiMask(l)
+				continue
 			}
 			hasACE = true
 			ace[i], uni[i] = l, u
 			unsafe = unsafe || unsafeLabel(u)
 		default:
 			ace[i], uni[i] = l, l
+			if l != "" && unsafeLabel(l) {
+				unsafe, ace[i] = true, asciiMask(l)
+			}
 		}
 	}
 	if unsafe {

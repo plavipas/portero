@@ -398,6 +398,8 @@ func TestRememberKey(t *testing.T) {
 		{"https://Meet.Google.com/abc-defg-hij/extra", "meet.google.com", "/abc-defg-hij", true},
 		{"https://meet.google.com/lookup/xyz", "", "", false},
 		{"https://meet.google.com/", "", "", false},
+		{"https://example.com/a\u0085b", "", "", false},
+		{"https://exa\u009bmple.com/abc", "", "", false},
 		{"https://us06web.zoom.us/j/123?pwd=x", "us06web.zoom.us", "/j/123", true},
 		{"https://zoom.us/w/456/more", "zoom.us", "/w/456", true},
 		{"https://example.zoom.us/s/789", "example.zoom.us", "/s/789", true},

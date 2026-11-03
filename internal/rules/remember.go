@@ -50,7 +50,7 @@ func RememberKey(u *url.URL) (host, path string, ok bool) {
 		return "", "", false
 	}
 	for _, r := range p + host {
-		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
 			return "", "", false
 		}
 	}
@@ -71,7 +71,7 @@ func RememberHost(u *url.URL) (host string, ok bool) {
 		return "", false
 	}
 	for _, r := range host {
-		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
 			return "", false
 		}
 	}
