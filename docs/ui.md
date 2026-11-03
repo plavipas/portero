@@ -32,7 +32,7 @@ Left side:
   marked as stale; a target whose browser is not installed is marked too. A group is one node named after the
   group, with one edge to its target; the edges of the group node count the decisions of all rules inside it.
   A rule or group that asks (see [rules.md](rules.md#ask)) has a dashed outline, and its edges are dashed: one to
-  each choice and one to the `default` target that Esc uses. The tooltip of such an edge ends with `(asks)`. A rule that follows the default (`open: { default: true }`) has a dotted edge to the default target, tooltip `(follows default)`.
+  each choice and one to the `default` target that Esc uses. The tooltip of such an edge ends with `(asks)`. A rule that follows the default (`open: { default: true }`) has a dotted edge to the default target, tooltip `(follows default)`. A link settled by the panel for a link no rule matched (rule column `none` in the log) is drawn through the node **no rule (asked)**; older lines with `default` are drawn through the default node as before.
 - The last decisions (up to 20, newest first): time, opener, rule, target, URL. A rule inside a group shows as
   `Group / rule`, or as the group name when it has no name. An `ERROR` line is highlighted. When the log line has
   a sixth column, the target cell shows it in brackets, for example `Dia/Work (asked -> Dia/Work)`.

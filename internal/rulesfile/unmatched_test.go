@@ -242,3 +242,47 @@ func TestSetAskUnmatchedKeepsCommentsAndOtherKeys(t *testing.T) {
 		t.Errorf("invalid: %v", err)
 	}
 }
+
+func TestInsertLastCRLFTrailingCommentAfterLastRule(t *testing.T) {
+	in := "version: 1\r\ndefault: {browser: Dia, profile: Personal}\r\nrules:\r\n  - name: Forge\r\n    match: {host: forge.example.com}\r\n    open: {browser: Safari}\r\n    # kept with the last rule\r\n"
+	want := in + "  # added by Portero (Remember, no rule matched) 2026-11-03\r\n" +
+		"  - name: \"new.example.com\"\r\n    match:\r\n      host: \"new.example.com\"\r\n    open:\r\n      browser: \"Dia\"\r\n      profile: \"Work\"\r\n"
+	got, err := InsertLast(in, hostRule("new.example.com", "new.example.com", work), req("https://new.example.com/"), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
+func TestRememberUnmatchedGroupFollowingDefault(t *testing.T) {
+	in := `version: 1
+default: {browser: Dia, profile: Personal}
+rules:
+  - name: Team
+    open: {default: true}
+    rules:
+      - name: forge
+        match: {host: git.example.com}
+`
+	path, dir := rememberRig(t, in)
+	name, err := RememberUnmatched(path, dir, req("https://new.example.com/"), work, false, nil, now)
+	if err != nil || name != "new.example.com" {
+		t.Fatalf("%q %v", name, err)
+	}
+	r, err := rules.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := r.Route(req("https://new.example.com/x")); d.Rule != name || d.Target != work {
+		t.Errorf("new rule: %+v", d)
+	}
+	if d := r.Route(req("https://git.example.com/x")); d.Rule == "" || d.Target != r.Default {
+		t.Errorf("group child must still follow the default: %+v", d)
+	}
+	got, _ := os.ReadFile(path)
+	if !strings.HasPrefix(string(got), in) {
+		t.Errorf("existing text changed:\n%s", got)
+	}
+}

@@ -7,7 +7,7 @@ import (
 	"github.com/plavipas/portero/internal/rules"
 )
 
-// Node ids: "o:<bundle id or ->", "r:<user rule name>", "s:default|file|error" for the built-in nodes,
+// Node ids: "o:<bundle id or ->", "r:<user rule name>", "s:default|none|file|error" for the built-in nodes,
 // "t:<Target.String()>". The built-ins have their own namespace so a user rule named "default" stays apart.
 func openerID(o string) string { return "o:" + o }
 func ruleID(r string) string   { return "r:" + r }
@@ -17,6 +17,8 @@ func specialID(name string) string {
 	switch name {
 	case "default", "":
 		return "s:default"
+	case "none":
+		return "s:none"
 	case "file":
 		return "s:file"
 	case "ERROR":
@@ -183,6 +185,7 @@ func BuildGraph(r *rules.Rules, decisions []Decision) Graph {
 		}
 	}
 	addRule("s:default", "default", "default", false)
+	addRule("s:none", "no rule (asked)", "default", false)
 	addRule("s:file", "file", "file", false)
 	addRule("s:error", "ERROR → Safari fallback", "error", false)
 	if r != nil {

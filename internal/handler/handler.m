@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#import <UserNotifications/UserNotifications.h>
 #import <os/log.h>
 #import "handler.h"
 
@@ -56,12 +57,21 @@ static void porteroArrived(void) {
     inflight++;
 }
 
-@interface PorteroDelegate : NSObject <NSApplicationDelegate>
+@interface PorteroDelegate : NSObject <NSApplicationDelegate, UNUserNotificationCenterDelegate>
 @end
 
 @implementation PorteroDelegate
 
 - (void)applicationWillFinishLaunching:(NSNotification *)note {
+    // UNUserNotificationCenter raises without a bundle identifier (a bare binary), so the delegate is set only
+    // inside an app bundle. Without it a banner is dropped while Portero is the active app.
+    if ([NSBundle mainBundle].bundleIdentifier.length > 0) {
+        @try {
+            [UNUserNotificationCenter currentNotificationCenter].delegate = self;
+        } @catch (NSException *e) {
+            os_log(porteroLog(), "notification delegate failed: %{public}@", e.reason);
+        }
+    }
     [[NSAppleEventManager sharedAppleEventManager]
         setEventHandler:self
             andSelector:@selector(handleGetURL:withReply:)
@@ -98,6 +108,12 @@ static void porteroArrived(void) {
 }
 
 // Documents (Open With, drag onto the icon): HTML files declared in Info.plist arrive here as file:// URLs.
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+       willPresentNotification:(UNNotification *)notification
+         withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
+    completionHandler(UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionList);
+}
+
 - (void)application:(NSApplication *)app openURLs:(NSArray<NSURL *> *)urls {
     for (NSURL *u in urls) {
         os_log(porteroLog(), "link received (opener=-) %{private}@", u.absoluteString);
@@ -220,5 +236,62 @@ char *porteroStartDownload(const char *path) {
             return strdup((e.localizedDescription ?: @"download not started").UTF8String);
         }
         return strdup("");
+    }
+}
+
+// Show one notification (title, body are UTF-8 C strings, never format strings). Blocks the calling thread (a
+// link's goroutine, never the main thread) up to 60 s for the permission prompt and 5 s for the delivery.
+// Returns "notified", "denied", "no answer" or "failed: <why>".
+char *porteroNotify(const char *title, const char *body) {
+    @autoreleasepool {
+        if ([NSBundle mainBundle].bundleIdentifier.length == 0) return strdup("failed: not an app bundle");
+        @try {
+            NSString *t = [NSString stringWithUTF8String:title ?: ""] ?: @"";
+            NSString *b = [NSString stringWithUTF8String:body ?: ""] ?: @"";
+            UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+
+            // The blocks may run after a timeout: their state is an object they retain.
+            NSMutableDictionary *state = [NSMutableDictionary dictionary];
+            dispatch_semaphore_t authDone = dispatch_semaphore_create(0);
+            [center requestAuthorizationWithOptions:UNAuthorizationOptionAlert
+                                  completionHandler:^(BOOL granted, NSError *error) {
+                @synchronized (state) {
+                    state[@"granted"] = @(granted);
+                    if (error) state[@"error"] = error.localizedDescription ?: @"authorization error";
+                }
+                dispatch_semaphore_signal(authDone);
+            }];
+            if (dispatch_semaphore_wait(authDone, dispatch_time(DISPATCH_TIME_NOW, 60LL * NSEC_PER_SEC)) != 0) {
+                return strdup("no answer");
+            }
+            NSString *authErr; BOOL granted;
+            @synchronized (state) { authErr = state[@"error"]; granted = [state[@"granted"] boolValue]; }
+            if (!granted) {
+                return strdup(authErr ? [NSString stringWithFormat:@"failed: %@", authErr].UTF8String : "denied");
+            }
+
+            UNMutableNotificationContent *content = [UNMutableNotificationContent new];
+            content.title = t;
+            content.body = b;
+            UNNotificationRequest *req = [UNNotificationRequest requestWithIdentifier:@"remember-failed"
+                                                                              content:content
+                                                                              trigger:nil];
+            dispatch_semaphore_t addDone = dispatch_semaphore_create(0);
+            [center addNotificationRequest:req withCompletionHandler:^(NSError *error) {
+                @synchronized (state) {
+                    if (error) state[@"adderror"] = error.localizedDescription ?: @"delivery error";
+                }
+                dispatch_semaphore_signal(addDone);
+            }];
+            if (dispatch_semaphore_wait(addDone, dispatch_time(DISPATCH_TIME_NOW, 5LL * NSEC_PER_SEC)) != 0) {
+                return strdup("no answer");
+            }
+            NSString *addErr;
+            @synchronized (state) { addErr = state[@"adderror"]; }
+            if (addErr) return strdup([NSString stringWithFormat:@"failed: %@", addErr].UTF8String);
+            return strdup("notified");
+        } @catch (NSException *e) {
+            return strdup([NSString stringWithFormat:@"failed: %@", e.reason ?: e.name].UTF8String);
+        }
     }
 }

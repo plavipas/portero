@@ -15,11 +15,12 @@ func TestBuildGraph(t *testing.T) {
 		mk("com.example.app", "work", "Safari/Work"),
 		mk("com.example.app", "work", "Safari/Work"),
 		mk("-", "default", "Safari"),
+		mk("-", "none", "Safari"),
 		mk("-", "old rule", "Zen:Work"),
 		{Opener: "-", Rule: "ERROR", Kind: "error", Path: [3]string{"o:-", "s:error", "t:Safari"}},
 	}
 	g := BuildGraph(r, ds)
-	if g.Total != 5 {
+	if g.Total != 6 {
 		t.Errorf("total %d", g.Total)
 	}
 	if len(g.Openers) != 2 || g.Openers[1].Label != "no opener / CLI" {
@@ -29,10 +30,13 @@ func TestBuildGraph(t *testing.T) {
 	for _, n := range g.Rules {
 		ids[n.ID] = n
 	}
-	for _, id := range []string{"r:work", "s:default", "s:file", "s:error", "r:old rule"} {
+	for _, id := range []string{"r:work", "s:default", "s:none", "s:file", "s:error", "r:old rule"} {
 		if _, ok := ids[id]; !ok {
 			t.Errorf("missing rule node %s", id)
 		}
+	}
+	if n := ids["s:none"]; n.Label != "no rule (asked)" || n.Kind != "default" {
+		t.Errorf("none node %+v", n)
 	}
 	if !ids["r:old rule"].Stale || ids["r:work"].Stale {
 		t.Errorf("stale flags: %+v", ids)

@@ -16,7 +16,8 @@ scripts, `$BROWSER`) in the browser and profile that a rule picks. One link, one
   instance and ignore command-line arguments (Dia, Arc and the like) are driven through their
   AppleScript dictionary, so a profile can still be chosen.
 - Keeps the rules in one plain file on the Mac; the file can live in iCloud Drive to be shared between
-  Macs.
+  Macs. Update Portero on every Mac that shares the file before using `open: { default: true }`: an older
+  build rejects the whole file and sends every link to Safari.
 - Opens local HTML files too (Open With, drag onto the icon): they go to the default browser and profile.
 - Logs every routing decision. A missing or broken rules file never swallows a link: it opens in Safari and the
   error is logged.
@@ -88,7 +89,8 @@ with `open: { ask: [...] }` makes the handler show a small panel near the pointe
 The CLI never asks; it uses the default target. See [docs/rules.md](docs/rules.md#ask).
 
 A link from an app that no rule matches asks too: "Keep default" or a target the rules already use, and
-"Remember" appends a host rule. `ask_unmatched: false` turns it off. See [docs/rules.md](docs/rules.md#unmatched-links).
+"Remember" appends a host rule. `ask_unmatched: false` turns it off. A "Remember" that cannot write the file posts a macOS notification
+([ADR 0007](docs/adr/0007-remember-failure-notification.md)); the link still opens. See [docs/rules.md](docs/rules.md#unmatched-links).
 
 ```yaml
 - name: Meetings

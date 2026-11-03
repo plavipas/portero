@@ -96,6 +96,26 @@ var rememberUnmatched = func(req rules.Request, chosen rules.Target, followDefau
 	return rulesfile.RememberUnmatched(config.RulesFile(), config.Dir(), req, chosen, followDefault, sync.Offloaded, time.Now())
 }
 
+// notifyFunc posts the native notification of a failed "Remember" (handler.Notify in the app, a fake in tests).
+var notifyFunc = handler.Notify
+
+// notifyRememberFailed tells the user that "Remember" could not write the rules file and returns the part the
+// decision log appends: ` (notified)`, ` (notification denied)` and so on. The body is built only from the host
+// (already filtered) and the error text, one line, cut to 300 runes. The link has opened before this runs.
+func notifyRememberFailed(host string, rerr error) string {
+	body := "Could not remember " + host + ": " + rerr.Error() + ". Details: ~/.config/portero/decisions.log"
+	body = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+			return ' '
+		}
+		return r
+	}, body)
+	if r := []rune(body); len(r) > 300 {
+		body = string(r[:299]) + "…"
+	}
+	return " (" + notifyFunc("Portero", body) + ")"
+}
+
 // unmatchedInstalled reports whether a target of the rules file can be offered on this Mac: a known browser must
 // be installed; one the table does not know cannot be checked and counts as installed (a fake in tests).
 var unmatchedInstalled = func(t rules.Target) bool {
@@ -223,7 +243,8 @@ func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*u
 	_, err := open(link, target)
 	if err == nil && remembered {
 		if name, rerr := remember(req, d.Rule, target); rerr != nil {
-			note += ", remember failed: " + rerr.Error()
+			host, _, _ := rules.RememberKey(u)
+			note += ", remember failed: " + rerr.Error() + notifyRememberFailed(host, rerr)
 		} else {
 			note += fmt.Sprintf(", remembered %q", name)
 		}
@@ -250,7 +271,7 @@ func routeUnmatched(choices []rules.Target, req rules.Request, link *url.URL, op
 	canRemember := hostOK && canWrite
 	label := ""
 	if canRemember {
-		label = "Remember for this host (" + askTitle(&url.URL{Host: host}) + ")"
+		label = "Remember for this host (" + askTitle(&url.URL{Host: rules.HostForms(host)}) + "), links from any app"
 	}
 	res := ask(handler.AskRequest{ID: req.Opener + "\x00" + link.String(), Title: askTitleVia(u, link), Options: opts, CanRemember: canRemember, RememberLabel: label})
 	target, note := def, "asked (no rule) -> default (cancelled)"
@@ -272,12 +293,12 @@ func routeUnmatched(choices []rules.Target, req rules.Request, link *url.URL, op
 		case errors.Is(rerr, rulesfile.ErrNowMatched):
 			note += ", remember skipped: a rule matches now"
 		case rerr != nil:
-			note += ", remember failed: " + rerr.Error()
+			note += ", remember failed: " + rerr.Error() + notifyRememberFailed(host, rerr)
 		default:
 			note += fmt.Sprintf(", remembered %q", name)
 		}
 	}
-	if lerr := decisionlog.AppendLink(config.LogFile(), rules.Decision{Target: target}, req, link, note); lerr != nil {
+	if lerr := decisionlog.AppendLink(config.LogFile(), rules.Decision{Rule: "none", Target: target}, req, link, note); lerr != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", lerr)
 	}
 	return err

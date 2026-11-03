@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"net/url"
@@ -102,12 +103,34 @@ func slackTarget(jwt string) string {
 	if err != nil {
 		return ""
 	}
-	var claims map[string]json.RawMessage
-	if json.Unmarshal(b, &claims) != nil {
+	// Token by token, so a repeated claim is seen: encoding/json would keep the last one while another reader
+	// may take the first, and a link must not route by a value that parsers disagree on.
+	dec := json.NewDecoder(bytes.NewReader(b))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return ""
+	}
+	var target json.RawMessage
+	seen := 0
+	for dec.More() {
+		tok, err := dec.Token()
+		key, isKey := tok.(string)
+		if err != nil || !isKey {
+			return ""
+		}
+		var v json.RawMessage
+		if dec.Decode(&v) != nil {
+			return ""
+		}
+		if key == slackTargetKey {
+			seen++
+			target = v
+		}
+	}
+	if seen != 1 {
 		return ""
 	}
 	var s string
-	if json.Unmarshal(claims[slackTargetKey], &s) != nil {
+	if json.Unmarshal(target, &s) != nil {
 		return ""
 	}
 	return s

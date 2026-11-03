@@ -306,3 +306,23 @@ func TestLockSerializes(t *testing.T) {
 		t.Fatal("second Lock never got the lock")
 	}
 }
+
+func TestLockTimesOut(t *testing.T) {
+	old := lockWait
+	lockWait = 200 * time.Millisecond
+	defer func() { lockWait = old }()
+	dir := t.TempDir()
+	unlock, err := Lock(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	start := time.Now()
+	_, err = Lock(dir)
+	if err == nil || !strings.Contains(err.Error(), "held by another writer") {
+		t.Fatalf("err %v", err)
+	}
+	if d := time.Since(start); d < 150*time.Millisecond || d > time.Second {
+		t.Errorf("waited %v", d)
+	}
+}
