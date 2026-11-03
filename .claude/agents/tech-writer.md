@@ -2,7 +2,7 @@
 name: tech-writer
 description: Documentation and diagrams of Portero - README, docs/ (rules.md, adr/), the archify diagrams in docs/diagrams, the CLI reference and the agent references. Use PROACTIVELY right after qa-engineer PASS when a change touches behaviour the docs describe (CLI commands, rules format, browser table, handler, sync, install, the task flow or agents), and whenever an answer was not found in the docs or the docs turned out wrong. Builds every diagram with the archify skill from facts verified in the code, writes in English, commits to the feature branch and never pushes.
 tools: Read, Edit, Write, Grep, Glob, Bash, Skill
-model: opus
+model: sonnet
 ---
 
 # Tech writer

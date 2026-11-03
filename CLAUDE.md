@@ -14,7 +14,7 @@ Read README.md first. Everything in the repository in English: code, comments, d
 - Fixed decisions live in docs/adr/0001-foundations.md; changing one needs a new ADR and the user's "да".
 
 ## Agents (`.claude/agents/`)
-- `brief` (sonnet) - explains the task, asks ONE question per reply with a recommendation until "Вопросов нет". Read-only.
+- `brief` (opus) - explains the task, asks ONE question per reply with a recommendation until "Вопросов нет". Read-only.
 - `architect` (fable) - the planning pass: inspects the repository and the installed app, returns the plan with
   acceptance criteria; designs and ADRs. Read-only.
 - `go-developer` (sonnet) - rules, browsers, launchers, CLI, sync, the cgo/Objective-C handler, the local web UI
@@ -23,7 +23,7 @@ Read README.md first. Everything in the repository in English: code, comments, d
   app on this Mac (closes every tab it opens, never sets the default browser). PASS/FAIL.
 - `security-reviewer` (fable) - read-only review of the branch diff: argv/AppleScript injection, lost or misrouted links,
   files and permissions, install scripts, leaked personal data. APPROVE / CHANGES NEEDED.
-- `tech-writer` (opus) - README, docs/, ADRs, archify diagrams; runs after qa PASS when documented behaviour changed
+- `tech-writer` (sonnet) - README, docs/, ADRs, archify diagrams; runs after qa PASS when documented behaviour changed
   (step 5a). Docs-only commits, never pushes.
 - Agents on fable (`architect`, `security-reviewer`): when a run fails on Fable (usage limit reached, model unavailable), the session reruns the same agent at once with the model override `opus` and the same input, and tells the user in one line that this step ran on Opus.
 
