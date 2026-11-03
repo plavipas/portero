@@ -175,6 +175,9 @@ func openUI(link, authLink string, open func(*url.URL, rules.Target) (launch.Pla
 		return openErr
 	}
 	d := r.Route(req)
+	if len(d.Ask) > 0 { // the page opens in the default target; the panel exists only in the handler app
+		return openCLIAsked(d, req, func(_ *url.URL, t rules.Target) (launch.Plan, error) { return open(launchURL, t) })
+	}
 	if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}

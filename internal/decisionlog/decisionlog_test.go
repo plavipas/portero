@@ -47,3 +47,28 @@ func TestAppendGroupLabelKeepsFiveColumns(t *testing.T) {
 		t.Errorf("columns = %q", cols)
 	}
 }
+
+func TestAppendNote(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "d.log")
+	u, _ := url.Parse("https://meet.example.com/abc-defg-hij")
+	req := rules.Request{URL: u, Opener: "com.apple.iCal"}
+	d := rules.Decision{Target: rules.Target{Browser: "Dia", Profile: "Work"}, Rule: "Meetings"}
+	if err := AppendNote(path, d, req, "asked -> Dia/Work, remembered \"a\tb\nc\""); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendNote(path, d, req, ""); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(path)
+	lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("lines: %q", lines)
+	}
+	c := strings.Split(lines[0], "\t")
+	if len(c) != 6 || c[5] != `asked -> Dia/Work, remembered "a b c"` || c[3] != "Dia/Work" {
+		t.Errorf("columns: %q", c)
+	}
+	if len(strings.Split(lines[1], "\t")) != 5 {
+		t.Errorf("no note must keep five columns: %q", lines[1])
+	}
+}
