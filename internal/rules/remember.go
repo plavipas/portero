@@ -49,7 +49,7 @@ func RememberKey(u *url.URL) (host, path string, ok bool) {
 	if p == "" || p != strings.TrimSpace(p) || len(p) > maxRememberPath || strings.Contains(p, "*") || strings.Contains(p, " / ") {
 		return "", "", false
 	}
-	for _, r := range p {
+	for _, r := range p + host {
 		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
 			return "", "", false
 		}
