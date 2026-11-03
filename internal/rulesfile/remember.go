@@ -75,3 +75,47 @@ func containsTarget(list []rules.Target, t rules.Target) bool {
 	}
 	return false
 }
+
+// ErrNowMatched: a rule matches the link by the time the file is read again (the file changed since the panel
+// was shown). Nothing is written.
+var ErrNowMatched = errors.New("a rule matches this link now")
+
+// RememberUnmatched appends a host rule for the link in req, which no rule matched when the panel was shown: it
+// opens in chosen, or follows the default when followDefault is set. It locks lockDir, re-reads the file and
+// writes nothing (ErrNowMatched) when a rule decides the link now. It returns the name of the new rule.
+func RememberUnmatched(path, lockDir string, req rules.Request, chosen rules.Target, followDefault bool, offloaded func(string) bool, now time.Time) (string, error) {
+	host, ok := rules.RememberHost(req.URL)
+	if !ok {
+		return "", errors.New("the link has no host to remember")
+	}
+	if lockDir != "" {
+		unlock, err := Lock(lockDir)
+		if err != nil {
+			return "", err
+		}
+		defer unlock()
+	}
+	if offloaded != nil && offloaded(path) {
+		return "", ErrOffloaded
+	}
+	data, hash, err := Read(path)
+	if err != nil {
+		return "", fmt.Errorf("read rules file: %w", err)
+	}
+	r, err := rules.Parse(data)
+	if err != nil {
+		return "", err
+	}
+	if r.Route(req).Rule != "" {
+		return "", ErrNowMatched
+	}
+	name := UniqueName(r, host)
+	text, err := InsertLast(string(data), Remembered{Name: name, Host: host, Target: chosen, FollowDefault: followDefault}, req, now)
+	if err != nil {
+		return "", err
+	}
+	if _, err := Write(path, text, hash, offloaded); err != nil {
+		return "", err
+	}
+	return name, nil
+}

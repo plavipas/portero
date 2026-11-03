@@ -38,16 +38,22 @@ func (t Target) String() string {
 type Open struct {
 	Target `yaml:",inline"`
 	Ask    []Target `yaml:"ask,omitempty"`
+	// Default makes the element follow the file's `default` target: `open: {default: true}`. It excludes browser,
+	// profile, container and ask. The link opens in whatever `default` is when it arrives.
+	Default bool `yaml:"default,omitempty"`
 }
 
 // MaxAsk is the most targets one ask list can hold (keys 1 to 9 in the panel).
 const MaxAsk = 9
 
 // IsZero reports whether nothing is set.
-func (o Open) IsZero() bool { return o.Target == (Target{}) && len(o.Ask) == 0 }
+func (o Open) IsZero() bool { return o.Target == (Target{}) && len(o.Ask) == 0 && !o.Default }
 
-// String is the target, or "ask: A | B" for a list.
+// String is the target, "default" for an element that follows the default, or "ask: A | B" for a list.
 func (o Open) String() string {
+	if o.Default {
+		return "default"
+	}
 	if !o.Asks() {
 		return o.Target.String()
 	}
@@ -171,7 +177,12 @@ type Rules struct {
 	Unwrap *bool `yaml:"unwrap,omitempty"`
 	// UnwrapSkipOpeners lists bundle ids of apps whose links are never unwrapped.
 	UnwrapSkipOpeners []string `yaml:"unwrap_skip_openers,omitempty"`
+	// AskUnmatched switches the panel for links from apps that no rule matches; nil means on.
+	AskUnmatched *bool `yaml:"ask_unmatched,omitempty"`
 }
+
+// AsksUnmatched reports whether the handler app asks about links that no rule matches (the default is on).
+func (r *Rules) AsksUnmatched() bool { return r == nil || r.AskUnmatched == nil || *r.AskUnmatched }
 
 // UnwrapFor reports whether a link opened by opener is unwrapped. When it is not, why says so for the
 // user: `unwrap: off` or `unwrap: skipped for <opener>`.
@@ -225,6 +236,9 @@ func Parse(text []byte) (*Rules, error) {
 		for j := 0; j+1 < len(m.Content); j += 2 {
 			if m.Content[j].Value == "rules" {
 				markGroups(r.Rules, m.Content[j+1])
+				if err := checkDefaultFalse(r.Rules, m.Content[j+1]); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -281,8 +295,46 @@ func (r *Rules) Validate() error {
 	return nil
 }
 
-// checkOpen validates the target of a plain rule or group: either a browser or an ask list, never both.
+// checkDefaultFalse rejects `open: {default: false}`: a bool with omitempty cannot tell it from no key, so the
+// nodes are read. seq is the sequence node of rules.
+func checkDefaultFalse(rs []Rule, seq *yaml.Node) error {
+	if seq == nil || seq.Kind != yaml.SequenceNode {
+		return nil
+	}
+	for i, rule := range rs {
+		if i >= len(seq.Content) || seq.Content[i].Kind != yaml.MappingNode {
+			continue
+		}
+		m := seq.Content[i]
+		where := "rule " + quoted(i, rule.Name)
+		if rule.IsGroup() {
+			where = fmt.Sprintf("group %q", rule.Name)
+		}
+		for j := 0; j+1 < len(m.Content); j += 2 {
+			if m.Content[j].Value != "open" || m.Content[j+1].Kind != yaml.MappingNode {
+				continue
+			}
+			o := m.Content[j+1]
+			for k := 0; k+1 < len(o.Content); k += 2 {
+				var on bool
+				if o.Content[k].Value == "default" && (o.Content[k+1].Decode(&on) != nil || !on) {
+					return fmt.Errorf("rules: %s: open has \"default: false\"; remove it (only \"default: true\" is a setting)", where)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// checkOpen validates the target of a plain rule or group: a browser, an ask list or "follow the default",
+// never a mix.
 func checkOpen(where string, o Open) error {
+	if o.Default {
+		if o.Target != (Target{}) || o.Ask != nil {
+			return fmt.Errorf("rules: %s: open has default: true together with browser, profile, container or ask; use one of them", where)
+		}
+		return nil
+	}
 	if o.Ask != nil && len(o.Ask) == 0 { // `ask: []`
 		return fmt.Errorf("rules: %s: ask is empty; list 1 to %d targets", where, MaxAsk)
 	}

@@ -40,7 +40,7 @@ rules inside them are counted one by one:
 
 The file has `version: 1`, a `default` target, an ordered `rules` list and two optional top-level keys for
 redirect links (see "Redirect links"): `unwrap: true | false` (default `true`) and
-`unwrap_skip_openers: [bundle ids]`. An element of the list is either a
+`unwrap_skip_openers: [bundle ids]`, and `ask_unmatched: true | false` (default `true`, see "Unmatched links"). An element of the list is either a
 plain rule or a group.
 
 ```yaml
@@ -242,6 +242,56 @@ remember: meet.google.com /abc-defg-hij
 
 `--dry-run` adds one `would run (N):` line per choice and a `would run (Esc):` line.
 
+## Unmatched links
+
+A link that arrives in the handler app (`Portero.app`) from another app and that no rule matches would open
+silently in `default`. Instead the handler shows the ask panel (see "Ask"):
+
+- The first button is `Keep default · <Browser · Profile>`. Then come the distinct targets the file already uses,
+  in file order: plain rules, groups and ask lists. Left out: the default itself, rules that follow the default
+  and browsers that are not installed on this Mac. At most 9 buttons in total. When nothing is left besides the
+  default, the panel is not shown.
+- Esc or closing the panel opens the link in `default`. Other links are never blocked by an open panel.
+- Only `http` and `https` links from the handler ask. `portero open` and `$BROWSER` never ask, nor do `file://`
+  links, and an offloaded, missing or broken rules file behaves as before (Safari).
+- A link wrapped in a redirect is judged by its inner URL (see "Redirect links").
+- The checkbox says `Remember for this host (<host>)`. With a target chosen it appends a plain host rule; with
+  "Keep default" it appends a rule that follows `default`:
+
+```yaml
+  # added by Portero (Remember, no rule matched) 2026-11-03
+  - name: "example.net"
+    match:
+      host: "example.net"
+    open:
+      default: true
+```
+
+  The rule is the last element of `rules` (before the next top-level key), so it can only catch links no other
+  element matches. The write is the same safe write as "Remember" above; if a rule matches the link by the time
+  the file is written, nothing is written (`remember skipped: a rule matches now` in the log). A rule added by
+  hand below a remembered host rule loses that host; `portero rules check` warns about it.
+
+`ask_unmatched: false` at the top level turns the panel off; without the key it is on. The Settings page has the
+checkbox **Ask where to open links from apps that match no rule**.
+
+### Following the default
+
+`open: { default: true }` on a plain rule or a group makes the element open in whatever `default` is when the link
+arrives. It cannot be combined with `browser`, `profile`, `container` or `ask`; `default: false` is an error
+(remove the key); it is not allowed inside `default` or an ask list. `portero rules match` prints
+`Dia/Personal (follows default)  (rule: name)`, and the diagram draws a dotted edge to the default target.
+
+`portero rules match` and `portero open --dry-run` describe an unmatched `http(s)` link:
+
+```text
+unmatched: the app would ask: [default, Dia/Work]
+remember: host example.net
+```
+
+They print `ask_unmatched: off` when the key is false and `unmatched: nothing to ask, default` when the panel
+would not show. `--dry-run` adds `would run (N):` lines for the choices (the default is 1) and `would run (Esc):`.
+
 ## Working directory
 
 `cwd` matches the working directory of the command that ran `portero open`. It routes links that command-line
@@ -389,6 +439,10 @@ An asking rule adds a sixth column with the outcome:
 | `asked -> <target>, remembered "<name>"` | the same, and "Remember" added the rule `<name>` |
 | `asked -> default (cancelled)` | Esc, closing the panel, or the app quit; the `default` target was used |
 | `asked -> default (CLI)` | `portero open` has no panel; the `default` target was used |
+| `asked (no rule) -> <target>` | an unmatched link from an app: the user picked this target |
+| `asked (no rule) -> default (kept)` | the user chose "Keep default" |
+| `asked (no rule) -> default (cancelled)` | Esc, closing the panel, or the app quit |
+| `..., remembered "<name>"` / `..., remember failed: <reason>` / `..., remember skipped: a rule matches now` | outcome of "Remember" on an unmatched link, appended to the notes above |
 | `unwrapped <url>` | the link was a redirect wrapper and the rules decided on `<url>`; after an ask note it follows `; ` (last, cut at 2048 characters) |
 
 The url column always holds the original link.

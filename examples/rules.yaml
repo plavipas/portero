@@ -7,6 +7,9 @@ default:
   browser: Dia          # app name as in /Applications, or a bundle id
   profile: Personal     # optional: profile / space / container name
 
+# ask_unmatched: false  # optional, default true: a link from an app that no rule matches shows the panel
+#                       # (Keep default, or one of the targets used below; "Remember" appends a host rule)
+
 rules:
   # A group: one target for several conditions. The first child that matches decides; the group's `open`
   # applies. Children have `match` only. The log and the diagram show "Work / name" and draw one node "Work".
@@ -44,3 +47,8 @@ rules:
     match:
       host: "docs-*.example.org"                    # plain glob, "*" anywhere
     open: { browser: Safari }
+
+  # A rule that always follows `default`, whatever it is later. "Keep default" + Remember adds one of these.
+  # - name: example.net
+  #   match: { host: example.net }
+  #   open: { default: true }

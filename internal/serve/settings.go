@@ -83,7 +83,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {
 			sy["local_path"] = f.LocalPath()
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"default": def, "sync": sy, "unwrap": s.unwrapInfo(), "log_file": s.opts.LogFile, "config_file": s.opts.ConfigFile})
+	writeJSON(w, http.StatusOK, map[string]any{"default": def, "sync": sy, "unwrap": s.unwrapInfo(), "ask_unmatched": s.askUnmatchedInfo(), "log_file": s.opts.LogFile, "config_file": s.opts.ConfigFile})
 }
 
 func (s *Server) handleSetDefault(w http.ResponseWriter, r *http.Request) {
@@ -288,6 +288,15 @@ func (s *Server) handleSettingsUnwrap(w http.ResponseWriter, r *http.Request) {
 			skip = append(skip, o)
 		}
 	}
+	s.editRulesText(w, req.BaseHash, func(text string) (string, error) {
+		return rulesfile.SetUnwrap(text, *req.Unwrap, skip)
+	}, map[string]any{"enabled": *req.Unwrap, "skip": skip})
+}
+
+// editRulesText is the guarded write of a settings endpoint: the Apply mutex, the lock, the offloaded check, the
+// base hash against the file, edit on the current text, Write (with the .bak) and the JSON answer, which is out
+// plus the new hash and the backup path.
+func (s *Server) editRulesText(w http.ResponseWriter, baseHash string, edit func(string) (string, error), out map[string]any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	path := s.rulesPath()
@@ -312,13 +321,13 @@ func (s *Server) handleSettingsUnwrap(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnprocessableEntity, "there is no rules file to change")
 		return
 	}
-	if hash != req.BaseHash {
+	if hash != baseHash {
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error":        map[string]any{"message": rulesfile.ErrStale.Error()},
 			"current_hash": hash})
 		return
 	}
-	text, err := rulesfile.SetUnwrap(string(data), *req.Unwrap, skip)
+	text, err := edit(string(data))
 	if err != nil {
 		fail(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -342,5 +351,46 @@ func (s *Server) handleSettingsUnwrap(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "cannot write the rules file: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"enabled": *req.Unwrap, "skip": skip, "hash": res.Hash, "backup": res.Backup})
+	out["hash"], out["backup"] = res.Hash, res.Backup
+	writeJSON(w, http.StatusOK, out)
+}
+
+// askUnmatchedInfo is the ask_unmatched setting as the rules file has it (same fields as unwrapInfo, without skip).
+func (s *Server) askUnmatchedInfo() map[string]any {
+	info := map[string]any{"enabled": true, "editable": false, "hash": ""}
+	data, exists, err := s.readRules()
+	if err != nil {
+		info["note"] = err.Error()
+		return info
+	}
+	if !exists {
+		info["note"] = "there is no rules file yet"
+		return info
+	}
+	info["hash"] = hashOf(data)
+	r, err := rules.Parse(data)
+	if err != nil {
+		info["note"] = "the rules file is not valid: " + err.Error()
+		return info
+	}
+	info["editable"] = true
+	info["enabled"] = r.AsksUnmatched()
+	return info
+}
+
+func (s *Server) handleSettingsAskUnmatched(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Enabled  *bool  `json:"enabled"`
+		BaseHash string `json:"base_hash"`
+	}
+	if !readStrict(w, r, &req) {
+		return
+	}
+	if req.Enabled == nil {
+		fail(w, http.StatusBadRequest, "enabled (true or false) is required")
+		return
+	}
+	s.editRulesText(w, req.BaseHash, func(text string) (string, error) {
+		return rulesfile.SetAskUnmatched(text, *req.Enabled)
+	}, map[string]any{"enabled": *req.Enabled})
 }
