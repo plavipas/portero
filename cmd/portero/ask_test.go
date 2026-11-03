@@ -269,6 +269,7 @@ func TestAskTitle(t *testing.T) {
 	cases := []struct{ url, want string }{
 		{"https://meet.example.com/a%0Ab?x=1", "meet.example.com/a b"},
 		{"https://meet.example.com/a%E2%80%AEb", "meet.example.com/a b"},
+		{"https://meet.example.com/a%C2%85b%C2%9Bc", "meet.example.com/a b c"},
 		{"https://meet.example.com/a%E2%80%8Bb", "meet.example.com/a b"},
 		{"https://meet.example.com/a%E2%80%A8b%E2%80%A9c", "meet.example.com/a b c"},
 	}

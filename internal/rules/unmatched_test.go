@@ -153,6 +153,8 @@ func TestRememberHost(t *testing.T) {
 		{"file:///tmp/x.html", "", false},
 		{"https://exa%2Ampl.com/", "", false},
 		{"https://example.com​/", "", false},
+		{"https://exa\u0085mple.com/", "", false},
+		{"https://exa\u009bmple.com/", "", false},
 	}
 	for _, tt := range tests {
 		u, err := url.Parse(tt.raw)
