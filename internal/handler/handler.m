@@ -270,6 +270,9 @@ char *porteroNotify(const char *title, const char *body) {
                 return strdup(authErr ? [NSString stringWithFormat:@"failed: %@", authErr].UTF8String : "denied");
             }
 
+            // The fixed identifier replaces a pending request only; drop an already delivered one too, so
+            // repeated failures show one banner instead of piling up in Notification Center.
+            [center removeDeliveredNotificationsWithIdentifiers:@[ @"remember-failed" ]];
             UNMutableNotificationContent *content = [UNMutableNotificationContent new];
             content.title = t;
             content.body = b;
