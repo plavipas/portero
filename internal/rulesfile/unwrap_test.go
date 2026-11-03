@@ -124,3 +124,49 @@ func TestSetUnwrapCRLF(t *testing.T) {
 		t.Errorf("%v %q", err, out)
 	}
 }
+
+func TestSetUnwrapIdempotent(t *testing.T) {
+	inputs := []string{
+		"version: 1\nunwrap_skip_openers:   # apps\n  - com.a\ndefault: {browser: Safari}\n",
+		"version: 1\nunwrap: false  # off\nunwrap_skip_openers:  # apps\n  # note\n  - com.a.b\ndefault: {browser: Safari}\n",
+		"version: 1\nunwrap_skip_openers: [\"com.a.b\"] # c\nunwrap: false # d\ndefault: {browser: Safari}\n",
+		"version: 1\nunwrap_skip_openers:\n# note\n- com.a.b\ndefault: {browser: Safari}\n",
+		unwrapBase,
+		strings.ReplaceAll("version: 1\nunwrap: false # off\nunwrap_skip_openers: # apps\n  - com.a.b\ndefault: {browser: Safari}\n", "\n", "\r\n"),
+	}
+	settings := []struct {
+		unwrap bool
+		skip   []string
+	}{{false, []string{"com.a.b"}}, {true, nil}, {false, nil}, {true, []string{"com.a.b", "com.c.d"}}}
+	for i, in := range inputs {
+		for _, st := range settings {
+			first, err := SetUnwrap(in, st.unwrap, st.skip)
+			if err != nil {
+				t.Fatalf("input %d %v: %v", i, st, err)
+			}
+			second, err := SetUnwrap(first, st.unwrap, st.skip)
+			if err != nil || second != first {
+				t.Errorf("input %d %v not idempotent (%v):\n%s\n---\n%s", i, st, err, first, second)
+			}
+			for n := 0; n < 20; n++ { // map order must not matter
+				again, _ := SetUnwrap(in, st.unwrap, st.skip)
+				if again != first {
+					t.Fatalf("input %d %v: output changes between runs", i, st)
+				}
+			}
+		}
+	}
+}
+
+func TestSetUnwrapQuotedListComment(t *testing.T) {
+	in := "version: 1\nunwrap_skip_openers: [\"com.a.b\"] # c\ndefault: {browser: Safari}\n"
+	out, err := SetUnwrap(in, true, []string{"com.a.b"})
+	if err != nil || !strings.Contains(out, "unwrap_skip_openers:  # c\n") {
+		t.Errorf("%v\n%s", err, out)
+	}
+	for in, want := range map[string]string{`["a#b"] # c`: "# c", `["a#b"]`: "", `'x' # y`: "# y", ` # z`: "# z"} {
+		if got := trailingComment(in); got != want {
+			t.Errorf("trailingComment(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

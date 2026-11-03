@@ -23,6 +23,7 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 		eol = "\r\n"
 	}
 	lines := strings.SplitAfter(text, "\n")
+	firstRemoved := -1       // the new keys go where the old ones were, so a second save changes nothing
 	var kept, loose []string // loose: comments of the old keys that stay in the file
 	trailing := map[string]string{}
 	for i := 0; i < len(lines); i++ {
@@ -36,6 +37,9 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 		default:
 			kept = append(kept, l)
 			continue
+		}
+		if firstRemoved < 0 {
+			firstRemoved = len(kept)
 		}
 		if c := trailingComment(strings.TrimRight(l, "\r\n")[len(key)+1:]); c != "" {
 			trailing[key] = c
@@ -75,18 +79,21 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 	if !unwrap {
 		line("unwrap", " false")
 	}
-	for _, c := range trailing { // a default key that is no longer written keeps its comment
-		loose = append(loose, c)
-	}
-	var head strings.Builder
-	for _, c := range loose {
-		head.WriteString(c + eol)
-	}
 	if len(skip) > 0 {
 		line("unwrap_skip_openers", "")
 		for _, o := range skip {
 			add.WriteString("  - " + strconv.Quote(o) + eol)
 		}
+	}
+	// the comment of a key that is no longer written stays as a line of its own, in a fixed order
+	for _, key := range []string{"unwrap", "unwrap_skip_openers"} {
+		if c, ok := trailing[key]; ok {
+			loose = append(loose, c)
+		}
+	}
+	var head strings.Builder
+	for _, c := range loose {
+		head.WriteString(c + eol)
 	}
 	at := -1
 	for i, l := range kept {
@@ -97,6 +104,9 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 	}
 	if at < 0 {
 		return "", fmt.Errorf("%w: no top-level version key", ErrInvalid)
+	}
+	if firstRemoved >= 0 {
+		at = firstRemoved
 	}
 	if at > 0 && !strings.HasSuffix(kept[at-1], "\n") {
 		kept[at-1] += eol
@@ -123,10 +133,22 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 
 func isComment(line string) bool { return strings.HasPrefix(strings.TrimSpace(line), "#") }
 
-// trailingComment returns the `# ...` that ends the rest of a key line, "" when there is none.
+// trailingComment returns the `# ...` that ends the rest of a key line, "" when there is none. A `#` inside a
+// quoted scalar is not a comment.
 func trailingComment(rest string) string {
-	if i := strings.Index(rest, "#"); i >= 0 && (i == 0 || rest[i-1] == ' ' || rest[i-1] == '\t') && !strings.ContainsAny(rest[:i], "\"'") {
-		return strings.TrimSpace(rest[i:])
+	var q byte
+	for i := 0; i < len(rest); i++ {
+		c := rest[i]
+		switch {
+		case q == '"' && c == '\\':
+			i++
+		case q != 0 && c == q:
+			q = 0
+		case q == 0 && (c == '"' || c == '\''):
+			q = c
+		case q == 0 && c == '#' && (i == 0 || rest[i-1] == ' ' || rest[i-1] == '\t'):
+			return strings.TrimSpace(rest[i:])
+		}
 	}
 	return ""
 }
