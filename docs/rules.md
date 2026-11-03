@@ -278,8 +278,10 @@ silently in `default`. Instead the handler shows the ask panel (see "Ask"):
 - A "Remember" that cannot write the file (offloaded or symlinked file, a lock held by another writer for over
   5 seconds, a parse error, a full disk) still opens the link first. It then posts a macOS notification from
   Portero (`Could not remember <host>: <reason>. Details: ~/.config/portero/decisions.log`); the first one asks
-  for the notification permission once. The log line ends with `(notified)`, `(notification denied)`,
-  `(notification: no answer)` or `(notification failed: <why>)`. See
+  for the notification permission once. The log line (`remember failed: <reason>`) is written first, so
+  it exists even if the app is quit while the permission prompt is open; the outcome of the notification
+  (`notified`, `notification denied`, `notification: no answer`, `notification failed: <why>`) goes to the
+  handler's stderr, not to `decisions.log`. See
   [ADR 0007](adr/0007-remember-failure-notification.md).
 - The log line of a link settled by this panel has `none` in the rule column (the link had no rule); the
   diagram draws these links through a "no rule (asked)" node.

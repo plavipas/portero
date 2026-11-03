@@ -111,7 +111,7 @@ func TestRouteUnmatchedRememberOutcomes(t *testing.T) {
 		want     string
 		notified bool
 	}{
-		{errors.New("disk full"), "asked (no rule) -> default (kept), remember failed: disk full (notified)", true},
+		{errors.New("disk full"), "asked (no rule) -> default (kept), remember failed: disk full", true},
 		{rulesfile.ErrNowMatched, "asked (no rule) -> default (kept), remember skipped: a rule matches now", false},
 	}
 	for _, tt := range tests {
@@ -129,6 +129,9 @@ func TestRouteUnmatchedRememberOutcomes(t *testing.T) {
 		if tt.notified {
 			if len(notifyCalls) != 1 || !strings.Contains(notifyCalls[0], "Could not remember other.example.com: disk full.") || !strings.Contains(notifyCalls[0], "decisions.log") {
 				t.Errorf("notifications %q", notifyCalls)
+			}
+			if len(logAtNotify) != 1 || !strings.Contains(logAtNotify[0], "remember failed: disk full") {
+				t.Errorf("the log line must be written before the notification: %q", logAtNotify)
 			}
 		} else if len(notifyCalls) != 0 {
 			t.Errorf("unexpected notifications %q", notifyCalls)

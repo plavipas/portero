@@ -48,8 +48,8 @@ func fileNodes(r *rules.Rules) map[string]string {
 	return m
 }
 
-// logRuleID maps the rule column of the log to a node. The log cannot tell a user rule named "default" or
-// "file" from the built-in outcome of the same name, so when the rules file has such a rule it wins;
+// logRuleID maps the rule column of the log to a node. The log cannot tell a user rule named "default",
+// "none" or "file" from the built-in outcome of the same name, so when the rules file has such a rule it wins;
 // otherwise the built-in node is used. A label the file does not have gets a node of its own (stale).
 func logRuleID(r *rules.Rules, name string) string {
 	sp := specialID(name)

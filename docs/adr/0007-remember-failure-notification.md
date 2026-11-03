@@ -31,8 +31,10 @@ the link opens, and the next link to the same host asks again with no hint why.
 4. **Shown even when Portero is active.** The app is the notification center's delegate and presents banners in
    the foreground; otherwise macOS would drop the banner when the panel had made Portero the active app.
 5. **Log.** The `remember failed: <reason>` part of the sixth column (ADR 0005 decision 7, ADR 0006 decision 6)
-   is followed by ` (notified)`, ` (notification denied)`, ` (notification: no answer)` or
-   ` (notification failed: <why>)`. The third column of a link settled by the unmatched panel says `none` instead
+   is written to the log first, then the notification is posted: the wait for the permission prompt can last up
+   to 65 s and a quit during it must not lose the line the notification points to. The outcome of the notification
+   (`notified`, `notification denied`, `notification: no answer`, `notification failed: <why>`) goes to the
+   handler's stderr, not to the log line. The third column of a link settled by the unmatched panel says `none` instead
    of `default` (the link had no rule; the sixth column says what was chosen); the diagram draws these lines
    through a "no rule" node.
 6. **Clarified ADR 0006 decision 4.** A remembered host rule carries no opener condition: it applies to links
