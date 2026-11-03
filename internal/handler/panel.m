@@ -8,10 +8,15 @@ extern void porteroAskDone(int id, int choice, int remember);
 
 static const int kMaxPanels = 9;
 static const CGFloat kPanelWidth = 380;
+// Queued asks beyond this are answered Cancelled at once (the default opens), so a flood cannot grow memory.
+static const NSUInteger kMaxQueued = 50;
+// Keys typed in the first moments after a panel appears were meant for the app that had focus: ignore them.
+static const NSTimeInterval kKeyGuard = 0.4;
 
 @interface PorteroPanel : NSPanel
 @property (nonatomic) int askID;
 @property (nonatomic) BOOL finished;
+@property (nonatomic) NSTimeInterval shownAt; // NSProcessInfo systemUptime when the panel was shown
 @property (nonatomic, strong) NSButton *remember;
 @end
 
@@ -49,8 +54,13 @@ static void porteroFinish(PorteroPanel *panel, int choice) {
 @implementation PorteroPanel
 - (BOOL)canBecomeKeyWindow { return YES; }
 - (BOOL)canBecomeMainWindow { return NO; }
-- (void)cancelOperation:(id)sender { porteroFinish(self, -1); } // Esc
+- (BOOL)keysGuarded { return NSProcessInfo.processInfo.systemUptime - self.shownAt < kKeyGuard; }
+- (void)cancelOperation:(id)sender { // Esc
+    if ([self keysGuarded]) return;
+    porteroFinish(self, -1);
+}
 - (void)keyDown:(NSEvent *)event {
+    if ([self keysGuarded]) return; // mouse clicks are not affected
     NSString *c = event.charactersIgnoringModifiers;
     if (c.length == 1 && !(event.modifierFlags & (NSEventModifierFlagCommand | NSEventModifierFlagControl | NSEventModifierFlagOption))) {
         unichar ch = [c characterAtIndex:0];
@@ -150,6 +160,7 @@ static void porteroFinish(PorteroPanel *panel, int choice) {
     py = MAX(NSMinY(vf), MIN(py, NSMaxY(vf) - sz.height));
     [panel setFrameOrigin:NSMakePoint(x, py)];
 
+    panel.shownAt = NSProcessInfo.processInfo.systemUptime;
     [openPanels addObject:panel];
     [panel makeKeyAndOrderFront:nil];
 }
@@ -178,6 +189,10 @@ void porteroAsk(int askID, const char *title, const char *options, int canRememb
         a.options = opts;
         a.canRemember = canRemember != 0;
         if (openPanels.count >= kMaxPanels) {
+            if (queued.count >= kMaxQueued) {
+                porteroAskDone(askID, -1, 0);
+                return;
+            }
             [queued addObject:a];
         } else {
             [controller present:a];
