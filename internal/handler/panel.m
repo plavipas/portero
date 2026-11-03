@@ -25,6 +25,8 @@ static const CGFloat kPanelWidth = 380;
 static NSMutableArray<PorteroPanel *> *openPanels;
 static NSMutableArray<PorteroAsk *> *queued;
 static PorteroAsk *controller; // one delegate/target for every panel
+// Set by porteroCancelAllPanels once the app is quitting: later asks are answered with the default at once.
+static BOOL shuttingDown = NO;
 
 static void porteroFinish(PorteroPanel *panel, int choice) {
     if (panel.finished) return;
@@ -36,7 +38,7 @@ static void porteroFinish(PorteroPanel *panel, int choice) {
     [panel close];
     porteroAskDone(panel.askID, choice, remember);
     // A slot is free: show the next queued link.
-    if (queued.count > 0 && openPanels.count < kMaxPanels) {
+    if (!shuttingDown && queued.count > 0 && openPanels.count < kMaxPanels) {
         PorteroAsk *next = queued.firstObject;
         [queued removeObjectAtIndex:0];
         [controller present:next];
@@ -159,6 +161,11 @@ void porteroAsk(int askID, const char *title, const char *options, int canRememb
     NSString *o = [NSString stringWithUTF8String:options] ?: @"";
     NSArray<NSString *> *opts = [o componentsSeparatedByString:@"\n"];
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (shuttingDown) {
+            // Termination already cancelled every panel; a link dispatched before that must not open a new one.
+            porteroAskDone(askID, -1, 0);
+            return;
+        }
         if (!openPanels) {
             openPanels = [NSMutableArray array];
             queued = [NSMutableArray array];
@@ -179,6 +186,7 @@ void porteroAsk(int askID, const char *title, const char *options, int canRememb
 
 // Cancel every open and queued panel (the app is quitting); each answers with the default. Main thread.
 int porteroCancelAllPanels(void) {
+    shuttingDown = YES;
     int n = (int)(openPanels.count + queued.count);
     NSArray<PorteroAsk *> *q = [queued copy];
     [queued removeAllObjects];
