@@ -1,5 +1,6 @@
 #import <Cocoa/Cocoa.h>
 #import "handler.h"
+extern void porteroRunOnMain(void (^block)(void));
 
 extern void porteroAskDone(int id, int choice, int remember);
 
@@ -160,7 +161,7 @@ void porteroAsk(int askID, const char *title, const char *options, int canRememb
     NSString *t = [NSString stringWithUTF8String:title] ?: @"";
     NSString *o = [NSString stringWithUTF8String:options] ?: @"";
     NSArray<NSString *> *opts = [o componentsSeparatedByString:@"\n"];
-    dispatch_async(dispatch_get_main_queue(), ^{
+    porteroRunOnMain(^{
         if (shuttingDown) {
             // Termination already cancelled every panel; a link dispatched before that must not open a new one.
             porteroAskDone(askID, -1, 0);

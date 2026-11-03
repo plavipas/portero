@@ -20,6 +20,30 @@ static os_log_t porteroLog(void) {
     return log;
 }
 
+// Threading: -[NSApplication terminate:] with an NSTerminateLater answer runs a nested run loop until the reply
+// comes. A libdispatch main-queue block that is itself running cannot be re-entered, so calling terminate: from
+// one (and waiting for work queued on the main queue) deadlocks. Therefore nothing in the quit path uses
+// dispatch_*(main queue): every deferred step is a run-loop timer or a CFRunLoopPerformBlock, registered in the
+// common modes and NSModalPanelRunLoopMode (the mode AppKit waits in), and terminate: is only ever called from
+// such a timer, never from a main-queue block. Both are serviced by the nested loop, so the grace timer, the
+// 10 s cap, porteroDone and the panel blocks keep running while AppKit waits for the reply.
+static NSArray<NSRunLoopMode> *porteroModes(void) {
+    return @[NSRunLoopCommonModes, NSModalPanelRunLoopMode];
+}
+
+// Run block on the main run loop (any thread may call).
+void porteroRunOnMain(void (^block)(void)) {
+    CFRunLoopRef loop = CFRunLoopGetMain();
+    CFRunLoopPerformBlock(loop, (__bridge CFArrayRef)porteroModes(), block);
+    CFRunLoopWakeUp(loop);
+}
+
+// Run block on the main run loop after ms milliseconds (main thread only).
+static void porteroAfterMs(int ms, void (^block)(void)) {
+    NSTimer *t = [NSTimer timerWithTimeInterval:ms / 1000.0 repeats:NO block:^(NSTimer *timer) { block(); }];
+    for (NSRunLoopMode m in porteroModes()) [[NSRunLoop mainRunLoop] addTimer:t forMode:m];
+}
+
 static void porteroReplyTerminate(void) {
     if (!terminating) return;
     terminating = NO;
@@ -63,13 +87,13 @@ static void porteroArrived(void) {
     porteroCancelAllPanels();
     terminating = YES;
     graceOver = NO;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 150 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+    porteroAfterMs(150, ^{
         if (!terminating) return;
         graceOver = YES;
         os_log(porteroLog(), "terminate grace over, inflight=%d", inflight);
         if (inflight == 0) porteroReplyTerminate();
     });
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{ porteroReplyTerminate(); });
+    porteroAfterMs(10000, ^{ porteroReplyTerminate(); });
     return NSTerminateLater;
 }
 
@@ -110,14 +134,14 @@ void porteroRunApp(void) {
 // Quit after ms milliseconds unless another link arrives or one is still being routed.
 void porteroExitAfter(int ms) {
     int mine = generation;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)ms * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+    porteroAfterMs(ms, ^{
         if (mine == generation && inflight == 0) [NSApp terminate:nil];
     });
 }
 
 // Called from Go when one link has been routed (or failed); the app quits 2 s after the last one.
 void porteroDone(void) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    porteroRunOnMain(^{
         if (inflight > 0) inflight--;
         if (inflight == 0) {
             if (terminating) { if (graceOver) porteroReplyTerminate(); }
