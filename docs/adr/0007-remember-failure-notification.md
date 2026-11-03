@@ -1,6 +1,6 @@
 # ADR 0007: A failed "Remember" is shown as a native notification
 
-Status: proposed, 2026-11-03 (DEV-50); the user chose in the brief (a native macOS notification, permission
+Status: accepted by the user, 2026-11-03 (DEV-50); chosen in the brief (a native macOS notification, permission
 asked once, short reason plus a hint to the log; the link still opens where it was sent).
 
 Extends ADR 0005 decision 5 and ADR 0006 decision 4 ("a failed write never blocks the link: it opens first, the
