@@ -424,8 +424,15 @@ async function match() {
     out.append(el("div", { class: "error", text: msg }));
     return;
   }
-  out.append(el("div", {}, el("span", { class: "k", text: "Rule: " }), el("code", { text: data.rule }),
-    el("span", { class: "k", text: "  Opens in: " }), el("code", { text: data.target })));
+  if (data.ask && data.ask.length) {
+    out.append(el("div", {}, el("span", { class: "k", text: "Rule: " }), el("code", { text: data.rule }),
+      el("span", { class: "k", text: "  Asks: " }), el("code", { text: data.ask.join(" | ") })));
+    out.append(el("div", {}, el("span", { class: "k", text: "Esc, no panel or the CLI opens in: " }),
+      el("code", { text: data.cancel_target })));
+  } else {
+    out.append(el("div", {}, el("span", { class: "k", text: "Rule: " }), el("code", { text: data.rule }),
+      el("span", { class: "k", text: "  Opens in: " }), el("code", { text: data.target })));
+  }
   out.append(el("div", { class: "k", text: data.cwd_note ? "Directory: " + data.cwd_note : "Directory: " + data.cwd_used }));
   if (data.plan) out.append(el("div", {}, el("span", { class: "k", text: "Would run: " }), el("code", { text: data.plan })));
   if (data.plan_error) out.append(el("div", { class: "warn", text: data.plan_error }));

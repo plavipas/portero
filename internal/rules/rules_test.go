@@ -310,7 +310,7 @@ func TestAskValidate(t *testing.T) {
 		name, body, want string // want "" means valid
 	}{
 		{"valid", "  - name: Meetings\n    match: {host: meet.example.com}\n    open:\n      ask:\n        - {browser: Dia, profile: Personal}\n        - {browser: Dia, profile: Work}\n", ""},
-		{"empty ask", "  - name: M\n    match: {host: a.example.com}\n    open: {ask: []}\n", "empty browser"},
+		{"empty ask", "  - name: M\n    match: {host: a.example.com}\n    open: {ask: []}\n", "ask is empty"},
 		{"ask and browser", "  - name: M\n    match: {host: a.example.com}\n    open:\n      browser: Dia\n      ask: [{browser: Dia}]\n", "open has both ask and browser"},
 		{"ask and profile only", "  - name: M\n    match: {host: a.example.com}\n    open:\n      profile: Work\n      ask: [{browser: Dia}]\n", "open has both ask and browser"},
 		{"duplicate", "  - name: M\n    match: {host: a.example.com}\n    open: {ask: [{browser: Dia, profile: Work}, {browser: Dia, profile: Work}]}\n", "twice"},

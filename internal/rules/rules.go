@@ -237,6 +237,9 @@ func (r *Rules) Validate() error {
 
 // checkOpen validates the target of a plain rule or group: either a browser or an ask list, never both.
 func checkOpen(where string, o Open) error {
+	if o.Ask != nil && len(o.Ask) == 0 { // `ask: []`
+		return fmt.Errorf("rules: %s: ask is empty; list 1 to %d targets", where, MaxAsk)
+	}
 	if o.Asks() {
 		if o.Target != (Target{}) {
 			return fmt.Errorf("rules: %s: open has both ask and browser; use one of them", where)
