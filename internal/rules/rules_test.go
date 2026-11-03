@@ -409,6 +409,10 @@ func TestRememberKey(t *testing.T) {
 		{"https://example.com/a*b", "", "", false},
 		{"https://example.com/a%20/%20b", "", "", false},
 		{"https://example.com/a%09b", "", "", false},
+		{"https://example.com/a%E2%80%AEb", "", "", false}, // U+202E right-to-left override
+		{"https://example.com/a%E2%80%8Bb", "", "", false}, // U+200B zero width space
+		{"https://example.com/a%E2%80%A8b", "", "", false}, // U+2028 line separator
+		{"https://example.com/a%E2%80%A9b", "", "", false}, // U+2029 paragraph separator
 		{"https://example.com/" + strings.Repeat("a", 600), "", "", false},
 	}
 	for _, c := range cases {

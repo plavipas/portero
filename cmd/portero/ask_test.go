@@ -214,9 +214,17 @@ func TestRouteAskedRulesChangedSkipsRemember(t *testing.T) {
 }
 
 func TestAskTitle(t *testing.T) {
-	u, _ := url.Parse("https://meet.example.com/a%0Ab?x=1")
-	if got := askTitle(u); got != "meet.example.com/a b" {
-		t.Errorf("%q", got)
+	cases := []struct{ url, want string }{
+		{"https://meet.example.com/a%0Ab?x=1", "meet.example.com/a b"},
+		{"https://meet.example.com/a%E2%80%AEb", "meet.example.com/a b"},
+		{"https://meet.example.com/a%E2%80%8Bb", "meet.example.com/a b"},
+		{"https://meet.example.com/a%E2%80%A8b%E2%80%A9c", "meet.example.com/a b c"},
+	}
+	for _, c := range cases {
+		u, _ := url.Parse(c.url)
+		if got := askTitle(u); got != c.want {
+			t.Errorf("askTitle(%s) = %q, want %q", c.url, got, c.want)
+		}
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 var meetCode = regexp.MustCompile(`^[a-z]{3}-[a-z]{4}-[a-z]{3}$`)
@@ -49,7 +50,7 @@ func RememberKey(u *url.URL) (host, path string, ok bool) {
 		return "", "", false
 	}
 	for _, r := range p {
-		if r < 0x20 || r == 0x7f {
+		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
 			return "", "", false
 		}
 	}
