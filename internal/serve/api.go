@@ -30,6 +30,7 @@ func (s *Server) routesAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/settings", s.handleSettings)
 	mux.HandleFunc("POST /api/settings/default", s.handleSetDefault)
 	mux.HandleFunc("POST /api/settings/sync", s.handleSettingsSync)
+	mux.HandleFunc("POST /api/settings/unwrap", s.handleSettingsUnwrap)
 }
 
 // Summary is the rules file as the UI lists it.
@@ -359,7 +360,15 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	opener := strings.TrimSpace(req.Opener)
-	d := rs.Route(rules.Request{URL: u, Opener: opener, Cwd: cwd})
+	routed, unwrapNote := u, ""
+	if inner, ok := rules.Unwrap(u); ok {
+		if apply, why := rs.UnwrapFor(opener); apply {
+			routed = inner
+		} else {
+			unwrapNote = why
+		}
+	}
+	d := rs.Route(rules.Request{URL: routed, Opener: opener, Cwd: cwd})
 	rule := d.Rule
 	if rule == "" {
 		rule = "default"
@@ -373,6 +382,11 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		"profile": d.Target.Profile, "container": d.Target.Container,
 		"cwd_used": cwd, "cwd_note": note,
 		"path": [3]string{openerID(oid), matchRuleID(d, rule), targetID(d.Target.String())},
+	}
+	if routed != u {
+		out["unwrapped"] = routed.String()
+	} else if unwrapNote != "" {
+		out["unwrap_note"] = unwrapNote
 	}
 	if len(d.Ask) > 0 {
 		// The handler app asks; the default target is what Esc, a missing panel and the CLI use.

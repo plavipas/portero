@@ -182,11 +182,16 @@ func open(args []string) error {
 		fmt.Fprintf(os.Stderr, "portero: cwd: %s; cwd rules skipped\n", note)
 	}
 	u := a.url
-	req := rules.Request{URL: u, Opener: a.opener, Cwd: cwd}
+	req, why := routeReq(r, u, a.opener, cwd)
+	if req.URL != u {
+		fmt.Println("unwrapped:", req.URL)
+	} else if why != "" {
+		fmt.Println(why)
+	}
 	d := r.Route(req)
 	fmt.Println(d)
 	if len(d.Ask) > 0 {
-		printAskLines(os.Stdout, d, u)
+		printAskLines(os.Stdout, d, req.URL)
 	}
 	if a.dry {
 		if len(d.Ask) > 0 {
@@ -212,9 +217,9 @@ func open(args []string) error {
 		return nil
 	}
 	if len(d.Ask) > 0 {
-		return openCLIAsked(d, req, launch.Open)
+		return openCLIAsked(d, req, u, launch.Open)
 	}
-	if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
+	if err := decisionlog.AppendLink(config.LogFile(), d, req, u, ""); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}
 	_, err = launch.Open(u, d.Target)
@@ -232,13 +237,13 @@ func printAskLines(w io.Writer, d rules.Decision, u *url.URL) {
 }
 
 // openCLIAsked opens a link whose rule asks: the CLI cannot show the panel, so the default target is used.
-func openCLIAsked(d rules.Decision, req rules.Request, open func(*url.URL, rules.Target) (launch.Plan, error)) error {
+func openCLIAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*url.URL, rules.Target) (launch.Plan, error)) error {
 	fmt.Fprintf(os.Stderr, "portero: rule %q asks; the CLI cannot show the panel, opened %s (default)\n", d.Rule, d.Target)
 	d.Ask = nil
-	if err := decisionlog.AppendNote(config.LogFile(), d, req, "asked -> default (CLI)"); err != nil {
+	if err := decisionlog.AppendLink(config.LogFile(), d, req, link, "asked -> default (CLI)"); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}
-	_, err := open(req.URL, d.Target)
+	_, err := open(link, d.Target)
 	return err
 }
 
@@ -319,10 +324,16 @@ func rulesCmd(args []string) error {
 		if line := cwdLine(r, a, cwd, note); line != "" {
 			fmt.Println(line)
 		}
-		d := r.Route(rules.Request{URL: a.url, Opener: a.opener, Cwd: cwd})
+		req, why := routeReq(r, a.url, a.opener, cwd)
+		if req.URL != a.url {
+			fmt.Println("unwrapped:", req.URL)
+		} else if why != "" {
+			fmt.Println(why)
+		}
+		d := r.Route(req)
 		fmt.Println(d)
 		if len(d.Ask) > 0 {
-			printAskLines(os.Stdout, d, a.url)
+			printAskLines(os.Stdout, d, req.URL)
 		}
 	default:
 		return fmt.Errorf("unknown rules command %q", sub)
