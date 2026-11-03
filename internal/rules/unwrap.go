@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/url"
 	"strings"
 )
@@ -125,6 +126,13 @@ func slackTarget(jwt string) string {
 			seen++
 			target = v
 		}
+	}
+	// The object must close and nothing may follow it (json.Unmarshal rejected trailing data too).
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('}') {
+		return ""
+	}
+	if _, err := dec.Token(); err != io.EOF {
+		return ""
 	}
 	if seen != 1 {
 		return ""
