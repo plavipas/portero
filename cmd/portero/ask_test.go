@@ -46,10 +46,12 @@ func askRig(t *testing.T, text string) (opened *[]string, open func(*url.URL, ru
 	}
 	notifyCalls, logAtNotify = nil, nil
 	oldNotify := notifyFunc
-	notifyFunc = func(title, body string) string { notifyCalls = append(notifyCalls, title+"|"+body)
+	notifyFunc = func(title, body string) string {
+		notifyCalls = append(notifyCalls, title+"|"+body)
 		b, _ := os.ReadFile(config.LogFile())
 		logAtNotify = append(logAtNotify, string(b))
-		return "notified" }
+		return "notified"
+	}
 	t.Cleanup(func() { notifyFunc = oldNotify })
 	var got []string
 	return &got, func(u *url.URL, tg rules.Target) (launch.Plan, error) {
