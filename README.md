@@ -80,6 +80,25 @@ apps never match it.
 directories that are missing on this Mac and about names used twice, and ends with a count such as
 `7 rule(s): 2 plain, 5 in 1 group(s), default Dia/Personal`.
 
+### Ask
+
+A link that no rule can place (a meeting from Calendar, Google Meet, a shared Zoom host) can ask. A rule or group
+with `open: { ask: [...] }` makes the handler show a small panel near the pointer with one button per target
+(1 to 9 targets, keys 1 to 9). Esc opens the default target. "Remember" adds a rule for that meeting to the file.
+The CLI never asks; it uses the default target. See [docs/rules.md](docs/rules.md#ask).
+
+```yaml
+- name: Meetings
+  match: { host: meet.google.com }
+  open:
+    ask:
+      - { browser: Dia, profile: Personal }
+      - { browser: Dia, profile: Work }
+```
+
+Choosing Work for `https://meet.google.com/abc-defg-hij` with "Remember" ticked adds a rule for
+`meet.google.com` and `/abc-defg-hij`.
+
 ## Known limit
 
 Links clicked **inside** a browser stay in that browser. Only links coming from other apps are routed.

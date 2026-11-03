@@ -125,3 +125,19 @@ func TestAfterTruncated(t *testing.T) {
 		t.Error("removed file is a truncation")
 	}
 }
+
+func TestParseLineSixColumns(t *testing.T) {
+	d, ok := parseLine("2026-01-01T00:00:00Z\tcom.apple.iCal\tMeetings\tDia/Work\thttps://meet.example.com/abc-defg-hij\tasked -> Dia/Work")
+	if !ok || d.Ask != "asked -> Dia/Work" || d.Target != "Dia/Work" || d.Kind != "ok" {
+		t.Fatalf("%+v %v", d, ok)
+	}
+	if d.Path[2] != "t:Dia/Work" {
+		t.Errorf("path %v", d.Path)
+	}
+	if d5, ok := parseLine("2026-01-01T00:00:00Z\t-\tdefault\tSafari\thttps://example.com/"); !ok || d5.Ask != "" {
+		t.Errorf("five columns: %+v %v", d5, ok)
+	}
+	if _, ok := parseLine("a\tb\tc\td\te\tf\tg"); ok {
+		t.Error("seven columns must be skipped")
+	}
+}

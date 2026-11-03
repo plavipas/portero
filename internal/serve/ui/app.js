@@ -89,10 +89,10 @@ function drawGraph(g) {
     const x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2, mx = (x1 + x2) / 2;
     const p = svg("path", {
       d: "M" + x1 + " " + y1 + " C" + mx + " " + y1 + " " + mx + " " + y2 + " " + x2 + " " + y2,
-      class: "edge" + (e.count === 0 ? " static" : ""),
+      class: "edge" + (e.count === 0 ? " static" : "") + (e.ask ? " ask" : ""),
       "stroke-width": e.count === 0 ? 1 : Math.min(10, 1.5 + Math.log2(e.count + 1) * 1.6),
     });
-    p.append(svg("title", {}, e.count + " link(s)"));
+    p.append(svg("title", {}, e.count + " link(s)" + (e.ask ? " (asks)" : "")));
     p.dataset.from = e.from;
     p.dataset.to = e.to;
     edges.append(p);
@@ -103,6 +103,7 @@ function drawGraph(g) {
     const p = pos[n.id];
     let cls = "node kind-" + n.kind;
     if (n.stale) cls += " stale";
+    if (n.ask) cls += " ask";
     if (n.kind === "target" && !n.installed) cls += " off";
     const grp = svg("g", { class: cls, transform: "translate(" + p.x + " " + p.y + ")" });
     grp.dataset.id = n.id;
@@ -263,7 +264,7 @@ function drawDecisions() {
       el("td", { text: fmtTime(d.time) }),
       el("td", { text: d.opener === "-" ? "(none)" : d.opener }),
       el("td", { text: d.rule }),
-      el("td", { text: target, title: target }),
+      el("td", { text: d.ask ? target + " (" + d.ask + ")" : target, title: d.ask ? target + " (" + d.ask + ")" : target }),
       el("td", { text: d.url, title: d.url }),
       el("td", {}, replay));
     body.append(tr);
@@ -423,8 +424,15 @@ async function match() {
     out.append(el("div", { class: "error", text: msg }));
     return;
   }
-  out.append(el("div", {}, el("span", { class: "k", text: "Rule: " }), el("code", { text: data.rule }),
-    el("span", { class: "k", text: "  Opens in: " }), el("code", { text: data.target })));
+  if (data.ask && data.ask.length) {
+    out.append(el("div", {}, el("span", { class: "k", text: "Rule: " }), el("code", { text: data.rule }),
+      el("span", { class: "k", text: "  Asks: " }), el("code", { text: data.ask.join(" | ") })));
+    out.append(el("div", {}, el("span", { class: "k", text: "Esc, no panel or the CLI opens in: " }),
+      el("code", { text: data.cancel_target })));
+  } else {
+    out.append(el("div", {}, el("span", { class: "k", text: "Rule: " }), el("code", { text: data.rule }),
+      el("span", { class: "k", text: "  Opens in: " }), el("code", { text: data.target })));
+  }
   out.append(el("div", { class: "k", text: data.cwd_note ? "Directory: " + data.cwd_note : "Directory: " + data.cwd_used }));
   if (data.plan) out.append(el("div", {}, el("span", { class: "k", text: "Would run: " }), el("code", { text: data.plan })));
   if (data.plan_error) out.append(el("div", { class: "warn", text: data.plan_error }));

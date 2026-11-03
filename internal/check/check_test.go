@@ -111,3 +111,20 @@ func TestCheckCwd(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckAskTargets(t *testing.T) {
+	text := "version: 1\ndefault: {browser: Safari}\nrules:\n  - name: Meetings\n    match: {host: meet.example.com}\n    open:\n      ask: [{browser: Zen, container: Work}, {browser: Safari}]\n"
+	got, err := Targets(parse(t, text), testEnv(false, nil, nil, true, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `warning: rule "Meetings", ask 1: Zen is not installed on this Mac`
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("got %q, want [%q]", got, want)
+	}
+	bad := "version: 1\ndefault: {browser: Safari}\nrules:\n  - name: G\n    open:\n      ask: [{browser: Safari}, {browser: Dia, container: Work}]\n    rules:\n      - match: {host: a.example.com}\n"
+	_, err = Targets(parse(t, bad), testEnv(true, nil, nil, true, nil))
+	if err == nil || !strings.Contains(err.Error(), `group "G", ask 2`) {
+		t.Errorf("err = %v", err)
+	}
+}

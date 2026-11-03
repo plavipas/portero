@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#import <os/log.h>
 #import "handler.h"
 
 extern void porteroHandleURL(char *url, char *opener);
@@ -7,6 +8,48 @@ extern void porteroHandleURL(char *url, char *opener);
 // never terminate the app while a slower one (a browser still starting) is in progress.
 static int generation = 0;
 static int inflight = 0;
+// terminating: applicationShouldTerminate answered NSTerminateLater and waits for inflight to reach 0.
+static BOOL terminating = NO;
+// graceOver: the short delay after a quit request has passed; Apple events already queued were delivered.
+static BOOL graceOver = NO;
+
+static os_log_t porteroLog(void) {
+    static os_log_t log;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ log = os_log_create("dev.plavipas.portero", "handler"); });
+    return log;
+}
+
+// Threading: -[NSApplication terminate:] with an NSTerminateLater answer runs a nested run loop until the reply
+// comes. A libdispatch main-queue block that is itself running cannot be re-entered, so calling terminate: from
+// one (and waiting for work queued on the main queue) deadlocks. Therefore nothing in the quit path uses
+// dispatch_*(main queue): every deferred step is a run-loop timer or a CFRunLoopPerformBlock, registered in the
+// common modes and NSModalPanelRunLoopMode (the mode AppKit waits in), and terminate: is only ever called from
+// such a timer, never from a main-queue block. Both are serviced by the nested loop, so the grace timer, the
+// 10 s cap, porteroDone and the panel blocks keep running while AppKit waits for the reply.
+static NSArray<NSRunLoopMode> *porteroModes(void) {
+    return @[NSRunLoopCommonModes, NSModalPanelRunLoopMode];
+}
+
+// Run block on the main run loop (any thread may call).
+void porteroRunOnMain(void (^block)(void)) {
+    CFRunLoopRef loop = CFRunLoopGetMain();
+    CFRunLoopPerformBlock(loop, (__bridge CFArrayRef)porteroModes(), block);
+    CFRunLoopWakeUp(loop);
+}
+
+// Run block on the main run loop after ms milliseconds (main thread only).
+static void porteroAfterMs(int ms, void (^block)(void)) {
+    NSTimer *t = [NSTimer timerWithTimeInterval:ms / 1000.0 repeats:NO block:^(NSTimer *timer) { block(); }];
+    for (NSRunLoopMode m in porteroModes()) [[NSRunLoop mainRunLoop] addTimer:t forMode:m];
+}
+
+static void porteroReplyTerminate(void) {
+    if (!terminating) return;
+    terminating = NO;
+    graceOver = NO;
+    [NSApp replyToApplicationShouldTerminate:YES];
+}
 
 static void porteroArrived(void) {
     generation++;
@@ -29,12 +72,35 @@ static void porteroArrived(void) {
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
     // Launched with no link (double-click): leave quietly. A document opened at launch arrives through
     // openURLs: BEFORE this callback, so the timer must not start when a link is already in flight.
-    if (inflight == 0 && generation == 0) porteroExitAfter(3000);
+    if (inflight == 0 && generation == 0) {
+        os_log(porteroLog(), "launched without link");
+        porteroExitAfter(3000);
+    }
+}
+
+// Quit requests (logout, restart, Quit, the idle quit): never NSTerminateNow. A link whose Apple event is
+// already queued when the request arrives would be lost with the process, so the reply is deferred by a
+// short grace so that the run loop delivers pending events first. Pending panels open their link in the
+// default target; the reply then waits (at most 10 s) until every link in flight is done.
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
+    os_log(porteroLog(), "terminating, inflight=%d", inflight);
+    porteroCancelAllPanels();
+    terminating = YES;
+    graceOver = NO;
+    porteroAfterMs(150, ^{
+        if (!terminating) return;
+        graceOver = YES;
+        os_log(porteroLog(), "terminate grace over, inflight=%d", inflight);
+        if (inflight == 0) porteroReplyTerminate();
+    });
+    porteroAfterMs(10000, ^{ porteroReplyTerminate(); });
+    return NSTerminateLater;
 }
 
 // Documents (Open With, drag onto the icon): HTML files declared in Info.plist arrive here as file:// URLs.
 - (void)application:(NSApplication *)app openURLs:(NSArray<NSURL *> *)urls {
     for (NSURL *u in urls) {
+        os_log(porteroLog(), "link received (opener=-) %{private}@", u.absoluteString);
         porteroArrived();
         porteroHandleURL((char *)u.absoluteString.UTF8String, (char *)"");
     }
@@ -48,6 +114,7 @@ static void porteroArrived(void) {
         NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         opener = app.bundleIdentifier ?: @"";
     }
+    os_log(porteroLog(), "link received (opener=%{public}@) %{private}@", opener.length ? opener : @"-", url);
     porteroArrived();
     porteroHandleURL((char *)url.UTF8String, (char *)opener.UTF8String);
 }
@@ -67,16 +134,19 @@ void porteroRunApp(void) {
 // Quit after ms milliseconds unless another link arrives or one is still being routed.
 void porteroExitAfter(int ms) {
     int mine = generation;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)ms * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+    porteroAfterMs(ms, ^{
         if (mine == generation && inflight == 0) [NSApp terminate:nil];
     });
 }
 
 // Called from Go when one link has been routed (or failed); the app quits 2 s after the last one.
 void porteroDone(void) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    porteroRunOnMain(^{
         if (inflight > 0) inflight--;
-        if (inflight == 0) porteroExitAfter(2000);
+        if (inflight == 0) {
+            if (terminating) { if (graceOver) porteroReplyTerminate(); }
+            else porteroExitAfter(2000);
+        }
     });
 }
 

@@ -84,11 +84,17 @@ func Targets(r *rules.Rules, env Env) (warnings []string, err error) {
 	}
 	items := []item{{"default", r.Default}}
 	for i, rule := range r.Rules {
+		where := "rule " + quoted(i, rule.Name)
 		if rule.IsGroup() {
-			items = append(items, item{fmt.Sprintf("group %q", rule.Name), rule.Open})
+			where = fmt.Sprintf("group %q", rule.Name)
+		}
+		if rule.Open.Asks() {
+			for j, t := range rule.Open.Ask {
+				items = append(items, item{fmt.Sprintf("%s, ask %d", where, j+1), t})
+			}
 			continue
 		}
-		items = append(items, item{"rule " + quoted(i, rule.Name), rule.Open})
+		items = append(items, item{where, rule.Open.Target})
 	}
 	for _, it := range items {
 		b, known := browsers.Lookup(it.t.Browser)

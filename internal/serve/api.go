@@ -1,8 +1,6 @@
 package serve
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +15,7 @@ import (
 
 	"github.com/plavipas/portero/internal/check"
 	"github.com/plavipas/portero/internal/rules"
+	"github.com/plavipas/portero/internal/rulesfile"
 )
 
 const stateDecisions = 200
@@ -73,10 +72,7 @@ func summarize(r *rules.Rules) *Summary {
 	return sum
 }
 
-func hashOf(b []byte) string {
-	h := sha256.Sum256(b)
-	return hex.EncodeToString(h[:])
-}
+func hashOf(b []byte) string { return rulesfile.HashOf(b) }
 
 // readRules returns the bytes of the rules file; exists is false when there is none.
 func (s *Server) readRules() (data []byte, exists bool, err error) {
@@ -378,6 +374,15 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		"cwd_used": cwd, "cwd_note": note,
 		"path": [3]string{openerID(oid), matchRuleID(d, rule), targetID(d.Target.String())},
 	}
+	if len(d.Ask) > 0 {
+		// The handler app asks; the default target is what Esc, a missing panel and the CLI use.
+		asks := make([]string, len(d.Ask))
+		for i, t := range d.Ask {
+			asks[i] = t.String()
+		}
+		out["ask"] = asks
+		out["cancel_target"] = d.Target.String()
+	}
 	if s.opts.Plan != nil {
 		if plan, err := s.opts.Plan(u, d.Target); err != nil {
 			out["plan_error"] = err.Error()
@@ -401,73 +406,44 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	path := s.rulesPath()
-	if fi, err := os.Lstat(path); err == nil && fi.Mode()&fs.ModeSymlink != 0 {
-		fail(w, http.StatusUnprocessableEntity, "rules file is a symlink; edit the target by hand")
-		return
-	}
-	if err := s.offloadedErr(path); err != nil {
-		readFail(w, err)
-		return
-	}
-	old, exists, err := readRulesAt(path) // the same path as the symlink check and the write below
-	if err != nil {
-		readFail(w, err)
-		return
-	}
-	curHash := ""
-	if exists {
-		curHash = hashOf(old)
-	}
-	// Stale: the file changed, or it was removed/moved (e.g. `portero sync`) after the page loaded.
-	if curHash != req.BaseHash {
-		writeJSON(w, http.StatusConflict, map[string]any{
-			"error":        map[string]any{"message": "the rules file changed on disk; reload it before applying"},
-			"current_hash": curHash})
-		return
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		fail(w, http.StatusInternalServerError, "cannot create the rules directory: "+err.Error())
-		return
-	}
-	backup := ""
-	if exists {
-		backup = path + ".bak"
-		if err := writeAtomic(backup, old); err != nil {
-			fail(w, http.StatusInternalServerError, "cannot write the backup: "+err.Error())
+	if s.opts.LockDir != "" { // the link handler's "Remember" writes the same file
+		unlock, err := rulesfile.Lock(s.opts.LockDir)
+		if err != nil {
+			fail(w, http.StatusInternalServerError, "cannot lock the rules file: "+err.Error())
 			return
 		}
+		defer unlock()
 	}
-	if err := writeAtomic(path, []byte(req.YAML)); err != nil {
+	offloaded := func(p string) bool {
+		if err := s.offloadedErr(p); err != nil { // requests the download
+			return true
+		}
+		return false
+	}
+	res, err := rulesfile.Write(path, req.YAML, req.BaseHash, offloaded)
+	var stale *rulesfile.StaleError
+	switch {
+	case err == nil:
+	case errors.Is(err, rulesfile.ErrSymlink):
+		fail(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	case errors.Is(err, rulesfile.ErrOffloaded):
+		readFail(w, errOffloaded)
+		return
+	case errors.As(err, &stale):
+		// The file changed, or it was removed/moved (e.g. `portero sync`) after the page loaded.
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error":        map[string]any{"message": stale.Error()},
+			"current_hash": stale.Current})
+		return
+	case errors.Is(err, rulesfile.ErrInvalid):
+		fail(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	default:
 		fail(w, http.StatusInternalServerError, "cannot write the rules file: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"hash": hashOf([]byte(req.YAML)), "warnings": warnings, "backup": backup})
-}
-
-// writeAtomic writes data with mode 0600 through a temporary file in the same directory and a rename, so a
-// reader never sees half a file and a symlink at path is replaced, not followed.
-func writeAtomic(path string, data []byte) error {
-	f, err := os.CreateTemp(filepath.Dir(path), ".portero-*.tmp") // 0600
-	if err != nil {
-		return err
-	}
-	tmp := f.Name()
-	_, werr := f.Write(data)
-	if werr == nil {
-		werr = f.Sync()
-	}
-	if cerr := f.Close(); werr == nil {
-		werr = cerr
-	}
-	if werr != nil {
-		os.Remove(tmp)
-		return werr
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp)
-		return err
-	}
-	return nil
+	writeJSON(w, http.StatusOK, map[string]any{"hash": res.Hash, "warnings": warnings, "backup": res.Backup})
 }
 
 // resolveWhatIf is rules.ResolveDir for a directory that may not exist: the deepest existing ancestor is

@@ -61,6 +61,8 @@ input { font: inherit; color: var(--text); background: var(--panel); border: 1px
 .node.last rect { stroke-width: 3; }
 .edge { fill: none; stroke: var(--arrow); opacity: .75; }
 .edge.static { opacity: .3; stroke-dasharray: 3 4; }
+.edge.ask { stroke-dasharray: 6 4; opacity: .55; }
+.node.ask rect { stroke-dasharray: 4 3; }
 .edge.flow { stroke: var(--arrow-emphasis); opacity: 1; stroke-dasharray: 8 6; animation: dash 1s linear infinite; }
 .edge.hl { stroke: var(--arrow-emphasis); opacity: 1; }
 .dim .edge:not(.hl):not(.flow) { opacity: .08; }
