@@ -53,6 +53,7 @@ rules:
       opener: com.vendor.app | [...]       # bundle id of the app that opened the link
       cwd: ~/dir | [/abs/dir, ...]         # working directory of a shell command; see "Working directory"
     open: { browser: <app name or bundle id>, profile: <optional>, container: <optional, Firefox family> }
+    # or: open: { ask: [ { browser: ..., profile: ... }, ... ] }   1 to 9 targets, see "Ask"
 
   # A group: one target for several conditions.
   - name: required for a group
@@ -155,6 +156,87 @@ Dia/Work  (rule: Work / hosts)
 The last link comes from Slack, but `hosts` stands above `Slack` in the group and matches first; the target is
 the same either way. The plain rule without a name after the group is `#3`: the group takes position 2.
 When the rules file has a `cwd` rule, as here, each answer is preceded by a `cwd: <dir>` line.
+
+## Ask
+
+Some links say nothing a rule can use: a meeting link from Calendar (one opener for every account), Google Meet
+(one host for every account), Zoom (a shared host). `ask` lets the link handler offer a choice instead of a
+fixed target.
+
+```yaml
+- name: Meetings
+  match: { host: [meet.google.com, "*.zoom.us"] }
+  open:
+    ask:
+      - { browser: Dia, profile: Personal }
+      - { browser: Dia, profile: Work }
+```
+
+- `ask` replaces `browser`/`profile`/`container` in `open`; the two forms cannot be combined. It lists 1 to 9
+  targets, each written like a normal target.
+- It is allowed on a plain rule and on a group's `open`. It is not allowed on a rule inside a group (those have no
+  `open`) or in `default`.
+- **An ask on a group asks for every link that any child rule of the group matches.** The group's children cannot
+  carry a target of their own, so there is no way to ask for only some of them; use a plain rule for that.
+- Rules are still tried top to bottom. The first match decides, so a plain rule placed above an asking rule
+  (for example one made by "Remember") wins.
+
+When the link handler (`Portero.app`) routes a link to an asking rule, it shows a small panel near the mouse
+pointer:
+
+- one button per target, labelled `N  Browser · Profile` (with ` · Container` when set), and a "Remember"
+  checkbox;
+- keys 1 to 9 pick the target; Esc or closing the panel opens the link in the `default` target of the file;
+- there is no timeout, and other links are routed as usual while a panel is open;
+- the same link (same URL and opener) arriving while its panel is open joins that panel and opens once;
+- up to 9 panels are shown at the same time, further ones wait in a queue;
+- when macOS asks the app to quit with panels open, every pending link opens in `default` and is logged as
+  cancelled.
+
+### Remember
+
+With "Remember" ticked, the chosen button also adds a plain rule for this meeting to the rules file:
+
+```yaml
+  # added by Portero (Remember) 2026-11-03
+  - name: meet.google.com/abc-defg-hij
+    match:
+      host: meet.google.com
+      path: /abc-defg-hij
+    open:
+      browser: Dia
+      profile: Work
+```
+
+- The rule matches the host and the meeting path. Google Meet: the meeting code. Zoom: `/j/<id>`, `/w/<id>`,
+  `/s/<id>` or `/my/<name>`. Any other host: the whole path without a trailing slash. The query is ignored.
+  A link without a path (`/`) has nothing to pin: the checkbox is disabled and `portero rules match` prints
+  `remember: not offered`.
+- The rule is inserted at the top level right before the asking rule, or before the asking group. The rest of
+  the file keeps its comments and formatting.
+- The write is the same as in the UI: a lock on `rules.lock` in the config directory, a symlinked or offloaded
+  file is refused, the new text must parse and route the link to the chosen target with every other rule
+  unchanged, the file must not have changed since it was read, the previous file is kept as `rules.yaml.bak`,
+  and the file is replaced atomically with mode 0600.
+- A failed write never blocks the link: it opens first, the failure is logged.
+- A remembered rule names a browser of this Mac. On another Mac that shares the file through iCloud Drive,
+  `portero rules check` warns when that browser is missing.
+- A tool that installs `rules.yaml` from a template sees the file differ from the template once a rule has been
+  remembered, and reports that as drift.
+
+### The CLI never asks
+
+`portero open` has no panel: for an asking rule it opens the `default` target and logs `asked -> default (CLI)`.
+`portero rules match` and `portero open --dry-run` print the choices, the target Esc uses and the key a
+"Remember" would pin:
+
+```text
+ask: [Dia/Personal, Dia/Work]  (rule: Meetings)
+cancel: Dia/Personal (default)
+remember: meet.google.com /abc-defg-hij
+```
+
+`--dry-run` adds one `would run (N):` line per choice and a `would run (Esc):` line.
 
 ## Working directory
 
@@ -260,3 +342,14 @@ Every routed link appends one tab-separated line to `~/.config/portero/decisions
 time, opener, rule, target, url. The rule is the label from "Names and labels" (`Work / GitHub organisation`
 for a rule in a group). The target is `Browser`, `Browser/Profile`, `Browser:Container` or
 `Browser/Profile:Container`, written as in the rule (also when the container was skipped at launch).
+
+An asking rule adds a sixth column with the outcome:
+
+| Note | Meaning |
+|---|---|
+| `asked -> <target>` | the user picked this target in the panel |
+| `asked -> <target>, remembered "<name>"` | the same, and "Remember" added the rule `<name>` |
+| `asked -> default (cancelled)` | Esc, closing the panel, or the app quit; the `default` target was used |
+| `asked -> default (CLI)` | `portero open` has no panel; the `default` target was used |
+
+Lines of other rules have five columns. The target column holds the target that opened the link.
