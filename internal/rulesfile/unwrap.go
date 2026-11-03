@@ -9,14 +9,36 @@ import (
 	"github.com/plavipas/portero/internal/rules"
 )
 
-// SetUnwrap returns text with the top-level `unwrap` and `unwrap_skip_openers` keys set. Everything else,
-// comments included, is kept byte for byte: the old keys are cut out line by line and the new ones are put
-// right after the `version:` line. `unwrap: true` and an empty list are written as no key at all (the defaults).
-// The result is parsed again and must equal the old file in everything but those two settings.
-func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
-	old, err := rules.Parse([]byte(text))
+// keyOut collects the lines of the new top-level keys; a trailing comment of an old key moves to the line of the
+// same key when it is written again.
+type keyOut struct {
+	b        strings.Builder
+	eol      string
+	trailing map[string]string
+}
+
+// line writes `key:v`, with the old trailing comment of key if it had one.
+func (k *keyOut) line(key, v string) {
+	k.b.WriteString(key + ":" + v)
+	if c, ok := k.trailing[key]; ok {
+		k.b.WriteString("  " + c)
+		delete(k.trailing, key)
+	}
+	k.b.WriteString(k.eol)
+}
+
+// item writes one block-list item of the key written last.
+func (k *keyOut) item(v string) { k.b.WriteString("  - " + v + k.eol) }
+
+// setTopKeys cuts the given top-level keys (with their values and the comments inside them) out of text and
+// writes what render produces where the first of them was, or right after the `version:` line when none was
+// there, so a second save changes nothing. Everything else, comments included, is kept byte for byte: comments
+// of removed keys stay as lines of their own, in the order of keys. The result is parsed again; it is returned
+// with the parse of the old text for the caller's comparison.
+func setTopKeys(text string, keys []string, render func(*keyOut)) (out string, old, nw *rules.Rules, err error) {
+	old, err = rules.Parse([]byte(text))
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrInvalid, err)
+		return "", nil, nil, fmt.Errorf("%w: %v", ErrInvalid, err)
 	}
 	eol := "\n"
 	if strings.Contains(text, "\r\n") {
@@ -29,12 +51,13 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 	for i := 0; i < len(lines); i++ {
 		l := lines[i]
 		key := ""
-		switch {
-		case isTopKey(l, "unwrap"):
-			key = "unwrap"
-		case isTopKey(l, "unwrap_skip_openers"):
-			key = "unwrap_skip_openers"
-		default:
+		for _, k := range keys {
+			if isTopKey(l, k) {
+				key = k
+				break
+			}
+		}
+		if key == "" {
 			kept = append(kept, l)
 			continue
 		}
@@ -67,26 +90,10 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 			break
 		}
 	}
-	var add strings.Builder
-	line := func(key, v string) {
-		add.WriteString(key + ":" + v)
-		if c, ok := trailing[key]; ok {
-			add.WriteString("  " + c)
-			delete(trailing, key)
-		}
-		add.WriteString(eol)
-	}
-	if !unwrap {
-		line("unwrap", " false")
-	}
-	if len(skip) > 0 {
-		line("unwrap_skip_openers", "")
-		for _, o := range skip {
-			add.WriteString("  - " + strconv.Quote(o) + eol)
-		}
-	}
+	ko := &keyOut{eol: eol, trailing: trailing}
+	render(ko)
 	// the comment of a key that is no longer written stays as a line of its own, in a fixed order
-	for _, key := range []string{"unwrap", "unwrap_skip_openers"} {
+	for _, key := range keys {
 		if c, ok := trailing[key]; ok {
 			loose = append(loose, c)
 		}
@@ -103,7 +110,7 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 		}
 	}
 	if at < 0 {
-		return "", fmt.Errorf("%w: no top-level version key", ErrInvalid)
+		return "", nil, nil, fmt.Errorf("%w: no top-level version key", ErrInvalid)
 	}
 	if firstRemoved >= 0 {
 		at = firstRemoved
@@ -111,10 +118,32 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 	if at > 0 && !strings.HasSuffix(kept[at-1], "\n") {
 		kept[at-1] += eol
 	}
-	out := strings.Join(kept[:at], "") + head.String() + add.String() + strings.Join(kept[at:], "")
-	nw, err := rules.Parse([]byte(out))
+	out = strings.Join(kept[:at], "") + head.String() + ko.b.String() + strings.Join(kept[at:], "")
+	nw, err = rules.Parse([]byte(out))
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrInvalid, err)
+		return "", nil, nil, fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
+	return out, old, nw, nil
+}
+
+// SetUnwrap returns text with the top-level `unwrap` and `unwrap_skip_openers` keys set. Everything else,
+// comments included, is kept byte for byte (see setTopKeys). `unwrap: true` and an empty list are written as no
+// key at all (the defaults). The result is parsed again and must equal the old file in everything but those two
+// settings.
+func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
+	out, old, nw, err := setTopKeys(text, []string{"unwrap", "unwrap_skip_openers"}, func(k *keyOut) {
+		if !unwrap {
+			k.line("unwrap", " false")
+		}
+		if len(skip) > 0 {
+			k.line("unwrap_skip_openers", "")
+			for _, o := range skip {
+				k.item(strconv.Quote(o))
+			}
+		}
+	})
+	if err != nil {
+		return "", err
 	}
 	wantOn := unwrap
 	if nw.Unwrap != nil && *nw.Unwrap != wantOn || nw.Unwrap == nil && !wantOn {
@@ -125,6 +154,28 @@ func SetUnwrap(text string, unwrap bool, skip []string) (string, error) {
 	}
 	a, b := *old, *nw
 	a.Unwrap, b.Unwrap, a.UnwrapSkipOpeners, b.UnwrapSkipOpeners = nil, nil, nil, nil
+	if !reflect.DeepEqual(a, b) {
+		return "", fmt.Errorf("%w: the edit would change the rules (edit the file by hand)", ErrInvalid)
+	}
+	return out, nil
+}
+
+// SetAskUnmatched returns text with the top-level `ask_unmatched` key set: on is no key (the default), off is
+// `ask_unmatched: false`. The rest of the file is kept as SetUnwrap keeps it.
+func SetAskUnmatched(text string, on bool) (string, error) {
+	out, old, nw, err := setTopKeys(text, []string{"ask_unmatched"}, func(k *keyOut) {
+		if !on {
+			k.line("ask_unmatched", " false")
+		}
+	})
+	if err != nil {
+		return "", err
+	}
+	if nw.AsksUnmatched() != on {
+		return "", fmt.Errorf("%w: the ask_unmatched key could not be set (edit the file by hand)", ErrInvalid)
+	}
+	a, b := *old, *nw
+	a.AskUnmatched, b.AskUnmatched = nil, nil
 	if !reflect.DeepEqual(a, b) {
 		return "", fmt.Errorf("%w: the edit would change the rules (edit the file by hand)", ErrInvalid)
 	}

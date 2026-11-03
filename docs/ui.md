@@ -32,7 +32,7 @@ Left side:
   marked as stale; a target whose browser is not installed is marked too. A group is one node named after the
   group, with one edge to its target; the edges of the group node count the decisions of all rules inside it.
   A rule or group that asks (see [rules.md](rules.md#ask)) has a dashed outline, and its edges are dashed: one to
-  each choice and one to the `default` target that Esc uses. The tooltip of such an edge ends with `(asks)`.
+  each choice and one to the `default` target that Esc uses. The tooltip of such an edge ends with `(asks)`. A rule that follows the default (`open: { default: true }`) has a dotted edge to the default target, tooltip `(follows default)`.
 - The last decisions (up to 20, newest first): time, opener, rule, target, URL. A rule inside a group shows as
   `Group / rule`, or as the group name when it has no name. An `ERROR` line is highlighted. When the log line has
   a sixth column, the target cell shows it in brackets, for example `Dia/Work (asked -> Dia/Work)`.
@@ -91,6 +91,9 @@ The rules editor on the right stays where it is.
   (the page's hash must still match the file, otherwise the answer is 409; the old file is kept as `rules.yaml.bak`;
   mode 0600); comments and rules are kept as they are. It is disabled when there is no valid rules file, and a
   change is refused while the rules editor has unsaved changes. See "Redirect links" in `rules.md`.
+- **Links that match no rule**: the checkbox **Ask where to open links from apps that match no rule**
+  (`ask_unmatched`, on by default). It is written like the wrapped-links settings (same safe write, hash check,
+  `.bak`). See "Unmatched links" in `rules.md`.
 - **Files**: the paths of the rules file, `decisions.log` and the config file.
 
 The confirmations use one `<dialog>` of the page, not `window.confirm`.
@@ -108,9 +111,10 @@ works on the rules file that `portero rules path` resolves and on `decisions.log
 | `POST /api/apply` | `{"yaml", "base_hash"}` | `hash`, `warnings`, `backup`; 422 on a parse error or a symlinked rules path, 409 when the file on disk changed |
 | `GET /api/decisions` | - | without `offset`: the tail of the log; with `offset=N`: the decisions that follow byte offset N. `limit` (default 200, at most 1000). Returns `decisions`, `offset`, `truncated`, `skipped` |
 | `GET /api/graph` | - | the diagram: openers, rules, targets, edges with counts |
-| `GET /api/settings` | - | `default` (`supported`, `app`, `bundle_id`, `schemes` with `scheme` / `handler` / `portero`, `pending`, `stale` (pending for over 3 minutes), `last`), `sync` (`supported`, `mode`, `pinned`, `rules_path`, `local_path`, `icloud_dir`, `icloud_available`, `icloud_exists` (also true when the file is offloaded), `icloud_offloaded` (the synced file is not downloaded to this Mac)), `unwrap` (`enabled`, `skip`, `editable`, `hash`, `note`), `log_file`, `config_file` |
+| `GET /api/settings` | - | `default` (`supported`, `app`, `bundle_id`, `schemes` with `scheme` / `handler` / `portero`, `pending`, `stale` (pending for over 3 minutes), `last`), `sync` (`supported`, `mode`, `pinned`, `rules_path`, `local_path`, `icloud_dir`, `icloud_available`, `icloud_exists` (also true when the file is offloaded), `icloud_offloaded` (the synced file is not downloaded to this Mac)), `unwrap` (`enabled`, `skip`, `editable`, `hash`, `note`), `ask_unmatched` (`enabled`, `editable`, `hash`, `note`), `log_file`, `config_file` |
 | `POST /api/settings/default` | `{}` | `schemes` with `scheme`, `handler`, `note` (`already set` / `set now`), or `error.message` when a scheme is still handled by another app. 202 `{"pending": true}` when macOS has not been answered within 60 seconds (the result then appears as `default.last`), 409 while a request is pending (less than 3 minutes old), 412 when not run from `Portero.app`, 501 where unsupported |
 | `POST /api/settings/unwrap` | `{"unwrap": bool, "skip": [bundle ids], "base_hash"}` | `enabled`, `skip`, `hash`, `backup`. 400 for a missing `unwrap` or an unknown field, 409 with `current_hash` when `base_hash` is not the file's hash, 422 for an invalid bundle id, a missing or symlinked rules file, 503 while the file is offloaded |
+| `POST /api/settings/ask-unmatched` | `{"enabled": bool, "base_hash"}` | `enabled`, `hash`, `backup`; the same errors as `/api/settings/unwrap` |
 | `POST /api/settings/sync` | `{"mode": "icloud" \| "off"}` | `mode` (`icloud` / `local`), `rules_path`, `changed`. 400 for another mode or an unknown field, 409 when `PORTERO_RULES` is set, 422 without iCloud Drive or when the move fails, 501 where unsupported. Same mode: 200 with `changed: false` |
 
 ## Write protection

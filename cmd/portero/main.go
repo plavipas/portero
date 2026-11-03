@@ -193,7 +193,26 @@ func open(args []string) error {
 	if len(d.Ask) > 0 {
 		printAskLines(os.Stdout, d, req.URL)
 	}
+	var unmatched []rules.Target
 	if a.dry {
+		unmatched = printUnmatchedLines(os.Stdout, r, d, req.URL)
+	}
+	if a.dry {
+		if len(unmatched) >= 2 {
+			for i, t := range unmatched {
+				plan, err := launch.DryRun(u, t)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("would run (%d): %s\n", i+1, plan)
+			}
+			plan, err := launch.DryRun(u, d.Target)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("would run (Esc): %s\n", plan)
+			return nil
+		}
 		if len(d.Ask) > 0 {
 			for i, t := range d.Ask {
 				plan, err := launch.DryRun(u, t)
@@ -234,6 +253,36 @@ func printAskLines(w io.Writer, d rules.Decision, u *url.URL) {
 	} else {
 		fmt.Fprintln(w, "remember: not offered")
 	}
+}
+
+// printUnmatchedLines says what the handler app would do with a link no rule matches: ask (with the choices,
+// the default first), or why not. It prints nothing for a link a rule decides, for file:// links and returns the
+// choices only when the panel would show (at least two).
+func printUnmatchedLines(w io.Writer, r *rules.Rules, d rules.Decision, u *url.URL) []rules.Target {
+	if d.Rule != "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil
+	}
+	if !r.AsksUnmatched() {
+		fmt.Fprintln(w, "ask_unmatched: off")
+		return nil
+	}
+	choices := rules.UnmatchedChoices(r, unmatchedInstalled)
+	if len(choices) < 2 {
+		fmt.Fprintln(w, "unmatched: nothing to ask, default")
+		return nil
+	}
+	names := make([]string, len(choices))
+	names[0] = "default"
+	for i := 1; i < len(choices); i++ {
+		names[i] = choices[i].String()
+	}
+	fmt.Fprintf(w, "unmatched: the app would ask: [%s]\n", strings.Join(names, ", "))
+	if host, ok := rules.RememberHost(u); ok {
+		fmt.Fprintf(w, "remember: host %s\n", host)
+	} else {
+		fmt.Fprintln(w, "remember: not offered")
+	}
+	return choices
 }
 
 // openCLIAsked opens a link whose rule asks: the CLI cannot show the panel, so the default target is used.
@@ -335,6 +384,7 @@ func rulesCmd(args []string) error {
 		if len(d.Ask) > 0 {
 			printAskLines(os.Stdout, d, req.URL)
 		}
+		printUnmatchedLines(os.Stdout, r, d, req.URL)
 	default:
 		return fmt.Errorf("unknown rules command %q", sub)
 	}

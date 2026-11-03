@@ -28,9 +28,11 @@ type Decision struct {
 	Target Target
 	// Ask lists the targets the handler app offers in a panel; Target is then the default target, which the
 	// panel's Esc/close and every caller that cannot ask use. Empty for an ordinary decision.
-	Ask   []Target
-	Rule  string // label of the matched rule: "name", "#n" or "Group / name"; "" when the default applied
-	Group string // name of the matched group; "" for a plain rule and for the default
+	Ask []Target
+	// FollowsDefault: the matched element is `open: {default: true}`; Target is the file's default.
+	FollowsDefault bool
+	Rule           string // label of the matched rule: "name", "#n" or "Group / name"; "" when the default applied
+	Group          string // name of the matched group; "" for a plain rule and for the default
 }
 
 // String renders "Browser/Profile  (rule: name)".
@@ -45,6 +47,9 @@ func (d Decision) String() string {
 			names[i] = t.String()
 		}
 		return fmt.Sprintf("ask: [%s]  (rule: %s)", strings.Join(names, ", "), rule)
+	}
+	if d.FollowsDefault {
+		return fmt.Sprintf("%s (follows default)  (rule: %s)", d.Target, rule)
 	}
 	return fmt.Sprintf("%s  (rule: %s)", d.Target, rule)
 }
@@ -73,7 +78,40 @@ func (r *Rules) decision(o Open, label, group string) Decision {
 	if o.Asks() {
 		return Decision{Target: r.Default, Ask: o.Ask, Rule: label, Group: group}
 	}
+	if o.Default {
+		return Decision{Target: r.Default, FollowsDefault: true, Rule: label, Group: group}
+	}
 	return Decision{Target: o.Target, Rule: label, Group: group}
+}
+
+// UnmatchedChoices lists what the handler app offers for a link no rule matches: the default first, then every
+// distinct target the file uses (plain rules, groups and ask lists, in file order) except the default,
+// elements that follow the default and targets for which installed reports false. At most MaxAsk entries; the
+// panel needs at least two. installed may be nil (everything counts as installed).
+func UnmatchedChoices(r *Rules, installed func(Target) bool) []Target {
+	out := []Target{r.Default}
+	seen := map[Target]bool{r.Default: true}
+	add := func(t Target) {
+		if seen[t] || len(out) >= MaxAsk {
+			return
+		}
+		seen[t] = true
+		if installed == nil || installed(t) {
+			out = append(out, t)
+		}
+	}
+	for _, rule := range r.Rules {
+		switch {
+		case rule.Open.Default:
+		case rule.Open.Asks():
+			for _, t := range rule.Open.Ask {
+				add(t)
+			}
+		default:
+			add(rule.Open.Target)
+		}
+	}
+	return out
 }
 
 func (m Match) matches(req Request) bool {

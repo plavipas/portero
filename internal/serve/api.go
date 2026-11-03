@@ -31,6 +31,7 @@ func (s *Server) routesAPI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/settings/default", s.handleSetDefault)
 	mux.HandleFunc("POST /api/settings/sync", s.handleSettingsSync)
 	mux.HandleFunc("POST /api/settings/unwrap", s.handleSettingsUnwrap)
+	mux.HandleFunc("POST /api/settings/ask-unmatched", s.handleSettingsAskUnmatched)
 }
 
 // Summary is the rules file as the UI lists it.

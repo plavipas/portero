@@ -89,10 +89,10 @@ function drawGraph(g) {
     const x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2, x2 = b.x, y2 = b.y + NODE_H / 2, mx = (x1 + x2) / 2;
     const p = svg("path", {
       d: "M" + x1 + " " + y1 + " C" + mx + " " + y1 + " " + mx + " " + y2 + " " + x2 + " " + y2,
-      class: "edge" + (e.count === 0 ? " static" : "") + (e.ask ? " ask" : ""),
+      class: "edge" + (e.count === 0 ? " static" : "") + (e.ask ? " ask" : "") + (e.follows ? " follows" : ""),
       "stroke-width": e.count === 0 ? 1 : Math.min(10, 1.5 + Math.log2(e.count + 1) * 1.6),
     });
-    p.append(svg("title", {}, e.count + " link(s)" + (e.ask ? " (asks)" : "")));
+    p.append(svg("title", {}, e.count + " link(s)" + (e.ask ? " (asks)" : "") + (e.follows ? " (follows default)" : "")));
     p.dataset.from = e.from;
     p.dataset.to = e.to;
     edges.append(p);
@@ -558,6 +558,7 @@ function drawSettings(d) {
   else setHint("sync-hint", "", false);
 
   drawUnwrap(d.unwrap || {});
+  drawAskUnmatched(d.ask_unmatched || {});
 
   $("file-rules").textContent = sy.rules_path || "";
   $("file-log").textContent = d.log_file || "";
@@ -611,6 +612,34 @@ $("unwrap-add-btn").addEventListener("click", () => {
   $("unwrap-add").value = "";
   saveUnwrap($("unwrap-switch").checked, [...((SET.unwrap || {}).skip || []), v]);
 });
+
+function drawAskUnmatched(u) {
+  SET.askUnmatched = u;
+  const sw = $("ask-unmatched-switch");
+  sw.checked = u.enabled !== false;
+  sw.disabled = !u.editable;
+  if (!u.editable) setHint("ask-unmatched-hint", u.note || "", false);
+}
+
+async function saveAskUnmatched(enabled) {
+  if (editor.value !== S.text) {
+    setHint("ask-unmatched-hint", "Save or discard the changes in the rules editor first.", true);
+    drawAskUnmatched(SET.askUnmatched || {});
+    return;
+  }
+  setHint("ask-unmatched-hint", "Saving...", false);
+  const { status, data } = await api("/api/settings/ask-unmatched", { enabled, base_hash: (SET.askUnmatched || {}).hash || "" });
+  if (status === 200) {
+    await loadState();
+    await loadSettings();
+    setHint("ask-unmatched-hint", "Saved.", false);
+  } else {
+    await loadSettings();
+    setHint("ask-unmatched-hint", data && data.error ? data.error.message : "Request failed (" + status + ").", true);
+  }
+}
+
+$("ask-unmatched-switch").addEventListener("change", () => saveAskUnmatched($("ask-unmatched-switch").checked));
 
 async function loadSettings() {
   const { status, data } = await api("/api/settings");

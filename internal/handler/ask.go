@@ -11,6 +11,8 @@ type AskRequest struct {
 	Options []string
 	// CanRemember enables the "Remember" checkbox.
 	CanRemember bool
+	// RememberLabel is the text of the checkbox, shown as plain text; empty keeps the default text.
+	RememberLabel string
 }
 
 // AskResult is the user's answer.

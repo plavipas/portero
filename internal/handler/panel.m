@@ -25,6 +25,7 @@ static const NSTimeInterval kKeyGuard = 0.4;
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, copy) NSArray<NSString *> *options;
 @property (nonatomic) BOOL canRemember;
+@property (nonatomic, copy) NSString *rememberLabel;
 - (void)present:(PorteroAsk *)a;
 @end
 
@@ -137,7 +138,7 @@ static void porteroFinish(PorteroPanel *panel, int choice) {
         [content addSubview:b];
         y -= gap;
     }
-    NSButton *rem = [NSButton checkboxWithTitle:@"Remember this choice for this meeting" target:nil action:nil];
+    NSButton *rem = [NSButton checkboxWithTitle:(a.rememberLabel.length ? a.rememberLabel : @"Remember this choice for this meeting") target:nil action:nil];
     rem.state = NSControlStateValueOff;
     rem.enabled = a.canRemember;
     rem.frame = NSMakeRect(pad, y - 6 - 20, kPanelWidth - 2 * pad, 20);
@@ -168,9 +169,10 @@ static void porteroFinish(PorteroPanel *panel, int choice) {
 @end
 
 // Show a panel for link `askID` (called from Go on any thread). options is newline-separated.
-void porteroAsk(int askID, const char *title, const char *options, int canRemember) {
+void porteroAsk(int askID, const char *title, const char *options, int canRemember, const char *rememberLabel) {
     NSString *t = [NSString stringWithUTF8String:title] ?: @"";
     NSString *o = [NSString stringWithUTF8String:options] ?: @"";
+    NSString *rl = (rememberLabel ? [NSString stringWithUTF8String:rememberLabel] : nil) ?: @"";
     NSArray<NSString *> *opts = [o componentsSeparatedByString:@"\n"];
     porteroRunOnMain(^{
         if (shuttingDown) {
@@ -188,6 +190,7 @@ void porteroAsk(int askID, const char *title, const char *options, int canRememb
         a.title = t;
         a.options = opts;
         a.canRemember = canRemember != 0;
+        a.rememberLabel = rl;
         if (openPanels.count >= kMaxPanels) {
             if (queued.count >= kMaxQueued) {
                 porteroAskDone(askID, -1, 0);
