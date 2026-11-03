@@ -33,8 +33,10 @@ type BrowserInfo struct {
 type Options struct {
 	// Offloaded reports a rules file iCloud removed from this Mac (reading it would block until it is
 	// downloaded); Download requests that download. Both nil: no iCloud handling (tests, other systems).
-	Offloaded  func(path string) bool
-	Download   func(path string) error
+	Offloaded func(path string) bool
+	Download  func(path string) error
+	// LockDir is the directory of rules.lock, shared with the link handler's "Remember"; empty: no lock (tests).
+	LockDir    string
 	RulesFile  string
 	RulesPlace string // "local" or "icloud"
 	// Nonce is the one-time secret in the link that opens the UI (see Nonce()); empty means a fresh random one.
