@@ -219,6 +219,8 @@ With "Remember" ticked, the chosen button also adds a plain rule for this meetin
   unchanged, the file must not have changed since it was read, the previous file is kept as `rules.yaml.bak`,
   and the file is replaced atomically with mode 0600.
 - A failed write never blocks the link: it opens first, the failure is logged.
+- A remembered rule pins only the host and the meeting path. An `opener` or `cwd` condition of the asking rule is
+  not copied, so after "Remember" that meeting opens in the chosen target from every app.
 - A remembered rule names a browser of this Mac. On another Mac that shares the file through iCloud Drive,
   `portero rules check` warns when that browser is missing.
 - A tool that installs `rules.yaml` from a template sees the file differ from the template once a rule has been

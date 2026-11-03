@@ -158,7 +158,9 @@ func routeAsked(d rules.Decision, req rules.Request, open func(*url.URL, rules.T
 		res := ask(handler.AskRequest{ID: req.Opener + "\x00" + u.String(), Title: askTitle(u), Options: opts, CanRemember: canRemember && remember != nil})
 		switch {
 		case res.Joined:
-			return nil // an identical link is waiting in a panel; that one opens it
+			// An identical link is waiting in a panel and that one opens it. If its open later fails, the error is
+			// logged for the first link only; this duplicate adds no second tab by design.
+			return nil
 		case res.Choice >= 0 && res.Choice < len(d.Ask):
 			target = d.Ask[res.Choice]
 			note = "asked -> " + target.String()

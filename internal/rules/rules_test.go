@@ -404,6 +404,9 @@ func TestRememberKey(t *testing.T) {
 		{"https://example.zoom.us/my/room", "example.zoom.us", "/my/room", true},
 		{"https://example.zoom.us/profile/", "example.zoom.us", "/profile", true},
 		{"https://example.com/team/room/", "example.com", "/team/room", true},
+		{"https://example.com/a%2Fb", "example.com", "/a/b", true},                     // decoded path, the same one the matcher sees
+		{"https://xn--bcher-kva.example/room", "xn--bcher-kva.example", "/room", true}, // punycode host kept as is
+		{"https://zoom.us./j/123", "zoom.us.", "/j/123", true},                         // trailing dot kept: the rule matches exactly that host
 		{"https://example.com/", "", "", false},
 		{"https://example.com", "", "", false},
 		{"https://example.com/a*b", "", "", false},
