@@ -22,6 +22,8 @@ func TestHostForms(t *testing.T) {
 		{"a\u009bb.xn--!!.com", "xn--ab-mca.xn--!!.com"},
 		{"aİb.com", "aib.com"},
 		{"XN--BCHER-KVA.example", "xn--bcher-kva.example = bücher.example"},
+		{"example.com.", "example.com."},
+		{"xn--bcher-kva.example.", "xn--bcher-kva.example. = bücher.example."},
 		{"a\u202eb.com", "xn--ab-g4t.com"},
 		{"xn--!!.example", "xn--!!.example"},
 		{"xn--9999999999999999.example", "xn--9999999999999999.example"},
