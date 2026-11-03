@@ -31,8 +31,11 @@ Left side:
   animated. Hovering a node highlights its edges. A rule that the log mentions but the file no longer has is
   marked as stale; a target whose browser is not installed is marked too. A group is one node named after the
   group, with one edge to its target; the edges of the group node count the decisions of all rules inside it.
+  A rule or group that asks (see [rules.md](rules.md#ask)) has a dashed outline, and its edges are dashed: one to
+  each choice and one to the `default` target that Esc uses. The tooltip of such an edge ends with `(asks)`.
 - The last decisions (up to 20, newest first): time, opener, rule, target, URL. A rule inside a group shows as
-  `Group / rule`, or as the group name when it has no name. An `ERROR` line is highlighted.
+  `Group / rule`, or as the group name when it has no name. An `ERROR` line is highlighted. When the log line has
+  a sixth column, the target cell shows it in brackets, for example `Dia/Work (asked -> Dia/Work)`.
   `show` animates that decision's path in the diagram.
 - The browsers Portero sees on this Mac, with their profiles.
 - A theme toggle (dark / light) in the header; the choice is kept in the browser's local storage. Without a stored
@@ -55,7 +58,8 @@ Right side, the editor of the rules file:
   the editor, not against the saved file. The result shows the rule, the target and, on macOS, the command that
   would run (as `--dry-run` prints it); the path is animated in the diagram, through the group node when a rule
   inside a group matched. Without a directory the `cwd` rules
-  are skipped and the result says so.
+  are skipped and the result says so. For an asking rule the result shows `Asks:` with the choices and
+  `Esc, no panel or the CLI opens in:` with the cancel target (`cancel_target` in the API) instead of one target.
 - **Apply** is enabled only when the text differs from the file, the last validation passed and the file on disk
   is unchanged. The server validates the text again, then writes exactly the bytes from the editor through a
   temporary file and a rename, mode 0600. The previous file is kept next to it as `rules.yaml.bak` (mode 0600).
@@ -94,7 +98,7 @@ works on the rules file that `portero rules path` resolves and on `decisions.log
 |---|---|---|
 | `GET /api/state` | - | rules path and place (`local` / `icloud`), file text and SHA-256, parse error with line, warnings, rules summary, browsers, the last 200 decisions, log offset, graph. In the rules summary a group carries `"group": true` and its rules in `rules` (name, match keys and the group's target) |
 | `POST /api/validate` | `{"yaml", "base_hash"}` | `ok`, `error` (message, line), `warnings`, `summary`, `diff`, `current_hash`, `stale` |
-| `POST /api/match` | `{"yaml", "url", "opener", "cwd"}` | `rule`, `target`, `cwd_used` / `cwd_note`, `path`, `plan` (macOS); an empty `yaml` matches against the saved file |
+| `POST /api/match` | `{"yaml", "url", "opener", "cwd"}` | `rule`, `target` (for an asking rule `ask`, the list of choices, and `cancel_target`), `cwd_used` / `cwd_note`, `path`, `plan` (macOS); an empty `yaml` matches against the saved file |
 | `POST /api/apply` | `{"yaml", "base_hash"}` | `hash`, `warnings`, `backup`; 422 on a parse error or a symlinked rules path, 409 when the file on disk changed |
 | `GET /api/decisions` | - | without `offset`: the tail of the log; with `offset=N`: the decisions that follow byte offset N. `limit` (default 200, at most 1000). Returns `decisions`, `offset`, `truncated`, `skipped` |
 | `GET /api/graph` | - | the diagram: openers, rules, targets, edges with counts |

@@ -147,7 +147,7 @@ func TestEnsureDefaultPollsStaleReads(t *testing.T) {
 
 func TestDecideFileURLsUseDefault(t *testing.T) {
 	r := &rules.Rules{Version: 1, Default: rules.Target{Browser: "Dia", Profile: "Personal"},
-		Rules: []rules.Rule{{Name: "work", Match: rules.Match{Path: rules.Strings{"/Users"}}, Open: rules.Target{Browser: "Zen"}}}}
+		Rules: []rules.Rule{{Name: "work", Match: rules.Match{Path: rules.Strings{"/Users"}}, Open: rules.Open{Target: rules.Target{Browser: "Zen"}}}}}
 	u, err := parseRoutable("file:///Users/someone/page.html")
 	if err != nil {
 		t.Fatal(err)

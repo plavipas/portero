@@ -32,6 +32,34 @@ func (t Target) String() string {
 	return s
 }
 
+// Open is the `open` element of a rule or group: one target, or `ask` with 1 to MaxAsk targets that the handler
+// app offers in a panel (the CLI never asks and uses the default target).
+type Open struct {
+	Target `yaml:",inline"`
+	Ask    []Target `yaml:"ask,omitempty"`
+}
+
+// MaxAsk is the most targets one ask list can hold (keys 1 to 9 in the panel).
+const MaxAsk = 9
+
+// IsZero reports whether nothing is set.
+func (o Open) IsZero() bool { return o.Target == (Target{}) && len(o.Ask) == 0 }
+
+// String is the target, or "ask: A | B" for a list.
+func (o Open) String() string {
+	if !o.Asks() {
+		return o.Target.String()
+	}
+	names := make([]string, len(o.Ask))
+	for i, t := range o.Ask {
+		names[i] = t.String()
+	}
+	return "ask: " + strings.Join(names, " | ")
+}
+
+// Asks reports whether the element offers a choice instead of one target.
+func (o Open) Asks() bool { return len(o.Ask) > 0 }
+
 // Strings accepts one string or a list in YAML: `host: a.com` or `host: [a.com, b.com]`.
 type Strings []string
 
@@ -103,7 +131,7 @@ func (r *Rules) UsesCwd() bool {
 type Rule struct {
 	Name  string `yaml:"name,omitempty"`
 	Match Match  `yaml:"match"`
-	Open  Target `yaml:"open"`
+	Open  Open   `yaml:"open"`
 	// Rules makes the element a group; the children have a match and no open.
 	Rules []Rule `yaml:"rules,omitempty"`
 
@@ -194,7 +222,7 @@ func (r *Rules) Validate() error {
 		if err := checkName(where, rule.Name); err != nil {
 			return err
 		}
-		if err := checkControl(where, rule.Open); err != nil {
+		if err := checkOpen(where, rule.Open); err != nil {
 			return err
 		}
 		if rule.Match.empty() {
@@ -203,11 +231,41 @@ func (r *Rules) Validate() error {
 		if err := checkCwd(where, rule.Match.Cwd); err != nil {
 			return err
 		}
-		if rule.Open.Browser == "" {
-			return fmt.Errorf("rules: %s has an empty browser", where)
-		}
 	}
 	return nil
+}
+
+// checkOpen validates the target of a plain rule or group: either a browser or an ask list, never both.
+func checkOpen(where string, o Open) error {
+	if o.Ask != nil && len(o.Ask) == 0 { // `ask: []`
+		return fmt.Errorf("rules: %s: ask is empty; list 1 to %d targets", where, MaxAsk)
+	}
+	if o.Asks() {
+		if o.Target != (Target{}) {
+			return fmt.Errorf("rules: %s: open has both ask and browser; use one of them", where)
+		}
+		if len(o.Ask) > MaxAsk {
+			return fmt.Errorf("rules: %s: ask has %d targets, at most %d", where, len(o.Ask), MaxAsk)
+		}
+		seen := map[Target]bool{}
+		for i, t := range o.Ask {
+			if t.Browser == "" {
+				return fmt.Errorf("rules: %s: ask target #%d has an empty browser", where, i+1)
+			}
+			if err := checkControl(where+", ask target #"+fmt.Sprint(i+1), t); err != nil {
+				return err
+			}
+			if seen[t] {
+				return fmt.Errorf("rules: %s: ask lists %s twice", where, t)
+			}
+			seen[t] = true
+		}
+		return nil
+	}
+	if o.Browser == "" {
+		return fmt.Errorf("rules: %s has an empty browser", where)
+	}
+	return checkControl(where, o.Target)
 }
 
 func validateGroup(i int, g Rule) error {
@@ -218,10 +276,7 @@ func validateGroup(i int, g Rule) error {
 	if err := checkName(gw, g.Name); err != nil {
 		return err
 	}
-	if g.Open.Browser == "" {
-		return fmt.Errorf("rules: %s has an empty browser", gw)
-	}
-	if err := checkControl(gw, g.Open); err != nil {
+	if err := checkOpen(gw, g.Open); err != nil {
 		return err
 	}
 	if !g.Match.empty() {
@@ -238,7 +293,7 @@ func validateGroup(i int, g Rule) error {
 		if c.IsGroup() {
 			return fmt.Errorf("rules: %s: groups cannot contain groups", where)
 		}
-		if c.Open != (Target{}) {
+		if !c.Open.IsZero() {
 			return fmt.Errorf("rules: %s: open is set on the group only", where)
 		}
 		if c.Match.empty() {

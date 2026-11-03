@@ -81,6 +81,8 @@ type Node struct {
 	Kind  string `json:"kind"` // opener, rule, default, file, error, target
 	// Stale: a rule the log mentions that the file no longer has.
 	Stale bool `json:"stale,omitempty"`
+	// Ask: the rule or group offers a choice of targets in a panel.
+	Ask bool `json:"ask,omitempty"`
 	// Targets only.
 	Browser   string `json:"browser,omitempty"`
 	Profile   string `json:"profile,omitempty"`
@@ -93,6 +95,8 @@ type Edge struct {
 	From  string `json:"from"`
 	To    string `json:"to"`
 	Count int    `json:"count"`
+	// Ask: the edge is one of the choices of an asking rule (or its Esc fallback, the default target).
+	Ask bool `json:"ask,omitempty"`
 }
 
 // Graph is the diagram: openers -> rules -> targets.
@@ -146,7 +150,25 @@ func BuildGraph(r *rules.Rules, decisions []Decision) Graph {
 		for i, rule := range r.Rules {
 			name := rules.Label(i, rule)
 			addRule(ruleID(name), name, "rule", false)
-			t := rule.Open
+			if rule.Open.Asks() {
+				for i := range g.Rules {
+					if g.Rules[i].ID == ruleID(name) {
+						g.Rules[i].Ask = true
+					}
+				}
+				for _, t := range rule.Open.Ask {
+					t := t
+					addTarget(t.String(), &t)
+					addEdge(ruleID(name), targetID(t.String()), 0)
+					edges[[2]string{ruleID(name), targetID(t.String())}].Ask = true
+				}
+				d := r.Default
+				addTarget(d.String(), &d)
+				addEdge(ruleID(name), targetID(d.String()), 0)
+				edges[[2]string{ruleID(name), targetID(d.String())}].Ask = true
+				continue
+			}
+			t := rule.Open.Target
 			addTarget(t.String(), &t)
 			addEdge(ruleID(name), targetID(t.String()), 0)
 		}

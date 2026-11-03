@@ -24,3 +24,6 @@ func DefaultApp(scheme string) string { return "" }
 
 // BundleVersion is not supported here.
 func BundleVersion(appPath string) (short, build string) { return "", "" }
+
+// Ask shows nothing here and cancels at once, so the default target is used.
+func Ask(req AskRequest) AskResult { return Cancelled }

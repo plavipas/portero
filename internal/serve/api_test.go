@@ -169,6 +169,27 @@ rules:
 	}
 }
 
+func TestMatchAsk(t *testing.T) {
+	r := newRig(t, `version: 1
+default: {browser: Safari}
+rules:
+  - name: pick
+    match: {host: example.com}
+    open: {ask: [{browser: Safari, profile: Work}, {browser: Safari, profile: Personal}]}
+`)
+	code, m := doMatch(r, map[string]any{"url": "https://example.com/x"})
+	if code != 200 || m["rule"] != "pick" {
+		t.Fatalf("%d %v", code, m)
+	}
+	ask, _ := m["ask"].([]any)
+	if len(ask) != 2 || ask[0] != "Safari/Work" || ask[1] != "Safari/Personal" || m["cancel_target"] != "Safari" {
+		t.Errorf("ask %v cancel %v", m["ask"], m["cancel_target"])
+	}
+	if _, m := doMatch(r, map[string]any{"url": "https://other.example.org/"}); m["ask"] != nil {
+		t.Errorf("plain default has ask: %v", m)
+	}
+}
+
 func TestMatchErrors(t *testing.T) {
 	r := newRig(t, goodRules)
 	if code, _ := doMatch(r, map[string]any{"url": "not a url"}); code != 400 {
