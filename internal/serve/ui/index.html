@@ -62,6 +62,18 @@
       <label class="switch"><input type="checkbox" id="sync-switch"> Sync rules through iCloud Drive</label>
       <p class="hint" id="sync-hint" aria-live="polite"></p>
     </div>
+    <h2>Wrapped links</h2>
+    <div class="block" id="set-unwrap">
+      <label class="switch"><input type="checkbox" id="unwrap-switch"> Route wrapped links by the real target</label>
+      <p class="hint">Links wrapped by Slack sign-in, Google, Outlook Safe Links or slack-redirect are matched by the address inside.</p>
+      <dl class="kv"><dt>Not unwrapped for</dt><dd id="unwrap-skip-none">no app</dd></dl>
+      <ul class="rows" id="unwrap-skip"></ul>
+      <div class="toolbar">
+        <input type="text" id="unwrap-add" class="mono" placeholder="com.example.mail" aria-label="Bundle id of an app to skip" autocomplete="off" spellcheck="false">
+        <button type="button" id="unwrap-add-btn">Skip this app</button>
+      </div>
+      <p class="hint" id="unwrap-hint" aria-live="polite"></p>
+    </div>
     <h2>Files</h2>
     <div class="block">
       <dl class="kv">

@@ -89,3 +89,53 @@ func FuzzUnwrap(f *testing.F) {
 		}
 	})
 }
+
+func TestUnwrapSettingValidation(t *testing.T) {
+	base := "version: 1\ndefault: {browser: Safari}\n"
+	bad := []string{
+		"unwrap_skip_openers: [mail]\n",
+		"unwrap_skip_openers: ['com.example.mail', 'COM.EXAMPLE.MAIL']\n",
+		"unwrap_skip_openers: ['com.example.mail ']\n",
+		"unwrap_skip_openers: ['']\n",
+		"unwrap: maybe\n",
+	}
+	for _, b := range bad {
+		if _, err := Parse([]byte(base + b)); err == nil {
+			t.Errorf("accepted %q", b)
+		}
+	}
+	r, err := Parse([]byte(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if on, _ := r.UnwrapFor("com.example.mail"); !on {
+		t.Error("a file without the keys must unwrap")
+	}
+	r, err = Parse([]byte(base + "unwrap_skip_openers: [com.example.mail]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		opener string
+		on     bool
+		why    string
+	}{
+		{"com.example.mail", false, "unwrap: skipped for com.example.mail"},
+		{"COM.example.Mail", false, "unwrap: skipped for COM.example.Mail"},
+		{"com.example.chat", true, ""},
+		{"", true, ""},
+	}
+	for _, c := range cases {
+		if on, why := r.UnwrapFor(c.opener); on != c.on || why != c.why {
+			t.Errorf("UnwrapFor(%q) = %v, %q", c.opener, on, why)
+		}
+	}
+	r, _ = Parse([]byte(base + "unwrap: false\n"))
+	if on, why := r.UnwrapFor("x.y"); on || why != "unwrap: off" {
+		t.Errorf("off: %v %q", on, why)
+	}
+	var nilRules *Rules
+	if on, _ := nilRules.UnwrapFor("x.y"); !on {
+		t.Error("nil rules must unwrap")
+	}
+}

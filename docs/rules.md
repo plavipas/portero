@@ -38,7 +38,9 @@ rules inside them are counted one by one:
 
 ## Format
 
-The file has `version: 1`, a `default` target and an ordered `rules` list. An element of the list is either a
+The file has `version: 1`, a `default` target, an ordered `rules` list and two optional top-level keys for
+redirect links (see "Redirect links"): `unwrap: true | false` (default `true`) and
+`unwrap_skip_openers: [bundle ids]`. An element of the list is either a
 plain rule or a group.
 
 ```yaml
@@ -334,6 +336,20 @@ exactly like the same link clicked directly. The opener and the working director
 and the browser still receives the original wrapper URL (`would run:` shows it). `portero rules match` and
 `portero open --dry-run` print `unwrapped: <url>` before the decision; the ask panel title and "Remember" use the
 inner URL. `file://` links, an offloaded or broken rules file are not unwrapped.
+
+Unwrapping is on unless the file says otherwise:
+
+```yaml
+unwrap: false                      # optional, default true: never unwrap
+unwrap_skip_openers:               # optional: links opened by these apps are not unwrapped
+  - com.example.mail
+```
+
+`rules check` rejects an `unwrap_skip_openers` entry that is not a bundle id (`com.example.mail`, letters, digits,
+`-`, `_` and at least one dot) and a duplicate (ignoring case). A link that is not unwrapped because of these keys
+routes by the wrapper URL, as before. `portero rules match` and `portero open --dry-run` print `unwrap: off` or
+`unwrap: skipped for <opener>` instead of the `unwrapped:` line when a wrapper was recognised but the setting
+skipped it. The same two keys can be changed in the web UI, Settings, **Wrapped links**.
 
 ## Local files
 

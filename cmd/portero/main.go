@@ -182,9 +182,11 @@ func open(args []string) error {
 		fmt.Fprintf(os.Stderr, "portero: cwd: %s; cwd rules skipped\n", note)
 	}
 	u := a.url
-	req := routeReq(u, a.opener, cwd)
+	req, why := routeReq(r, u, a.opener, cwd)
 	if req.URL != u {
 		fmt.Println("unwrapped:", req.URL)
+	} else if why != "" {
+		fmt.Println(why)
 	}
 	d := r.Route(req)
 	fmt.Println(d)
@@ -322,9 +324,11 @@ func rulesCmd(args []string) error {
 		if line := cwdLine(r, a, cwd, note); line != "" {
 			fmt.Println(line)
 		}
-		req := routeReq(a.url, a.opener, cwd)
+		req, why := routeReq(r, a.url, a.opener, cwd)
 		if req.URL != a.url {
 			fmt.Println("unwrapped:", req.URL)
+		} else if why != "" {
+			fmt.Println(why)
 		}
 		d := r.Route(req)
 		fmt.Println(d)

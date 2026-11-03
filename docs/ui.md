@@ -67,7 +67,7 @@ Right side, the editor of the rules file:
 
 ## Settings
 
-The **Settings** button in the header replaces the left column with three blocks (the button then reads **Back**).
+The **Settings** button in the header replaces the left column with four blocks (the button then reads **Back**).
 The rules editor on the right stays where it is.
 
 - **Default browser** (macOS only): one row per scheme (`http`, `https`) with a check mark and `Portero`, or the
@@ -85,6 +85,12 @@ The rules editor on the right stays where it is.
   (`local_path`), replacing the file there; the replaced local file is kept as `rules.yaml.icloud-backup`. Unsaved editor changes are discarded
   (the confirmation says so when there are any). The switch is disabled while `PORTERO_RULES` is set or when
   iCloud Drive is missing. After a switch the editor and the diagram load the new file.
+- **Wrapped links**: the checkbox **Route wrapped links by the real target** (`unwrap`, on by default) and the list
+  of apps whose links are never unwrapped (`unwrap_skip_openers`, bundle ids). **Skip this app** adds a bundle id,
+  **remove** deletes one. Every change is written into the rules file through the same safe write as the editor
+  (the page's hash must still match the file, otherwise the answer is 409; the old file is kept as `rules.yaml.bak`;
+  mode 0600); comments and rules are kept as they are. It is disabled when there is no valid rules file, and a
+  change is refused while the rules editor has unsaved changes. See "Redirect links" in `rules.md`.
 - **Files**: the paths of the rules file, `decisions.log` and the config file.
 
 The confirmations use one `<dialog>` of the page, not `window.confirm`.
@@ -98,12 +104,13 @@ works on the rules file that `portero rules path` resolves and on `decisions.log
 |---|---|---|
 | `GET /api/state` | - | rules path and place (`local` / `icloud`), file text and SHA-256, parse error with line, warnings, rules summary, browsers, the last 200 decisions, log offset, graph. In the rules summary a group carries `"group": true` and its rules in `rules` (name, match keys and the group's target) |
 | `POST /api/validate` | `{"yaml", "base_hash"}` | `ok`, `error` (message, line), `warnings`, `summary`, `diff`, `current_hash`, `stale` |
-| `POST /api/match` | `{"yaml", "url", "opener", "cwd"}` | `rule`, `target` (for an asking rule `ask`, the list of choices, and `cancel_target`), `cwd_used` / `cwd_note`, `path`, `plan` (macOS); an empty `yaml` matches against the saved file |
+| `POST /api/match` | `{"yaml", "url", "opener", "cwd"}` | `rule`, `target` (for an asking rule `ask`, the list of choices, and `cancel_target`), `cwd_used` / `cwd_note`, `unwrapped` (inner URL, when unwrapped) or `unwrap_note` (`unwrap: off` / `unwrap: skipped for <opener>`), `path`, `plan` (macOS); an empty `yaml` matches against the saved file |
 | `POST /api/apply` | `{"yaml", "base_hash"}` | `hash`, `warnings`, `backup`; 422 on a parse error or a symlinked rules path, 409 when the file on disk changed |
 | `GET /api/decisions` | - | without `offset`: the tail of the log; with `offset=N`: the decisions that follow byte offset N. `limit` (default 200, at most 1000). Returns `decisions`, `offset`, `truncated`, `skipped` |
 | `GET /api/graph` | - | the diagram: openers, rules, targets, edges with counts |
-| `GET /api/settings` | - | `default` (`supported`, `app`, `bundle_id`, `schemes` with `scheme` / `handler` / `portero`, `pending`, `stale` (pending for over 3 minutes), `last`), `sync` (`supported`, `mode`, `pinned`, `rules_path`, `local_path`, `icloud_dir`, `icloud_available`, `icloud_exists` (also true when the file is offloaded), `icloud_offloaded` (the synced file is not downloaded to this Mac)), `log_file`, `config_file` |
+| `GET /api/settings` | - | `default` (`supported`, `app`, `bundle_id`, `schemes` with `scheme` / `handler` / `portero`, `pending`, `stale` (pending for over 3 minutes), `last`), `sync` (`supported`, `mode`, `pinned`, `rules_path`, `local_path`, `icloud_dir`, `icloud_available`, `icloud_exists` (also true when the file is offloaded), `icloud_offloaded` (the synced file is not downloaded to this Mac)), `unwrap` (`enabled`, `skip`, `editable`, `hash`, `note`), `log_file`, `config_file` |
 | `POST /api/settings/default` | `{}` | `schemes` with `scheme`, `handler`, `note` (`already set` / `set now`), or `error.message` when a scheme is still handled by another app. 202 `{"pending": true}` when macOS has not been answered within 60 seconds (the result then appears as `default.last`), 409 while a request is pending (less than 3 minutes old), 412 when not run from `Portero.app`, 501 where unsupported |
+| `POST /api/settings/unwrap` | `{"unwrap": bool, "skip": [bundle ids], "base_hash"}` | `enabled`, `skip`, `hash`, `backup`. 400 for a missing `unwrap` or an unknown field, 409 with `current_hash` when `base_hash` is not the file's hash, 422 for an invalid bundle id, a missing or symlinked rules file, 503 while the file is offloaded |
 | `POST /api/settings/sync` | `{"mode": "icloud" \| "off"}` | `mode` (`icloud` / `local`), `rules_path`, `changed`. 400 for another mode or an unknown field, 409 when `PORTERO_RULES` is set, 422 without iCloud Drive or when the move fails, 501 where unsupported. Same mode: 200 with `changed: false` |
 
 ## Write protection

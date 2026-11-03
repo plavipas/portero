@@ -112,3 +112,43 @@ func TestUnwrappedLogIsCut(t *testing.T) {
 		t.Errorf("note length %d, columns %d", len(l[5]), len(l))
 	}
 }
+
+func TestUnwrapSettingSkipsLinks(t *testing.T) {
+	off := strings.Replace(unwrapRules, "default:", "unwrap: false\ndefault:", 1)
+	skip := strings.Replace(unwrapRules, "default:", "unwrap_skip_openers: [com.example.mail]\ndefault:", 1)
+	link := wrapGoogle("https://github.example.com/x")
+	cases := []struct {
+		name, rules, opener, wantTarget, wantNote string
+	}{
+		{"off", off, "com.example.mail", "Zen", ""},
+		{"skipped opener", skip, "com.example.mail", "Zen", ""},
+		{"other opener unwrapped", skip, "com.example.chat", "Dia/Work", "unwrapped https://github.example.com/x"},
+		{"no opener unwrapped", skip, "", "Dia/Work", "unwrapped https://github.example.com/x"},
+	}
+	for _, c := range cases {
+		opened, open := askRig(t, c.rules)
+		if err := routeLinkWith(link, c.opener, open); err != nil {
+			t.Fatal(err)
+		}
+		if len(*opened) != 1 || (*opened)[0] != c.wantTarget+" "+link {
+			t.Errorf("%s: opened %v", c.name, *opened)
+		}
+		l := lastLogLine(t)
+		note := ""
+		if len(l) == 6 {
+			note = l[5]
+		}
+		if note != c.wantNote {
+			t.Errorf("%s: note %q", c.name, note)
+		}
+	}
+	r, _ := rules.Parse([]byte(skip))
+	u, _ := url.Parse(link)
+	if req, why := routeReq(r, u, "com.example.mail", ""); req.URL != u || why != "unwrap: skipped for com.example.mail" {
+		t.Errorf("routeReq skipped: %v %q", req.URL, why)
+	}
+	plain, _ := url.Parse("https://github.example.com/x")
+	if _, why := routeReq(r, plain, "com.example.mail", ""); why != "" {
+		t.Errorf("a plain link gets no unwrap line: %q", why)
+	}
+}

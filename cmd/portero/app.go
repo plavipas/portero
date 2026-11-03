@@ -118,12 +118,20 @@ func askTitle(u *url.URL) string {
 // routeReq is the request the rules decide on: a link wrapped in a known redirect routes by its inner URL
 // (rules.Unwrap), with the opener and cwd of the wrapper. The returned request's URL is the same pointer as u
 // when nothing was unwrapped, so callers compare pointers to tell.
-func routeReq(u *url.URL, opener, cwd string) rules.Request {
-	req := rules.Request{URL: u, Opener: opener, Cwd: cwd}
+//
+// The rules file's `unwrap` and `unwrap_skip_openers` switch it off; r may be nil (no rules, always on). why
+// is `unwrap: off` or `unwrap: skipped for <opener>` when a wrapper was recognised but the setting skipped it.
+func routeReq(r *rules.Rules, u *url.URL, opener, cwd string) (req rules.Request, why string) {
+	req = rules.Request{URL: u, Opener: opener, Cwd: cwd}
+	apply, w := r.UnwrapFor(opener)
 	if inner, ok := rules.Unwrap(u); ok {
-		req.URL = inner
+		if apply {
+			req.URL = inner
+		} else {
+			why = w
+		}
 	}
-	return req
+	return req, why
 }
 
 func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc) error {
@@ -135,8 +143,8 @@ func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch
 		return offloadedFallback(link, u, opener, p, open)
 	}
 	// The handler has no meaningful cwd (Launch Services starts the app in /), so cwd rules never match here.
-	req := routeReq(u, opener, "")
 	r, err := rules.Load(config.RulesFile())
+	req, _ := routeReq(r, u, opener, "")
 	if err != nil {
 		// A missing or broken rules file must never swallow a link: Safari is always there.
 		_ = decisionlog.AppendError(config.LogFile(), link, opener, fmt.Errorf("%w; opened in %s", err, fallback.Browser))
