@@ -1,6 +1,6 @@
 # ADR 0005: Ask target - a panel for links no rule can place, and "Remember" writes the rules file
 
-Status: proposed, 2026-11-03 (DEV-47); needs the user's "да" before it is accepted.
+Status: accepted, 2026-11-03 (DEV-47); accepted by the user on 2026-11-03.
 
 Refines ADR 0001 decision 2 ("rules are edited by hand") and decision 5 (the handler app quits two seconds after
 the last link), and ADR 0002 decision 4 ("the server writes exactly one file"): the link handler becomes a second
