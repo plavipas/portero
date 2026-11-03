@@ -59,3 +59,21 @@ func RememberKey(u *url.URL) (host, path string, ok bool) {
 	}
 	return host, p, true
 }
+
+// RememberHost returns the lower-case host a "Remember" rule pins for an unmatched link (no path), ok false when
+// the host cannot be written as a plain host pattern.
+func RememberHost(u *url.URL) (host string, ok bool) {
+	if u == nil {
+		return "", false
+	}
+	host = strings.ToLower(u.Hostname())
+	if host == "" || len(host) > 253 || strings.ContainsAny(host, "*\t\n\r /") || host != strings.TrimSpace(host) {
+		return "", false
+	}
+	for _, r := range host {
+		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+			return "", false
+		}
+	}
+	return host, true
+}

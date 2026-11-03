@@ -87,6 +87,9 @@ with `open: { ask: [...] }` makes the handler show a small panel near the pointe
 (1 to 9 targets, keys 1 to 9). Esc opens the default target. "Remember" adds a rule for that meeting to the file.
 The CLI never asks; it uses the default target. See [docs/rules.md](docs/rules.md#ask).
 
+A link from an app that no rule matches asks too: "Keep default" or a target the rules already use, and
+"Remember" appends a host rule. `ask_unmatched: false` turns it off. See [docs/rules.md](docs/rules.md#unmatched-links).
+
 ```yaml
 - name: Meetings
   match: { host: meet.google.com }

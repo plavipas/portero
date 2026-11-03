@@ -8,6 +8,6 @@ char *porteroDefaultAppPath(const char *scheme);
 char *porteroBundleVersion(const char *appPath);
 char *porteroSetDefaultHandler(const char *appPath, const char *scheme);
 char *porteroStartDownload(const char *path);
-void porteroAsk(int askID, const char *title, const char *options, int canRemember);
+void porteroAsk(int askID, const char *title, const char *options, int canRemember, const char *rememberLabel);
 int porteroCancelAllPanels(void);
 #endif

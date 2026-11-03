@@ -88,6 +88,9 @@ func Targets(r *rules.Rules, env Env) (warnings []string, err error) {
 		if rule.IsGroup() {
 			where = fmt.Sprintf("group %q", rule.Name)
 		}
+		if rule.Open.Default {
+			continue // follows the default, which is checked on its own
+		}
 		if rule.Open.Asks() {
 			for j, t := range rule.Open.Ask {
 				items = append(items, item{fmt.Sprintf("%s, ask %d", where, j+1), t})
@@ -141,6 +144,51 @@ func Targets(r *rules.Rules, env Env) (warnings []string, err error) {
 		}
 	}
 	return warnings, nil
+}
+
+// Shadowed warns about a host-only rule with an exact host H above an element whose host pattern also matches H:
+// the later element never sees links to H.
+func Shadowed(r *rules.Rules) (warnings []string) {
+	type cand struct {
+		label string
+		hosts []string
+	}
+	var later [][]cand // per top-level element: the plain rules or group children with a host condition
+	for i, rule := range r.Rules {
+		var cs []cand
+		if rule.IsGroup() {
+			for _, c := range rule.Rules {
+				cs = append(cs, cand{rules.ChildLabel(rule, c), c.Match.Host})
+			}
+		} else {
+			cs = append(cs, cand{rules.Label(i, rule), rule.Match.Host})
+		}
+		later = append(later, cs)
+	}
+	for i, rule := range r.Rules {
+		m := rule.Match
+		if rule.IsGroup() || len(m.Host) == 0 || len(m.Path) > 0 || len(m.Opener) > 0 || len(m.Cwd) > 0 {
+			continue
+		}
+		for _, h := range m.Host {
+			h = strings.ToLower(h)
+			if strings.Contains(h, "*") {
+				continue
+			}
+			for _, cs := range later[i+1:] {
+				for _, c := range cs {
+					for _, p := range c.hosts {
+						if rules.HostMatches(strings.ToLower(p), h) {
+							warnings = append(warnings, fmt.Sprintf("warning: rule %q comes before rule %q which also matches %s; %s never sees %s links",
+								rules.Label(i, rule), c.label, h, c.label, h))
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+	return warnings
 }
 
 // Cwd warns about rules whose cwd directories all do not exist on this Mac.
@@ -211,5 +259,5 @@ func All(r *rules.Rules, env Env) ([]string, error) {
 	if err != nil {
 		return warnings, err
 	}
-	return append(append(warnings, Cwd(r, env)...), Names(r)...), nil
+	return append(append(append(warnings, Cwd(r, env)...), Names(r)...), Shadowed(r)...), nil
 }

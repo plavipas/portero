@@ -97,6 +97,8 @@ type Edge struct {
 	Count int    `json:"count"`
 	// Ask: the edge is one of the choices of an asking rule (or its Esc fallback, the default target).
 	Ask bool `json:"ask,omitempty"`
+	// Follows: the rule is `open: {default: true}`; the edge goes to whatever the default is.
+	Follows bool `json:"follows,omitempty"`
 }
 
 // Graph is the diagram: openers -> rules -> targets.
@@ -166,6 +168,13 @@ func BuildGraph(r *rules.Rules, decisions []Decision) Graph {
 				addTarget(d.String(), &d)
 				addEdge(ruleID(name), targetID(d.String()), 0)
 				edges[[2]string{ruleID(name), targetID(d.String())}].Ask = true
+				continue
+			}
+			if rule.Open.Default {
+				t := r.Default
+				addTarget(t.String(), &t)
+				addEdge(ruleID(name), targetID(t.String()), 0)
+				edges[[2]string{ruleID(name), targetID(t.String())}].Follows = true
 				continue
 			}
 			t := rule.Open.Target
