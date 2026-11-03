@@ -111,7 +111,7 @@ func shortHome(p string) string {
 // "notified", "notification denied" and so on. It blocks up to 65 s, so callers write the log line first. The body is built only from the host
 // (already filtered) and the error text, one line, cut to 300 runes. The link has opened before this runs.
 func notifyRememberFailed(host string, rerr error) string {
-	body := "Could not remember " + host + ": " + rerr.Error() + ". Details: " + shortHome(config.LogFile())
+	body := "Could not remember " + rules.HostForms(host) + ": " + rerr.Error() + ". Details: " + shortHome(config.LogFile())
 	body = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
 			return ' '
