@@ -116,7 +116,7 @@ func serveCmd(args []string) error {
 		}
 	}
 	s := serve.New(serve.Options{
-		Rules: rulesNow, LogFile: config.LogFile(), Session: session,
+		Rules: rulesNow, LogFile: config.LogFile(), LockDir: config.Dir(), Session: session,
 		Env: check.RealEnv(), Browsers: browserList, Plan: servePlan(), ConfigFile: config.File(),
 		DefaultStatus: defStatus, SetDefault: setDef, Sync: serveSync(),
 		Offloaded: sync.Offloaded, Download: startDownload,

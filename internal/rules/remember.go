@@ -45,7 +45,7 @@ func RememberKey(u *url.URL) (host, path string, ok bool) {
 	default:
 		p = strings.TrimRight(p, "/")
 	}
-	if p == "" || len(p) > maxRememberPath || strings.Contains(p, "*") || strings.Contains(p, " / ") {
+	if p == "" || p != strings.TrimSpace(p) || len(p) > maxRememberPath || strings.Contains(p, "*") || strings.Contains(p, " / ") {
 		return "", "", false
 	}
 	for _, r := range p {
