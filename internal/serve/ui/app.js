@@ -265,7 +265,7 @@ function drawDecisions() {
       el("td", { text: d.opener === "-" ? "(none)" : d.opener }),
       el("td", { text: d.rule }),
       el("td", { text: d.ask ? target + " (" + d.ask + ")" : target, title: d.ask ? target + " (" + d.ask + ")" : target }),
-      el("td", { text: d.url, title: d.url }),
+      el("td", { text: d.url, title: d.unwrapped ? d.url + " -> " + d.unwrapped : d.url }),
       el("td", {}, replay));
     body.append(tr);
   }
@@ -423,6 +423,9 @@ async function match() {
     const msg = data && data.error ? data.error.message : "Match failed (" + status + ")";
     out.append(el("div", { class: "error", text: msg }));
     return;
+  }
+  if (data.unwrapped) {
+    out.append(el("div", {}, el("span", { class: "k", text: "Unwrapped: " }), el("code", { text: data.unwrapped })));
   }
   if (data.ask && data.ask.length) {
     out.append(el("div", {}, el("span", { class: "k", text: "Rule: " }), el("code", { text: data.rule }),

@@ -315,6 +315,26 @@ Zen                          firefox   app.zen-browser.zen
 The suffix is `(extension: active)` or `(extension: missing)`; it is left out when `extensions.json` cannot be
 read.
 
+## Redirect links
+
+Mail, chat and search apps often wrap a link in a redirect, so the host a rule would see is the wrapper's, not
+the real target's. Portero peels these wrappers off before it matches, with no network access:
+
+- Slack sign-in: `<workspace>.slack.com/openid/connect/login_initiate_redirect`; the target is the
+  `https://slack.com/target_uri` claim of the JWT in `login_hint` (the signature is not checked; the claim only
+  picks a browser).
+- Google: `google.com/url` and `www.google.com/url`, parameter `q`, else `url`.
+- Outlook Safe Links: `*.safelinks.protection.outlook.com`, parameter `url`.
+- Slack redirect: `slack-redirect.com/link`, parameter `url`.
+
+Up to three wrappers in a row are peeled. The inner URL must be `http` or `https`, have a host and be at most
+8 KiB; otherwise the link is not unwrapped. Rules then see only the inner URL: a rule on the wrapper host
+(`www.google.com`) applies only when unwrapping fails, and an inner URL that matches no rule goes to `default`,
+exactly like the same link clicked directly. The opener and the working directory stay those of the wrapper link,
+and the browser still receives the original wrapper URL (`would run:` shows it). `portero rules match` and
+`portero open --dry-run` print `unwrapped: <url>` before the decision; the ask panel title and "Remember" use the
+inner URL. `file://` links, an offloaded or broken rules file are not unwrapped.
+
 ## Local files
 
 Portero also opens HTML documents handed to it by macOS (Open With, drag onto the icon). A `file://` URL has
@@ -353,5 +373,8 @@ An asking rule adds a sixth column with the outcome:
 | `asked -> <target>, remembered "<name>"` | the same, and "Remember" added the rule `<name>` |
 | `asked -> default (cancelled)` | Esc, closing the panel, or the app quit; the `default` target was used |
 | `asked -> default (CLI)` | `portero open` has no panel; the `default` target was used |
+| `unwrapped <url>` | the link was a redirect wrapper and the rules decided on `<url>`; after an ask note it follows `; ` (last, cut at 2048 characters) |
+
+The url column always holds the original link.
 
 Lines of other rules have five columns. The target column holds the target that opened the link.

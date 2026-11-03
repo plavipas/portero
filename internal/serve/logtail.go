@@ -18,8 +18,10 @@ type Decision struct {
 	Target string `json:"target"` // "Browser/Profile:Container"; the message for an ERROR line
 	URL    string `json:"url"`
 	// Ask is the optional sixth column: how an asking rule was settled ("asked -> Dia/Work").
-	Ask  string `json:"ask,omitempty"`
-	Kind string `json:"kind"` // "ok" or "error"
+	Ask string `json:"ask,omitempty"`
+	// Unwrapped is the inner URL the rules decided on when URL was a redirect wrapper.
+	Unwrapped string `json:"unwrapped,omitempty"`
+	Kind      string `json:"kind"` // "ok" or "error"
 	// Path is [opener node, rule node, target node] of the graph.
 	Path [3]string `json:"path"`
 }
@@ -177,7 +179,7 @@ func parseLine(l string) (Decision, bool) {
 	}
 	d := Decision{Time: c[0], Opener: c[1], Rule: c[2], Target: c[3], URL: c[4], Kind: "ok"}
 	if len(c) == 6 {
-		d.Ask = c[5]
+		d.Ask, d.Unwrapped = splitNote(c[5])
 	}
 	if d.Rule == "ERROR" {
 		msg, err1 := strconv.Unquote(c[3])
@@ -197,4 +199,17 @@ func (d Decision) path() [3]string {
 		return [3]string{openerID(d.Opener), specialID("ERROR"), targetID(fallbackTarget)}
 	}
 	return [3]string{openerID(d.Opener), logRuleID(nil, d.Rule), targetID(d.Target)}
+}
+
+// splitNote separates the sixth column into the ask note and the inner URL: `[ask note; ]unwrapped <url>`.
+// The URL comes last, so the first "unwrapped " that starts the note or follows "; " is the marker.
+func splitNote(n string) (ask, unwrapped string) {
+	const mark = "unwrapped "
+	if strings.HasPrefix(n, mark) {
+		return "", n[len(mark):]
+	}
+	if i := strings.Index(n, "; "+mark); i >= 0 {
+		return n[:i], n[i+2+len(mark):]
+	}
+	return n, ""
 }

@@ -115,6 +115,17 @@ func askTitle(u *url.URL) string {
 	return s
 }
 
+// routeReq is the request the rules decide on: a link wrapped in a known redirect routes by its inner URL
+// (rules.Unwrap), with the opener and cwd of the wrapper. The returned request's URL is the same pointer as u
+// when nothing was unwrapped, so callers compare pointers to tell.
+func routeReq(u *url.URL, opener, cwd string) rules.Request {
+	req := rules.Request{URL: u, Opener: opener, Cwd: cwd}
+	if inner, ok := rules.Unwrap(u); ok {
+		req.URL = inner
+	}
+	return req
+}
+
 func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc) error {
 	u, err := parseRoutable(link)
 	if err != nil {
@@ -124,7 +135,7 @@ func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch
 		return offloadedFallback(link, u, opener, p, open)
 	}
 	// The handler has no meaningful cwd (Launch Services starts the app in /), so cwd rules never match here.
-	req := rules.Request{URL: u, Opener: opener}
+	req := routeReq(u, opener, "")
 	r, err := rules.Load(config.RulesFile())
 	if err != nil {
 		// A missing or broken rules file must never swallow a link: Safari is always there.
@@ -134,18 +145,21 @@ func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch
 	}
 	d := decide(r, req)
 	if len(d.Ask) == 0 {
-		if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
+		if err := decisionlog.AppendLink(config.LogFile(), d, req, u, ""); err != nil {
 			fmt.Fprintln(os.Stderr, "portero: log:", err)
 		}
 		_, err = open(u, d.Target)
 		return err
 	}
-	return routeAsked(d, req, open, ask, remember)
+	return routeAsked(d, req, u, open, ask, remember)
 }
 
 // routeAsked settles a link whose rule asks: the panel (or, without one, the default target), then opens the
 // target, then "Remember". The link opens before anything is written, and a write error never delays it.
-func routeAsked(d rules.Decision, req rules.Request, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc) error {
+//
+// req.URL is what the rules decided on (the inner URL of a wrapped link); link is the original link the browser
+// opens and the log records.
+func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc) error {
 	u := req.URL
 	target, note := d.Target, "asked -> default (CLI)"
 	remembered := false
@@ -155,7 +169,7 @@ func routeAsked(d rules.Decision, req rules.Request, open func(*url.URL, rules.T
 			opts[i] = askOption(t)
 		}
 		_, _, canRemember := rules.RememberKey(u)
-		res := ask(handler.AskRequest{ID: req.Opener + "\x00" + u.String(), Title: askTitle(u), Options: opts, CanRemember: canRemember && remember != nil})
+		res := ask(handler.AskRequest{ID: req.Opener + "\x00" + link.String(), Title: askTitle(u), Options: opts, CanRemember: canRemember && remember != nil})
 		switch {
 		case res.Joined:
 			// An identical link is waiting in a panel and that one opens it. If its open later fails, the error is
@@ -169,7 +183,7 @@ func routeAsked(d rules.Decision, req rules.Request, open func(*url.URL, rules.T
 			note = "asked -> default (cancelled)"
 		}
 	}
-	_, err := open(u, target)
+	_, err := open(link, target)
 	if err == nil && remembered {
 		if name, rerr := remember(req, d.Rule, target); rerr != nil {
 			note += ", remember failed: " + rerr.Error()
@@ -178,7 +192,7 @@ func routeAsked(d rules.Decision, req rules.Request, open func(*url.URL, rules.T
 		}
 	}
 	d.Target, d.Ask = target, nil
-	if lerr := decisionlog.AppendNote(config.LogFile(), d, req, note); lerr != nil {
+	if lerr := decisionlog.AppendLink(config.LogFile(), d, req, link, note); lerr != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", lerr)
 	}
 	return err
