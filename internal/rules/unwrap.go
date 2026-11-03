@@ -40,20 +40,37 @@ func unwrapOnce(u *url.URL) *url.URL {
 	if u == nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return nil
 	}
+	// An ambiguous query is not trusted: `;` is read as a separator by some parsers, a repeated or conflicting
+	// target could be read differently by the service that follows the wrapper.
+	if strings.Contains(u.RawQuery, ";") {
+		return nil
+	}
 	host := strings.ToLower(u.Hostname())
 	q := u.Query()
+	one := func(key string) string {
+		if v := q[key]; len(v) == 1 {
+			return v[0]
+		}
+		return ""
+	}
 	var raw string
 	switch {
 	case (host == "slack.com" || strings.HasSuffix(host, ".slack.com")) && u.Path == "/openid/connect/login_initiate_redirect":
-		raw = slackTarget(q.Get("login_hint"))
+		raw = slackTarget(one("login_hint"))
 	case (host == "google.com" || host == "www.google.com") && u.Path == "/url":
-		if raw = q.Get("q"); raw == "" {
-			raw = q.Get("url")
+		if len(q["q"]) > 1 || len(q["url"]) > 1 {
+			return nil
+		}
+		raw = one("q")
+		if alt := one("url"); raw == "" {
+			raw = alt
+		} else if alt != "" && alt != raw {
+			return nil
 		}
 	case strings.HasSuffix(host, ".safelinks.protection.outlook.com"):
-		raw = q.Get("url")
+		raw = one("url")
 	case host == "slack-redirect.com" && u.Path == "/link":
-		raw = q.Get("url")
+		raw = one("url")
 	}
 	return parseInner(raw)
 }
