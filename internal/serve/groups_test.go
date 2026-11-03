@@ -45,7 +45,7 @@ func TestGraphDrawsGroupAsOneNode(t *testing.T) {
 			t.Errorf("stale node %+v", n)
 		}
 	}
-	want := []string{"r:Work", "r:plain", "r:#3", "s:default", "s:file", "s:error"}
+	want := []string{"r:Work", "r:plain", "r:#3", "s:default", "s:none", "s:file", "s:error"}
 	if len(ids) != len(want) {
 		t.Fatalf("rule nodes %v, want %v", ids, want)
 	}
@@ -129,5 +129,24 @@ func TestSummarizeGroup(t *testing.T) {
 	}
 	if sum.Rules[1].Group || sum.Rules[1].Rules != nil || sum.Rules[2].Name != "#3" {
 		t.Errorf("plain rules %+v", sum.Rules[1:])
+	}
+}
+
+func TestResolvePathsUnmatchedVersusRuleNamedNone(t *testing.T) {
+	r, err := rules.Parse([]byte("version: 1\ndefault: {browser: Safari}\nrules:\n  - name: none\n    match: {host: [a.example]}\n    open: {browser: Safari}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ds := []Decision{
+		{Kind: "ok", Rule: "none", Ask: "asked (no rule) -> default (kept)"},
+		{Kind: "ok", Rule: "none"},
+		{Kind: "ok", Rule: "none", Ask: "asked -> Safari"},
+	}
+	ResolvePaths(r, ds)
+	want := []string{"s:none", "r:none", "r:none"}
+	for i, w := range want {
+		if ds[i].Path[1] != w {
+			t.Errorf("decision %d: path %q, want %q", i, ds[i].Path[1], w)
+		}
 	}
 }

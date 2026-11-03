@@ -58,6 +58,18 @@ func TestUnwrap(t *testing.T) {
 		{"bad json", slackLink(fakeJWT(`not json`)), ""},
 		{"no claim", slackLink(fakeJWT(`{"sub":"x"}`)), ""},
 		{"non-string claim", slackLink(fakeJWT(`{"https://slack.com/target_uri":5}`)), ""},
+		{"repeated target claim", slackLink(fakeJWT(`{"https://slack.com/target_uri":"https://a.example.com","https://slack.com/target_uri":"https://b.example.com"}`)), ""},
+		{"repeated claim, same value", slackLink(fakeJWT(`{"https://slack.com/target_uri":"https://a.example.com","https://slack.com/target_uri":"https://a.example.com"}`)), ""},
+		{"nested claim of the same name is not top level", slackLink(fakeJWT(`{"x":{"https://slack.com/target_uri":"https://b.example.com"},"https://slack.com/target_uri":"https://a.example.com"}`)), "https://a.example.com"},
+		{"trailing garbage", slackLink(fakeJWT(`{"https://slack.com/target_uri":"https://a.example.com"}garbage`)), ""},
+		{"second JSON value", slackLink(fakeJWT(`{"https://slack.com/target_uri":"https://a.example.com"}{"x":1}`)), ""},
+		{"truncated object", slackLink(fakeJWT(`{"https://slack.com/target_uri":"https://a.example.com"`)), ""},
+		{"trailing whitespace", slackLink(fakeJWT(`{"https://slack.com/target_uri":"https://a.example.com"} ` + "\n")), "https://a.example.com"},
+		{"repeated claim only at depth: the top-level one counts", slackLink(fakeJWT(`{"x":{"https://slack.com/target_uri":"https://b.example.com","https://slack.com/target_uri":"https://c.example.com"},"https://slack.com/target_uri":"https://a.example.com"}`)), "https://a.example.com"},
+		{"claims not an object", slackLink(fakeJWT(`["https://slack.com/target_uri"]`)), ""},
+		{"inner with userinfo routes by the real host", g("https://evil.example@good.example/x"), "https://evil.example@good.example/x"},
+		{"wrapper host upper case", "https://WWW.GOOGLE.COM/url?q=https%3A%2F%2Fgithub.com%2Fx", "https://github.com/x"},
+		{"wrapper host trailing dot is not a wrapper", "https://google.com./url?q=https%3A%2F%2Fgithub.com%2Fx", ""},
 		{"two parts", slackLink("a.b"), ""},
 		{"oversize hint", slackLink(strings.Repeat("a", 17000)), ""},
 		{"javascript claim", slackLink(fakeJWT(`{"https://slack.com/target_uri":"javascript:alert(1)"}`)), ""},
@@ -144,5 +156,13 @@ func TestUnwrapSettingValidation(t *testing.T) {
 	var nilRules *Rules
 	if on, _ := nilRules.UnwrapFor("x.y"); !on {
 		t.Error("nil rules must unwrap")
+	}
+}
+
+func TestUnwrapInnerUserinfoHost(t *testing.T) {
+	u, _ := url.Parse("https://www.google.com/url?q=" + url.QueryEscape("https://evil.example@good.example/x"))
+	inner, ok := Unwrap(u)
+	if !ok || inner.Hostname() != "good.example" {
+		t.Errorf("host %v %v, want good.example", inner, ok)
 	}
 }

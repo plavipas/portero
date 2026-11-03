@@ -7,7 +7,7 @@ import (
 	"github.com/plavipas/portero/internal/rules"
 )
 
-// Node ids: "o:<bundle id or ->", "r:<user rule name>", "s:default|file|error" for the built-in nodes,
+// Node ids: "o:<bundle id or ->", "r:<user rule name>", "s:default|none|file|error" for the built-in nodes,
 // "t:<Target.String()>". The built-ins have their own namespace so a user rule named "default" stays apart.
 func openerID(o string) string { return "o:" + o }
 func ruleID(r string) string   { return "r:" + r }
@@ -17,6 +17,8 @@ func specialID(name string) string {
 	switch name {
 	case "default", "":
 		return "s:default"
+	case "none":
+		return "s:none"
 	case "file":
 		return "s:file"
 	case "ERROR":
@@ -46,8 +48,8 @@ func fileNodes(r *rules.Rules) map[string]string {
 	return m
 }
 
-// logRuleID maps the rule column of the log to a node. The log cannot tell a user rule named "default" or
-// "file" from the built-in outcome of the same name, so when the rules file has such a rule it wins;
+// logRuleID maps the rule column of the log to a node. The log cannot tell a user rule named "default",
+// "none" or "file" from the built-in outcome of the same name, so when the rules file has such a rule it wins;
 // otherwise the built-in node is used. A label the file does not have gets a node of its own (stale).
 func logRuleID(r *rules.Rules, name string) string {
 	sp := specialID(name)
@@ -63,12 +65,23 @@ func logRuleID(r *rules.Rules, name string) string {
 	return ruleID(name)
 }
 
+// unmatchedAsked reports a link settled by the unmatched panel: rule column "none" and an "asked (no rule)" note.
+func unmatchedAsked(d Decision) bool {
+	return d.Rule == "none" && strings.HasPrefix(d.Ask, "asked (no rule)")
+}
+
 // ResolvePaths sets Path[1] of every decision against the rules file (nil when it is broken).
 func ResolvePaths(r *rules.Rules, ds []Decision) {
 	for i := range ds {
-		if ds[i].Kind == "ok" {
-			ds[i].Path[1] = logRuleID(r, ds[i].Rule)
+		if ds[i].Kind != "ok" {
+			continue
 		}
+		if unmatchedAsked(ds[i]) {
+			// The note tells an unmatched link from a user rule named "none": only the panel writes it.
+			ds[i].Path[1] = "s:none"
+			continue
+		}
+		ds[i].Path[1] = logRuleID(r, ds[i].Rule)
 	}
 }
 
@@ -183,6 +196,7 @@ func BuildGraph(r *rules.Rules, decisions []Decision) Graph {
 		}
 	}
 	addRule("s:default", "default", "default", false)
+	addRule("s:none", "no rule (asked)", "default", false)
 	addRule("s:file", "file", "file", false)
 	addRule("s:error", "ERROR → Safari fallback", "error", false)
 	if r != nil {

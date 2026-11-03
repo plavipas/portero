@@ -190,6 +190,30 @@ rules:
 	}
 }
 
+func TestMatchUnwrapFields(t *testing.T) {
+	r := newRig(t, `version: 1
+default: {browser: Safari}
+rules:
+  - name: forge
+    match: {host: github.example.com}
+    open: {browser: Safari, profile: Work}
+unwrap_skip_openers: [com.example.skipped]
+`)
+	wrapped := "https://www.google.com/url?q=" + url.QueryEscape("https://github.example.com/x")
+	code, m := doMatch(r, map[string]any{"url": wrapped})
+	if code != 200 || m["rule"] != "forge" || m["unwrapped"] != "https://github.example.com/x" {
+		t.Errorf("unwrapped: %d %v", code, m)
+	}
+	code, m = doMatch(r, map[string]any{"url": wrapped, "opener": "com.example.skipped"})
+	if code != 200 || m["rule"] != "default" || m["unwrapped"] != nil || m["unwrap_note"] != "unwrap: skipped for com.example.skipped" {
+		t.Errorf("skipped: %d %v", code, m)
+	}
+	_, m = doMatch(r, map[string]any{"url": "https://github.example.com/x"})
+	if m["unwrapped"] != nil || m["unwrap_note"] != nil {
+		t.Errorf("plain link: %v", m)
+	}
+}
+
 func TestMatchErrors(t *testing.T) {
 	r := newRig(t, goodRules)
 	if code, _ := doMatch(r, map[string]any{"url": "not a url"}); code != 400 {

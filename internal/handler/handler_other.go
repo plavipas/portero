@@ -27,3 +27,6 @@ func BundleVersion(appPath string) (short, build string) { return "", "" }
 
 // Ask shows nothing here and cancels at once, so the default target is used.
 func Ask(req AskRequest) AskResult { return Cancelled }
+
+// Notify shows nothing here.
+func Notify(title, body string) string { return "notification failed: unsupported" }
