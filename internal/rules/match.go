@@ -26,8 +26,11 @@ type Request struct {
 // Decision is the result of routing one link.
 type Decision struct {
 	Target Target
-	Rule   string // label of the matched rule: "name", "#n" or "Group / name"; "" when the default applied
-	Group  string // name of the matched group; "" for a plain rule and for the default
+	// Ask lists the targets the handler app offers in a panel; Target is then the default target, which the
+	// panel's Esc/close and every caller that cannot ask use. Empty for an ordinary decision.
+	Ask   []Target
+	Rule  string // label of the matched rule: "name", "#n" or "Group / name"; "" when the default applied
+	Group string // name of the matched group; "" for a plain rule and for the default
 }
 
 // String renders "Browser/Profile  (rule: name)".
@@ -35,6 +38,13 @@ func (d Decision) String() string {
 	rule := d.Rule
 	if rule == "" {
 		rule = "default"
+	}
+	if len(d.Ask) > 0 {
+		names := make([]string, len(d.Ask))
+		for i, t := range d.Ask {
+			names[i] = t.String()
+		}
+		return fmt.Sprintf("ask: [%s]  (rule: %s)", strings.Join(names, ", "), rule)
 	}
 	return fmt.Sprintf("%s  (rule: %s)", d.Target, rule)
 }
@@ -46,16 +56,24 @@ func (r *Rules) Route(req Request) Decision {
 		if rule.IsGroup() {
 			for _, c := range rule.Rules {
 				if c.Match.matches(req) {
-					return Decision{Target: rule.Open, Rule: ChildLabel(rule, c), Group: rule.Name}
+					return r.decision(rule.Open, ChildLabel(rule, c), rule.Name)
 				}
 			}
 			continue
 		}
 		if rule.Match.matches(req) {
-			return Decision{Target: rule.Open, Rule: Label(i, rule)}
+			return r.decision(rule.Open, Label(i, rule), "")
 		}
 	}
 	return Decision{Target: r.Default}
+}
+
+// decision builds the result for a matched element; an asking element falls back to the default target.
+func (r *Rules) decision(o Open, label, group string) Decision {
+	if o.Asks() {
+		return Decision{Target: r.Default, Ask: o.Ask, Rule: label, Group: group}
+	}
+	return Decision{Target: o.Target, Rule: label, Group: group}
 }
 
 func (m Match) matches(req Request) bool {
