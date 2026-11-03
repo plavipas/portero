@@ -137,11 +137,13 @@ func Ask(req AskRequest) AskResult {
 	opts := C.CString(strings.Join(req.Options, "\n"))
 	defer C.free(unsafe.Pointer(title))
 	defer C.free(unsafe.Pointer(opts))
+	rlabel := C.CString(req.RememberLabel)
+	defer C.free(unsafe.Pointer(rlabel))
 	remember := 0
 	if req.CanRemember {
 		remember = 1
 	}
-	C.porteroAsk(C.int(id), title, opts, C.int(remember))
+	C.porteroAsk(C.int(id), title, opts, C.int(remember), rlabel)
 	res := <-p.done
 
 	askMu.Lock()

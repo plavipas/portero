@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/plavipas/portero/internal/browsers"
 	"github.com/plavipas/portero/internal/config"
 	"github.com/plavipas/portero/internal/decisionlog"
 	"github.com/plavipas/portero/internal/handler"
@@ -89,6 +91,18 @@ func rememberRule(req rules.Request, label string, chosen rules.Target) (string,
 	return rulesfile.Remember(config.RulesFile(), config.Dir(), req, label, chosen, sync.Offloaded, time.Now())
 }
 
+// rememberUnmatched writes the host rule "Remember" adds for a link no rule matched (a fake in tests).
+var rememberUnmatched = func(req rules.Request, chosen rules.Target, followDefault bool) (string, error) {
+	return rulesfile.RememberUnmatched(config.RulesFile(), config.Dir(), req, chosen, followDefault, sync.Offloaded, time.Now())
+}
+
+// unmatchedInstalled reports whether a target of the rules file can be offered on this Mac: a known browser must
+// be installed; one the table does not know cannot be checked and counts as installed (a fake in tests).
+var unmatchedInstalled = func(t rules.Target) bool {
+	b, ok := browsers.Lookup(t.Browser)
+	return !ok || b.Installed()
+}
+
 // askOption is the button label of a target: "Browser · Profile · Container".
 func askOption(t rules.Target) string {
 	parts := []string{t.Browser}
@@ -162,6 +176,11 @@ func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch
 		return openErr
 	}
 	d := decide(r, req)
+	if len(d.Ask) == 0 && ask != nil && d.Rule == "" && (u.Scheme == "http" || u.Scheme == "https") && r.AsksUnmatched() {
+		if choices := rules.UnmatchedChoices(r, unmatchedInstalled); len(choices) >= 2 {
+			return routeUnmatched(choices, req, u, open, ask, remember != nil)
+		}
+	}
 	if len(d.Ask) == 0 {
 		if err := decisionlog.AppendLink(config.LogFile(), d, req, u, ""); err != nil {
 			fmt.Fprintln(os.Stderr, "portero: log:", err)
@@ -211,6 +230,54 @@ func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*u
 	}
 	d.Target, d.Ask = target, nil
 	if lerr := decisionlog.AppendLink(config.LogFile(), d, req, link, note); lerr != nil {
+		fmt.Fprintln(os.Stderr, "portero: log:", lerr)
+	}
+	return err
+}
+
+// routeUnmatched settles a link from an app that no rule matched: the panel with "Keep default" first, then the
+// targets the file already uses (choices[0] is the default), then opens the choice, then "Remember" (a host rule
+// for the target, or one that follows the default for "Keep default"). The link opens before anything is written.
+func routeUnmatched(choices []rules.Target, req rules.Request, link *url.URL, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, canWrite bool) error {
+	u := req.URL
+	def := choices[0]
+	opts := make([]string, len(choices))
+	opts[0] = "Keep default · " + askOption(def)
+	for i := 1; i < len(choices); i++ {
+		opts[i] = askOption(choices[i])
+	}
+	host, hostOK := rules.RememberHost(u)
+	canRemember := hostOK && canWrite
+	label := ""
+	if canRemember {
+		label = "Remember for this host (" + askTitle(&url.URL{Host: host}) + ")"
+	}
+	res := ask(handler.AskRequest{ID: req.Opener + "\x00" + link.String(), Title: askTitleVia(u, link), Options: opts, CanRemember: canRemember, RememberLabel: label})
+	target, note := def, "asked (no rule) -> default (cancelled)"
+	remembered, follow := false, false
+	switch {
+	case res.Joined:
+		return nil
+	case res.Choice == 0:
+		note = "asked (no rule) -> default (kept)"
+		remembered, follow = res.Remember && canRemember, true
+	case res.Choice > 0 && res.Choice < len(choices):
+		target = choices[res.Choice]
+		note = "asked (no rule) -> " + target.String()
+		remembered = res.Remember && canRemember
+	}
+	_, err := open(link, target)
+	if err == nil && remembered {
+		switch name, rerr := rememberUnmatched(req, target, follow); {
+		case errors.Is(rerr, rulesfile.ErrNowMatched):
+			note += ", remember skipped: a rule matches now"
+		case rerr != nil:
+			note += ", remember failed: " + rerr.Error()
+		default:
+			note += fmt.Sprintf(", remembered %q", name)
+		}
+	}
+	if lerr := decisionlog.AppendLink(config.LogFile(), rules.Decision{Target: target}, req, link, note); lerr != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", lerr)
 	}
 	return err
