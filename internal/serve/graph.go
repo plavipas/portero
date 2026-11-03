@@ -65,12 +65,23 @@ func logRuleID(r *rules.Rules, name string) string {
 	return ruleID(name)
 }
 
+// unmatchedAsked reports a link settled by the unmatched panel: rule column "none" and an "asked (no rule)" note.
+func unmatchedAsked(d Decision) bool {
+	return d.Rule == "none" && strings.HasPrefix(d.Ask, "asked (no rule)")
+}
+
 // ResolvePaths sets Path[1] of every decision against the rules file (nil when it is broken).
 func ResolvePaths(r *rules.Rules, ds []Decision) {
 	for i := range ds {
-		if ds[i].Kind == "ok" {
-			ds[i].Path[1] = logRuleID(r, ds[i].Rule)
+		if ds[i].Kind != "ok" {
+			continue
 		}
+		if unmatchedAsked(ds[i]) {
+			// The note tells an unmatched link from a user rule named "none": only the panel writes it.
+			ds[i].Path[1] = "s:none"
+			continue
+		}
+		ds[i].Path[1] = logRuleID(r, ds[i].Rule)
 	}
 }
 
