@@ -65,6 +65,7 @@ func TestUnwrap(t *testing.T) {
 		{"second JSON value", slackLink(fakeJWT(`{"https://slack.com/target_uri":"https://a.example.com"}{"x":1}`)), ""},
 		{"truncated object", slackLink(fakeJWT(`{"https://slack.com/target_uri":"https://a.example.com"`)), ""},
 		{"trailing whitespace", slackLink(fakeJWT(`{"https://slack.com/target_uri":"https://a.example.com"} ` + "\n")), "https://a.example.com"},
+		{"repeated claim only at depth: the top-level one counts", slackLink(fakeJWT(`{"x":{"https://slack.com/target_uri":"https://b.example.com","https://slack.com/target_uri":"https://c.example.com"},"https://slack.com/target_uri":"https://a.example.com"}`)), "https://a.example.com"},
 		{"claims not an object", slackLink(fakeJWT(`["https://slack.com/target_uri"]`)), ""},
 		{"inner with userinfo routes by the real host", g("https://evil.example@good.example/x"), "https://evil.example@good.example/x"},
 		{"wrapper host upper case", "https://WWW.GOOGLE.COM/url?q=https%3A%2F%2Fgithub.com%2Fx", "https://github.com/x"},

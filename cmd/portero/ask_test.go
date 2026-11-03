@@ -211,6 +211,14 @@ func TestNotifyBodyNamesTheRealLog(t *testing.T) {
 	}
 }
 
+func TestNotifyBodyShowsBothIDNForms(t *testing.T) {
+	askRig(t, askRules)
+	notifyRememberFailed("xn--80ak6aa92e.com", errors.New("disk full"))
+	if len(notifyCalls) != 1 || !strings.Contains(notifyCalls[0], "Could not remember xn--80ak6aa92e.com = аррӏе.com: disk full.") {
+		t.Errorf("body %q", notifyCalls)
+	}
+}
+
 func TestNotifyBodyIsOneShortLine(t *testing.T) {
 	askRig(t, askRules)
 	got := notifyRememberFailed("example.com", errors.New("bad\nline\t"+strings.Repeat("x", 500)))

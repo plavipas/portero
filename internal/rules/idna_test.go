@@ -1,6 +1,9 @@
 package rules
 
-import "testing"
+import (
+	"testing"
+	"unicode/utf8"
+)
 
 func TestHostForms(t *testing.T) {
 	tests := []struct{ host, want string }{
@@ -13,6 +16,8 @@ func TestHostForms(t *testing.T) {
 		{"www.xn--bcher-kva.example", "www.xn--bcher-kva.example = www.bücher.example"},
 		{"xn--ab-g4t.com", "xn--ab-g4t.com"},
 		{"xn--.com", "xn--.com"},
+		// A pure-ASCII decode (nothing after the last hyphen) is shown as the label it decodes to.
+		{"xn--abc-", "xn--abc- = abc"},
 		{"a\u0085b.xn--!!.com", "xn--ab-qa.xn--!!.com"},
 		{"a\u009bb.xn--!!.com", "xn--ab-mca.xn--!!.com"},
 		{"aİb.com", "aib.com"},
@@ -60,4 +65,23 @@ func lower(s string) string {
 		}
 	}
 	return string(b)
+}
+
+func FuzzPunycodeRoundTrip(f *testing.F) {
+	for _, s := range []string{"bücher", "почемужеонинеговорятпорусски", "他们为什么不说中文", "a-b", "abc", "аррӏе", "3年B組金八先生", ""} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		if !utf8.ValidString(s) {
+			t.Skip()
+		}
+		enc, err := punyEncode(s)
+		if err != nil {
+			t.Skip()
+		}
+		dec, err := punyDecode(enc)
+		if err != nil || dec != s {
+			t.Errorf("punyDecode(punyEncode(%q)) = %q, %v (encoded %q)", s, dec, err, enc)
+		}
+	})
 }
