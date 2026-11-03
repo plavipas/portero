@@ -1,6 +1,6 @@
 # ADR 0006: Ask for links no rule matches, and a target that follows `default`
 
-Status: proposed, 2026-11-03 (DEV-49); needs the user's "да".
+Status: accepted, 2026-11-03 (DEV-49); accepted by the user on 2026-11-03.
 
 Extends ADR 0005 (the ask panel and "Remember"): the panel is no longer shown only for rules that carry `ask`,
 and "Remember" gains a second insertion point and a new target form. ADR 0001 stands: one local YAML file,
