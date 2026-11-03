@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -300,5 +301,127 @@ func TestResolveDir(t *testing.T) {
 	}
 	if got, err := ResolveDir("/no/such/../dir/"); err != nil || got != "/no/dir" {
 		t.Errorf("missing: %q, %v", got, err)
+	}
+}
+
+func TestAskValidate(t *testing.T) {
+	const head = "version: 1\ndefault: {browser: Safari}\nrules:\n"
+	cases := []struct {
+		name, body, want string // want "" means valid
+	}{
+		{"valid", "  - name: Meetings\n    match: {host: meet.example.com}\n    open:\n      ask:\n        - {browser: Dia, profile: Personal}\n        - {browser: Dia, profile: Work}\n", ""},
+		{"empty ask", "  - name: M\n    match: {host: a.example.com}\n    open: {ask: []}\n", "empty browser"},
+		{"ask and browser", "  - name: M\n    match: {host: a.example.com}\n    open:\n      browser: Dia\n      ask: [{browser: Dia}]\n", "open has both ask and browser"},
+		{"ask and profile only", "  - name: M\n    match: {host: a.example.com}\n    open:\n      profile: Work\n      ask: [{browser: Dia}]\n", "open has both ask and browser"},
+		{"duplicate", "  - name: M\n    match: {host: a.example.com}\n    open: {ask: [{browser: Dia, profile: Work}, {browser: Dia, profile: Work}]}\n", "twice"},
+		{"empty browser in ask", "  - name: M\n    match: {host: a.example.com}\n    open: {ask: [{profile: Work}]}\n", "empty browser"},
+		{"control char", "  - name: M\n    match: {host: a.example.com}\n    open: {ask: [{browser: \"Dia\\t\"}]}\n", "control character"},
+		{"ten targets", "  - name: M\n    match: {host: a.example.com}\n    open: {ask: [" + tenTargets() + "]}\n", "at most 9"},
+		{"group asks", "  - name: G\n    open: {ask: [{browser: Dia}, {browser: Safari}]}\n    rules:\n      - {match: {host: a.example.com}}\n", ""},
+		{"child asks", "  - name: G\n    open: {browser: Dia}\n    rules:\n      - match: {host: a.example.com}\n        open: {ask: [{browser: Dia}]}\n", "open is set on the group only"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := Parse([]byte(head + c.body))
+			switch {
+			case c.want == "" && err != nil:
+				t.Fatalf("unexpected error: %v", err)
+			case c.want != "" && (err == nil || !strings.Contains(err.Error(), c.want)):
+				t.Fatalf("error = %v, want containing %q", err, c.want)
+			}
+		})
+	}
+}
+
+func tenTargets() string {
+	var s []string
+	for i := 0; i < 10; i++ {
+		s = append(s, fmt.Sprintf("{browser: B, profile: p%d}", i))
+	}
+	return strings.Join(s, ", ")
+}
+
+func TestAskInDefaultRejected(t *testing.T) {
+	_, err := Parse([]byte("version: 1\ndefault:\n  ask: [{browser: Dia}]\nrules: []\n"))
+	if err == nil {
+		t.Fatal("ask in default must be rejected")
+	}
+}
+
+func TestAskRoute(t *testing.T) {
+	r, err := Parse([]byte(`version: 1
+default: {browser: Dia, profile: Personal}
+rules:
+  - name: Meetings
+    match: {host: meet.example.com}
+    open:
+      ask:
+        - {browser: Dia, profile: Personal}
+        - {browser: Dia, profile: Work}
+  - name: Plain
+    match: {host: plain.example.com}
+    open: {browser: Safari}
+  - name: Grp
+    open: {ask: [{browser: Dia, profile: Work}]}
+    rules:
+      - name: room
+        match: {host: grp.example.com}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := func(raw string) Decision {
+		u, _ := url.Parse(raw)
+		return r.Route(Request{URL: u})
+	}
+	d := route("https://meet.example.com/abc-defg-hij")
+	if len(d.Ask) != 2 || d.Target != r.Default || d.Rule != "Meetings" {
+		t.Fatalf("decision = %+v", d)
+	}
+	if got, want := d.String(), "ask: [Dia/Personal, Dia/Work]  (rule: Meetings)"; got != want {
+		t.Errorf("String = %q, want %q", got, want)
+	}
+	if d := route("https://plain.example.com/"); len(d.Ask) != 0 || d.Target.Browser != "Safari" || d.String() != "Safari  (rule: Plain)" {
+		t.Errorf("plain decision = %+v / %s", d, d)
+	}
+	if d := route("https://grp.example.com/"); len(d.Ask) != 1 || d.Group != "Grp" || d.Rule != "Grp / room" {
+		t.Errorf("group decision = %+v", d)
+	}
+}
+
+func TestRememberKey(t *testing.T) {
+	cases := []struct {
+		url, host, path string
+		ok              bool
+	}{
+		{"https://meet.google.com/abc-defg-hij?authuser=1", "meet.google.com", "/abc-defg-hij", true},
+		{"https://Meet.Google.com/abc-defg-hij/extra", "meet.google.com", "/abc-defg-hij", true},
+		{"https://meet.google.com/lookup/xyz", "", "", false},
+		{"https://meet.google.com/", "", "", false},
+		{"https://us06web.zoom.us/j/123?pwd=x", "us06web.zoom.us", "/j/123", true},
+		{"https://zoom.us/w/456/more", "zoom.us", "/w/456", true},
+		{"https://example.zoom.us/s/789", "example.zoom.us", "/s/789", true},
+		{"https://example.zoom.us/my/room", "example.zoom.us", "/my/room", true},
+		{"https://example.zoom.us/profile/", "example.zoom.us", "/profile", true},
+		{"https://example.com/team/room/", "example.com", "/team/room", true},
+		{"https://example.com/", "", "", false},
+		{"https://example.com", "", "", false},
+		{"https://example.com/a*b", "", "", false},
+		{"https://example.com/a%20/%20b", "", "", false},
+		{"https://example.com/a%09b", "", "", false},
+		{"https://example.com/" + strings.Repeat("a", 600), "", "", false},
+	}
+	for _, c := range cases {
+		u, err := url.Parse(c.url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		host, path, ok := RememberKey(u)
+		if host != c.host || path != c.path || ok != c.ok {
+			t.Errorf("RememberKey(%s) = %q %q %v, want %q %q %v", c.url, host, path, ok, c.host, c.path, c.ok)
+		}
+	}
+	if _, _, ok := RememberKey(nil); ok {
+		t.Error("nil URL")
 	}
 }

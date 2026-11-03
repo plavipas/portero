@@ -17,7 +17,9 @@ type Decision struct {
 	Rule   string `json:"rule"`   // rule name, "default", "file" or "ERROR"
 	Target string `json:"target"` // "Browser/Profile:Container"; the message for an ERROR line
 	URL    string `json:"url"`
-	Kind   string `json:"kind"` // "ok" or "error"
+	// Ask is the optional sixth column: how an asking rule was settled ("asked -> Dia/Work").
+	Ask  string `json:"ask,omitempty"`
+	Kind string `json:"kind"` // "ok" or "error"
 	// Path is [opener node, rule node, target node] of the graph.
 	Path [3]string `json:"path"`
 }
@@ -170,10 +172,13 @@ func parseLines(lines []string) Page {
 
 func parseLine(l string) (Decision, bool) {
 	c := strings.Split(l, "\t")
-	if len(c) != 5 {
+	if len(c) != 5 && len(c) != 6 {
 		return Decision{}, false
 	}
 	d := Decision{Time: c[0], Opener: c[1], Rule: c[2], Target: c[3], URL: c[4], Kind: "ok"}
+	if len(c) == 6 {
+		d.Ask = c[5]
+	}
 	if d.Rule == "ERROR" {
 		msg, err1 := strconv.Unquote(c[3])
 		link, err2 := strconv.Unquote(c[4])

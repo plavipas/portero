@@ -131,3 +131,35 @@ func TestBuildGraphUserRuleNamedDefault(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildGraphAskRule(t *testing.T) {
+	r, err := rules.Parse([]byte(`version: 1
+default: {browser: Safari}
+rules:
+  - name: Meetings
+    match: {host: meet.example.com}
+    open:
+      ask: [{browser: Dia, profile: Personal}, {browser: Dia, profile: Work}]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := BuildGraph(r, nil)
+	if len(g.Rules) == 0 || g.Rules[0].ID != "r:Meetings" || !g.Rules[0].Ask {
+		t.Fatalf("rule node not marked ask: %+v", g.Rules)
+	}
+	got := map[string]bool{}
+	for _, e := range g.Edges {
+		if e.From == "r:Meetings" {
+			if !e.Ask || e.Count != 0 {
+				t.Errorf("edge %+v", e)
+			}
+			got[e.To] = true
+		}
+	}
+	for _, want := range []string{"t:Dia/Personal", "t:Dia/Work", "t:Safari"} {
+		if !got[want] {
+			t.Errorf("missing ask edge to %s: %v", want, got)
+		}
+	}
+}
