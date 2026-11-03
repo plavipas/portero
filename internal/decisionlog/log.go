@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/plavipas/portero/internal/rules"
@@ -12,6 +13,13 @@ import (
 
 // Append writes "time opener rule target url" (tab-separated) to path, creating it with mode 0600.
 func Append(path string, d rules.Decision, req rules.Request) error {
+	return AppendNote(path, d, req, "")
+}
+
+// AppendNote is Append with an optional sixth column that says how an asking rule was settled:
+// `asked -> Dia/Work`, `asked -> Dia/Work, remembered "<name>"`, `asked -> default (cancelled)`. d.Target is
+// the target the link was opened in. An empty note writes the usual five columns.
+func AppendNote(path string, d rules.Decision, req rules.Request, note string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -27,9 +35,22 @@ func Append(path string, d rules.Decision, req rules.Request) error {
 	if rule == "" {
 		rule = "default"
 	}
-	_, err = fmt.Fprintf(f, "%s\t%s\t%s\t%s\t%s\n",
-		time.Now().UTC().Format(time.RFC3339), opener, rule, d.Target, req.URL)
+	line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", time.Now().UTC().Format(time.RFC3339), opener, rule, d.Target, req.URL)
+	if note = cleanNote(note); note != "" {
+		line += "\t" + note
+	}
+	_, err = fmt.Fprintln(f, line)
 	return err
+}
+
+// cleanNote keeps the note on one column of one line.
+func cleanNote(s string) string {
+	return strings.TrimSpace(strings.Map(func(r rune) rune {
+		if r == '\t' || r == '\n' || r == '\r' {
+			return ' '
+		}
+		return r
+	}, s))
 }
 
 // AppendError records a link that could not be routed or opened.

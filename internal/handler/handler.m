@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#import <os/log.h>
 #import "handler.h"
 
 extern void porteroHandleURL(char *url, char *opener);
@@ -7,6 +8,21 @@ extern void porteroHandleURL(char *url, char *opener);
 // never terminate the app while a slower one (a browser still starting) is in progress.
 static int generation = 0;
 static int inflight = 0;
+// terminating: applicationShouldTerminate answered NSTerminateLater and waits for inflight to reach 0.
+static BOOL terminating = NO;
+
+static os_log_t porteroLog(void) {
+    static os_log_t log;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ log = os_log_create("dev.plavipas.portero", "handler"); });
+    return log;
+}
+
+static void porteroReplyTerminate(void) {
+    if (!terminating) return;
+    terminating = NO;
+    [NSApp replyToApplicationShouldTerminate:YES];
+}
 
 static void porteroArrived(void) {
     generation++;
@@ -29,12 +45,27 @@ static void porteroArrived(void) {
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
     // Launched with no link (double-click): leave quietly. A document opened at launch arrives through
     // openURLs: BEFORE this callback, so the timer must not start when a link is already in flight.
-    if (inflight == 0 && generation == 0) porteroExitAfter(3000);
+    if (inflight == 0 && generation == 0) {
+        os_log(porteroLog(), "launched without link");
+        porteroExitAfter(3000);
+    }
+}
+
+// Quit requests (logout, restart, Quit): pending panels open their link in the default target first, and the
+// app waits (at most 10 s) until every link in flight is done.
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
+    os_log(porteroLog(), "terminating, inflight=%d", inflight);
+    int panels = porteroCancelAllPanels();
+    if (inflight == 0 && panels == 0) return NSTerminateNow;
+    terminating = YES;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{ porteroReplyTerminate(); });
+    return NSTerminateLater;
 }
 
 // Documents (Open With, drag onto the icon): HTML files declared in Info.plist arrive here as file:// URLs.
 - (void)application:(NSApplication *)app openURLs:(NSArray<NSURL *> *)urls {
     for (NSURL *u in urls) {
+        os_log(porteroLog(), "link received (opener=-) %{private}@", u.absoluteString);
         porteroArrived();
         porteroHandleURL((char *)u.absoluteString.UTF8String, (char *)"");
     }
@@ -48,6 +79,7 @@ static void porteroArrived(void) {
         NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         opener = app.bundleIdentifier ?: @"";
     }
+    os_log(porteroLog(), "link received (opener=%{public}@) %{private}@", opener.length ? opener : @"-", url);
     porteroArrived();
     porteroHandleURL((char *)url.UTF8String, (char *)opener.UTF8String);
 }
@@ -76,7 +108,10 @@ void porteroExitAfter(int ms) {
 void porteroDone(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (inflight > 0) inflight--;
-        if (inflight == 0) porteroExitAfter(2000);
+        if (inflight == 0) {
+            if (terminating) porteroReplyTerminate();
+            else porteroExitAfter(2000);
+        }
     });
 }
 

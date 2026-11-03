@@ -14,6 +14,7 @@ import (
 	"github.com/plavipas/portero/internal/handler"
 	"github.com/plavipas/portero/internal/launch"
 	"github.com/plavipas/portero/internal/rules"
+	"github.com/plavipas/portero/internal/rulesfile"
 	"github.com/plavipas/portero/internal/sync"
 )
 
@@ -65,9 +66,55 @@ func offloadedFallback(link string, launchURL *url.URL, opener, rulesPath string
 	return openErr
 }
 
-func routeLink(link, opener string) error { return routeLinkWith(link, opener, launch.Open) }
+func routeLink(link, opener string) error {
+	return routeLinkAsk(link, opener, launch.Open, handler.Ask, rememberRule)
+}
 
+// routeLinkWith routes a link without ever asking: a rule that asks opens the default target.
 func routeLinkWith(link, opener string, open func(*url.URL, rules.Target) (launch.Plan, error)) error {
+	return routeLinkAsk(link, opener, open, nil, nil)
+}
+
+// askFunc shows the panel for an asking rule (handler.Ask in the app, a fake in tests); nil means the caller
+// cannot ask.
+type askFunc func(handler.AskRequest) handler.AskResult
+
+// rememberFunc writes the "Remember" rule: link req, decided by the asking rule label, goes to chosen. It
+// returns the name of the new rule.
+type rememberFunc func(req rules.Request, label string, chosen rules.Target) (string, error)
+
+// rememberRule is the real rememberFunc: the locked write of internal/rulesfile.
+func rememberRule(req rules.Request, label string, chosen rules.Target) (string, error) {
+	return rulesfile.Remember(config.RulesFile(), config.Dir(), req, label, chosen, sync.Offloaded, time.Now())
+}
+
+// askOption is the button label of a target: "Browser · Profile · Container".
+func askOption(t rules.Target) string {
+	parts := []string{t.Browser}
+	if t.Profile != "" {
+		parts = append(parts, t.Profile)
+	}
+	if t.Container != "" {
+		parts = append(parts, t.Container)
+	}
+	return strings.Join(parts, " · ")
+}
+
+// askTitle is what the panel shows about a link: host and path, one line, no control characters.
+func askTitle(u *url.URL) string {
+	s := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, u.Host+u.Path)
+	if r := []rune(s); len(r) > 300 {
+		s = string(r[:300])
+	}
+	return s
+}
+
+func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc) error {
 	u, err := parseRoutable(link)
 	if err != nil {
 		return err
@@ -85,10 +132,52 @@ func routeLinkWith(link, opener string, open func(*url.URL, rules.Target) (launc
 		return openErr
 	}
 	d := decide(r, req)
-	if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
-		fmt.Fprintln(os.Stderr, "portero: log:", err)
+	if len(d.Ask) == 0 {
+		if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
+			fmt.Fprintln(os.Stderr, "portero: log:", err)
+		}
+		_, err = open(u, d.Target)
+		return err
 	}
-	_, err = open(u, d.Target)
+	return routeAsked(d, req, open, ask, remember)
+}
+
+// routeAsked settles a link whose rule asks: the panel (or, without one, the default target), then opens the
+// target, then "Remember". The link opens before anything is written, and a write error never delays it.
+func routeAsked(d rules.Decision, req rules.Request, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc) error {
+	u := req.URL
+	target, note := d.Target, "asked -> default (CLI)"
+	remembered := false
+	if ask != nil {
+		opts := make([]string, len(d.Ask))
+		for i, t := range d.Ask {
+			opts[i] = askOption(t)
+		}
+		_, _, canRemember := rules.RememberKey(u)
+		res := ask(handler.AskRequest{ID: req.Opener + "\x00" + u.String(), Title: askTitle(u), Options: opts, CanRemember: canRemember && remember != nil})
+		switch {
+		case res.Joined:
+			return nil // an identical link is waiting in a panel; that one opens it
+		case res.Choice >= 0 && res.Choice < len(d.Ask):
+			target = d.Ask[res.Choice]
+			note = "asked -> " + target.String()
+			remembered = res.Remember && canRemember && remember != nil
+		default:
+			note = "asked -> default (cancelled)"
+		}
+	}
+	_, err := open(u, target)
+	if err == nil && remembered {
+		if name, rerr := remember(req, d.Rule, target); rerr != nil {
+			note += ", remember failed: " + rerr.Error()
+		} else {
+			note += fmt.Sprintf(", remembered %q", name)
+		}
+	}
+	d.Target, d.Ask = target, nil
+	if lerr := decisionlog.AppendNote(config.LogFile(), d, req, note); lerr != nil {
+		fmt.Fprintln(os.Stderr, "portero: log:", lerr)
+	}
 	return err
 }
 

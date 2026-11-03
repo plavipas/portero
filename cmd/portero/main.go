@@ -185,7 +185,25 @@ func open(args []string) error {
 	req := rules.Request{URL: u, Opener: a.opener, Cwd: cwd}
 	d := r.Route(req)
 	fmt.Println(d)
+	if len(d.Ask) > 0 {
+		printAskLines(os.Stdout, d, u)
+	}
 	if a.dry {
+		if len(d.Ask) > 0 {
+			for i, t := range d.Ask {
+				plan, err := launch.DryRun(u, t)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("would run (%d): %s\n", i+1, plan)
+			}
+			plan, err := launch.DryRun(u, d.Target)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("would run (Esc): %s\n", plan)
+			return nil
+		}
 		plan, err := launch.DryRun(u, d.Target)
 		if err != nil {
 			return err
@@ -193,10 +211,34 @@ func open(args []string) error {
 		fmt.Println("would run:", plan)
 		return nil
 	}
+	if len(d.Ask) > 0 {
+		return openCLIAsked(d, req, launch.Open)
+	}
 	if err := decisionlog.Append(config.LogFile(), d, req); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}
 	_, err = launch.Open(u, d.Target)
+	return err
+}
+
+// printAskLines prints what follows the "ask: [...]" line: the target of Esc and what "Remember" would pin.
+func printAskLines(w io.Writer, d rules.Decision, u *url.URL) {
+	fmt.Fprintf(w, "cancel: %s (default)\n", d.Target)
+	if host, path, ok := rules.RememberKey(u); ok {
+		fmt.Fprintf(w, "remember: %s %s\n", host, path)
+	} else {
+		fmt.Fprintln(w, "remember: not offered")
+	}
+}
+
+// openCLIAsked opens a link whose rule asks: the CLI cannot show the panel, so the default target is used.
+func openCLIAsked(d rules.Decision, req rules.Request, open func(*url.URL, rules.Target) (launch.Plan, error)) error {
+	fmt.Fprintf(os.Stderr, "portero: rule %q asks; the CLI cannot show the panel, opened %s (default)\n", d.Rule, d.Target)
+	d.Ask = nil
+	if err := decisionlog.AppendNote(config.LogFile(), d, req, "asked -> default (CLI)"); err != nil {
+		fmt.Fprintln(os.Stderr, "portero: log:", err)
+	}
+	_, err := open(req.URL, d.Target)
 	return err
 }
 
@@ -277,7 +319,11 @@ func rulesCmd(args []string) error {
 		if line := cwdLine(r, a, cwd, note); line != "" {
 			fmt.Println(line)
 		}
-		fmt.Println(r.Route(rules.Request{URL: a.url, Opener: a.opener, Cwd: cwd}))
+		d := r.Route(rules.Request{URL: a.url, Opener: a.opener, Cwd: cwd})
+		fmt.Println(d)
+		if len(d.Ask) > 0 {
+			printAskLines(os.Stdout, d, a.url)
+		}
 	default:
 		return fmt.Errorf("unknown rules command %q", sub)
 	}
