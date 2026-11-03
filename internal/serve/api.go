@@ -359,7 +359,11 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	opener := strings.TrimSpace(req.Opener)
-	d := rs.Route(rules.Request{URL: u, Opener: opener, Cwd: cwd})
+	routed := u
+	if inner, ok := rules.Unwrap(u); ok {
+		routed = inner
+	}
+	d := rs.Route(rules.Request{URL: routed, Opener: opener, Cwd: cwd})
 	rule := d.Rule
 	if rule == "" {
 		rule = "default"
@@ -373,6 +377,9 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		"profile": d.Target.Profile, "container": d.Target.Container,
 		"cwd_used": cwd, "cwd_note": note,
 		"path": [3]string{openerID(oid), matchRuleID(d, rule), targetID(d.Target.String())},
+	}
+	if routed != u {
+		out["unwrapped"] = routed.String()
 	}
 	if len(d.Ask) > 0 {
 		// The handler app asks; the default target is what Esc, a missing panel and the CLI use.

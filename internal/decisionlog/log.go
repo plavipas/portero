@@ -3,6 +3,7 @@ package decisionlog
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,31 @@ func Append(path string, d rules.Decision, req rules.Request) error {
 // `asked -> Dia/Work`, `asked -> Dia/Work, remembered "<name>"`, `asked -> default (cancelled)`. d.Target is
 // the target the link was opened in. An empty note writes the usual five columns.
 func AppendNote(path string, d rules.Decision, req rules.Request, note string) error {
+	return AppendLink(path, d, req, req.URL, note)
+}
+
+// maxUnwrappedLog caps the inner URL written to the log.
+const maxUnwrappedLog = 2048
+
+// AppendLink is AppendNote for a link that was unwrapped: req.URL is the inner URL the rules decided on, link is
+// the original link (column 5, what the browser was given). A req.URL other than link adds
+// `unwrapped <inner URL>` as the last part of the note, after the ask note, cut at 2048 characters.
+func AppendLink(path string, d rules.Decision, req rules.Request, link *url.URL, note string) error {
+	inner := ""
+	if req.URL != nil && link != nil && req.URL != link {
+		inner = req.URL.String()
+	}
+	note = cleanNote(note)
+	if inner != "" {
+		inner = cleanNote(inner)
+		if r := []rune(inner); len(r) > maxUnwrappedLog {
+			inner = string(r[:maxUnwrappedLog])
+		}
+		if note != "" {
+			note += "; "
+		}
+		note += "unwrapped " + inner
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -35,8 +61,8 @@ func AppendNote(path string, d rules.Decision, req rules.Request, note string) e
 	if rule == "" {
 		rule = "default"
 	}
-	line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", time.Now().UTC().Format(time.RFC3339), opener, rule, d.Target, req.URL)
-	if note = cleanNote(note); note != "" {
+	line := fmt.Sprintf("%s\t%s\t%s\t%s\t%s", time.Now().UTC().Format(time.RFC3339), opener, rule, d.Target, link)
+	if note != "" {
 		line += "\t" + note
 	}
 	_, err = fmt.Fprintln(f, line)

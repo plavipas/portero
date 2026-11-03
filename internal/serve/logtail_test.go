@@ -141,3 +141,25 @@ func TestParseLineSixColumns(t *testing.T) {
 		t.Error("seven columns must be skipped")
 	}
 }
+
+func TestSplitNote(t *testing.T) {
+	cases := []struct{ in, ask, unwrapped string }{
+		{"asked -> Dia/Work", "asked -> Dia/Work", ""},
+		{"unwrapped https://a.example.com/x", "", "https://a.example.com/x"},
+		{`asked -> Dia/Work, remembered "n"; unwrapped https://a.example.com/x`, `asked -> Dia/Work, remembered "n"`, "https://a.example.com/x"},
+		{"", "", ""},
+	}
+	for _, c := range cases {
+		ask, un := splitNote(c.in)
+		if ask != c.ask || un != c.unwrapped {
+			t.Errorf("splitNote(%q) = %q, %q", c.in, ask, un)
+		}
+	}
+	d, ok := parseLine("2026-01-01T00:00:00Z\t-\tCode\tDia/Work\thttps://w.example.com/\tunwrapped https://a.example.com/x")
+	if !ok || d.Unwrapped != "https://a.example.com/x" || d.Ask != "" {
+		t.Errorf("new line: %+v %v", d, ok)
+	}
+	if d, ok := parseLine("2026-01-01T00:00:00Z\t-\tCode\tDia/Work\thttps://a.example.com/\tasked -> Dia/Work"); !ok || d.Ask != "asked -> Dia/Work" || d.Unwrapped != "" {
+		t.Errorf("old line: %+v", d)
+	}
+}
