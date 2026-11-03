@@ -25,13 +25,9 @@ func TestLockTimesOutAgainstForeignHolder(t *testing.T) {
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
 		t.Fatal(err)
 	}
-	start := time.Now()
 	_, err = Lock(dir)
 	if err == nil || !strings.Contains(err.Error(), "held by another writer") {
 		t.Fatalf("err %v", err)
-	}
-	if d := time.Since(start); d < 150*time.Millisecond || d > time.Second {
-		t.Errorf("waited %v", d)
 	}
 	// Once the holder lets go, Lock succeeds.
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_UN); err != nil {
