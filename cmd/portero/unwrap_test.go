@@ -86,7 +86,7 @@ func TestWrappedAskUsesInner(t *testing.T) {
 	if err := routeLinkAsk(link, "com.example.mail", open, ask, remember); err != nil {
 		t.Fatal(err)
 	}
-	if got.Title != "meet.example.com/abc-defg-hij" || !got.CanRemember || got.ID != "com.example.mail\x00"+link {
+	if got.Title != "meet.example.com/abc-defg-hij  (via www.google.com)" || !got.CanRemember || got.ID != "com.example.mail\x00"+link {
 		t.Errorf("ask request %+v", got)
 	}
 	if host, path, ok := rules.RememberKey(remReq.URL); !ok || host != "meet.example.com" || path != "/abc-defg-hij" {
@@ -150,5 +150,20 @@ func TestUnwrapSettingSkipsLinks(t *testing.T) {
 	plain, _ := url.Parse("https://github.example.com/x")
 	if _, why := routeReq(r, plain, "com.example.mail", ""); why != "" {
 		t.Errorf("a plain link gets no unwrap line: %q", why)
+	}
+}
+
+func TestAskTitleVia(t *testing.T) {
+	inner, _ := url.Parse("https://meet.example.com/room")
+	wrapper, _ := url.Parse("https://team.slack.com/openid/connect/login_initiate_redirect")
+	if got := askTitleVia(inner, wrapper); got != "meet.example.com/room  (via team.slack.com)" {
+		t.Errorf("wrapped: %q", got)
+	}
+	if got := askTitleVia(inner, inner); got != "meet.example.com/room" {
+		t.Errorf("plain: %q", got)
+	}
+	evil := &url.URL{Scheme: "https", Host: "a.example.com\u202e\n"}
+	if got := askTitleVia(inner, evil); strings.ContainsAny(got, "\n\u202e\u2028") {
+		t.Errorf("not sanitized: %q", got)
 	}
 }

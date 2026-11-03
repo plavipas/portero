@@ -329,12 +329,12 @@ the real target's. Portero peels these wrappers off before it matches, with no n
 - Outlook Safe Links: `*.safelinks.protection.outlook.com`, parameter `url`.
 - Slack redirect: `slack-redirect.com/link`, parameter `url`.
 
-Up to three wrappers in a row are peeled. The inner URL must be `http` or `https`, have a host and be at most
+A wrapper with an ambiguous query is not unwrapped: the target parameter repeated, `;` anywhere in the query, or Google's `q` and `url` both present with different values. Up to three wrappers in a row are peeled. The inner URL must be `http` or `https`, have a host and be at most
 8 KiB; otherwise the link is not unwrapped. Rules then see only the inner URL: a rule on the wrapper host
 (`www.google.com`) applies only when unwrapping fails, and an inner URL that matches no rule goes to `default`,
 exactly like the same link clicked directly. The opener and the working directory stay those of the wrapper link,
 and the browser still receives the original wrapper URL (`would run:` shows it). `portero rules match` and
-`portero open --dry-run` print `unwrapped: <url>` before the decision; the ask panel title and "Remember" use the
+`portero open --dry-run` print `unwrapped: <url>` before the decision; the ask panel title shows the inner host and path followed by `(via <wrapper host>)`, and "Remember" uses the
 inner URL. `file://` links, an offloaded or broken rules file are not unwrapped.
 
 Unwrapping is on unless the file says otherwise:

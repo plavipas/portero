@@ -134,6 +134,16 @@ func routeReq(r *rules.Rules, u *url.URL, opener, cwd string) (req rules.Request
 	return req, why
 }
 
+// askTitleVia is askTitle of the URL the rules decided on, and for an unwrapped link the host of the wrapper:
+// `example.com/path  (via slack.com)`.
+func askTitleVia(u, link *url.URL) string {
+	t := askTitle(u)
+	if u != link && link != nil {
+		t += "  (via " + askTitle(&url.URL{Host: link.Hostname()}) + ")"
+	}
+	return t
+}
+
 func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc) error {
 	u, err := parseRoutable(link)
 	if err != nil {
@@ -177,7 +187,7 @@ func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*u
 			opts[i] = askOption(t)
 		}
 		_, _, canRemember := rules.RememberKey(u)
-		res := ask(handler.AskRequest{ID: req.Opener + "\x00" + link.String(), Title: askTitle(u), Options: opts, CanRemember: canRemember && remember != nil})
+		res := ask(handler.AskRequest{ID: req.Opener + "\x00" + link.String(), Title: askTitleVia(u, link), Options: opts, CanRemember: canRemember && remember != nil})
 		switch {
 		case res.Joined:
 			// An identical link is waiting in a panel and that one opens it. If its open later fails, the error is
