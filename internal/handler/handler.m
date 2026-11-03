@@ -10,6 +10,8 @@ static int generation = 0;
 static int inflight = 0;
 // terminating: applicationShouldTerminate answered NSTerminateLater and waits for inflight to reach 0.
 static BOOL terminating = NO;
+// graceOver: the short delay after a quit request has passed; Apple events already queued were delivered.
+static BOOL graceOver = NO;
 
 static os_log_t porteroLog(void) {
     static os_log_t log;
@@ -21,6 +23,7 @@ static os_log_t porteroLog(void) {
 static void porteroReplyTerminate(void) {
     if (!terminating) return;
     terminating = NO;
+    graceOver = NO;
     [NSApp replyToApplicationShouldTerminate:YES];
 }
 
@@ -51,13 +54,21 @@ static void porteroArrived(void) {
     }
 }
 
-// Quit requests (logout, restart, Quit): pending panels open their link in the default target first, and the
-// app waits (at most 10 s) until every link in flight is done.
+// Quit requests (logout, restart, Quit, the idle quit): never NSTerminateNow. A link whose Apple event is
+// already queued when the request arrives would be lost with the process, so the reply is deferred by a
+// short grace so that the run loop delivers pending events first. Pending panels open their link in the
+// default target; the reply then waits (at most 10 s) until every link in flight is done.
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     os_log(porteroLog(), "terminating, inflight=%d", inflight);
-    int panels = porteroCancelAllPanels();
-    if (inflight == 0 && panels == 0) return NSTerminateNow;
+    porteroCancelAllPanels();
     terminating = YES;
+    graceOver = NO;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 150 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        if (!terminating) return;
+        graceOver = YES;
+        os_log(porteroLog(), "terminate grace over, inflight=%d", inflight);
+        if (inflight == 0) porteroReplyTerminate();
+    });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{ porteroReplyTerminate(); });
     return NSTerminateLater;
 }
@@ -109,7 +120,7 @@ void porteroDone(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (inflight > 0) inflight--;
         if (inflight == 0) {
-            if (terminating) porteroReplyTerminate();
+            if (terminating) { if (graceOver) porteroReplyTerminate(); }
             else porteroExitAfter(2000);
         }
     });
