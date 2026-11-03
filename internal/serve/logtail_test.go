@@ -148,6 +148,9 @@ func TestSplitNote(t *testing.T) {
 		{"unwrapped https://a.example.com/x", "", "https://a.example.com/x"},
 		{`asked -> Dia/Work, remembered "n"; unwrapped https://a.example.com/x`, `asked -> Dia/Work, remembered "n"`, "https://a.example.com/x"},
 		{"", "", ""},
+		// An inner URL may carry the marker itself; the split is from the left, so the whole URL is the inner URL.
+		{"unwrapped https://a.example.com/?x=a; unwrapped b", "", "https://a.example.com/?x=a; unwrapped b"},
+		{"asked -> Dia/Work; unwrapped https://a.example.com/?x=a; unwrapped b", "asked -> Dia/Work", "https://a.example.com/?x=a; unwrapped b"},
 	}
 	for _, c := range cases {
 		ask, un := splitNote(c.in)

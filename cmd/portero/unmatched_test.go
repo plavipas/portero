@@ -68,13 +68,13 @@ func TestRouteUnmatchedPanel(t *testing.T) {
 	}
 	q := rig.asked[0]
 	if q.Title != "other.example.com/page" || len(q.Options) != 2 || q.Options[0] != "Keep default · Dia · Personal" ||
-		q.Options[1] != "Dia · Work · Team" || !q.CanRemember || q.RememberLabel != "Remember for this host (other.example.com)" {
+		q.Options[1] != "Dia · Work · Team" || !q.CanRemember || q.RememberLabel != "Remember for this host (other.example.com), links from any app" {
 		t.Errorf("request %+v", q)
 	}
 	if len(*rig.opened) != 1 || !strings.HasPrefix((*rig.opened)[0], "Dia/Work:Team ") {
 		t.Errorf("opened %v", *rig.opened)
 	}
-	if c := lastLogLine(t); c[2] != "" && c[2] != "default" || c[5] != "asked (no rule) -> Dia/Work:Team" {
+	if c := lastLogLine(t); c[2] != "none" || c[5] != "asked (no rule) -> Dia/Work:Team" {
 		t.Errorf("log %q", c)
 	}
 	if len(rig.remember) != 0 {
@@ -107,11 +107,12 @@ func TestRouteUnmatchedRememberTarget(t *testing.T) {
 
 func TestRouteUnmatchedRememberOutcomes(t *testing.T) {
 	tests := []struct {
-		err  error
-		want string
+		err      error
+		want     string
+		notified bool
 	}{
-		{errors.New("disk full"), "asked (no rule) -> default (kept), remember failed: disk full"},
-		{rulesfile.ErrNowMatched, "asked (no rule) -> default (kept), remember skipped: a rule matches now"},
+		{errors.New("disk full"), "asked (no rule) -> default (kept), remember failed: disk full (notified)", true},
+		{rulesfile.ErrNowMatched, "asked (no rule) -> default (kept), remember skipped: a rule matches now", false},
 	}
 	for _, tt := range tests {
 		rig := setupUnmatched(t, askRules)
@@ -124,6 +125,13 @@ func TestRouteUnmatchedRememberOutcomes(t *testing.T) {
 		}
 		if c := lastLogLine(t); c[5] != tt.want {
 			t.Errorf("log %q, want %q", c[5], tt.want)
+		}
+		if tt.notified {
+			if len(notifyCalls) != 1 || !strings.Contains(notifyCalls[0], "Could not remember other.example.com: disk full.") || !strings.Contains(notifyCalls[0], "decisions.log") {
+				t.Errorf("notifications %q", notifyCalls)
+			}
+		} else if len(notifyCalls) != 0 {
+			t.Errorf("unexpected notifications %q", notifyCalls)
 		}
 	}
 }
@@ -226,7 +234,9 @@ func TestPrintUnmatchedLines(t *testing.T) {
 		want string
 		n    int
 	}{
-		{"ask", r, "https://other.example.com/x", "unmatched: the app would ask: [default, Dia/Work:Team]\nremember: host other.example.com\n", 2},
+		{"ask", r, "https://other.example.com/x", "unmatched: for links from an app, Portero.app would ask: [default, Dia/Work:Team]\nremember: host other.example.com\n", 2},
+		{"idn host shows both forms", r, "https://bücher.example/", "unmatched: for links from an app, Portero.app would ask: [default, Dia/Work:Team]\nremember: host bücher.example = xn--bcher-kva.example\n", 2},
+		{"punycode host shows both forms", r, "https://xn--80ak6aa92e.com/", "unmatched: for links from an app, Portero.app would ask: [default, Dia/Work:Team]\nremember: host xn--80ak6aa92e.com = аррӏе.com\n", 2},
 		{"off", off, "https://other.example.com/", "ask_unmatched: off\n", 0},
 		{"matched", r, "https://meet.example.com/x", "", 0},
 		{"file", r, "file:///tmp/x.html", "", 0},

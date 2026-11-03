@@ -116,6 +116,7 @@ func TestUnmatchedChoices(t *testing.T) {
 		{"empty", mk(), nil, []Target{def}},
 		{"file order, ask lists and dupes", mk(Open{Target: work}, Open{Ask: []Target{saf, work, ff}}, Open{Target: saf}), nil, []Target{def, work, saf, ff}},
 		{"default and follows-default skipped", mk(Open{Target: def}, Open{Default: true}, Open{Ask: []Target{def, saf}}), nil, []Target{def, saf}},
+		{"same target in an ask list and a plain rule counts once", mk(Open{Ask: []Target{saf, work}}, Open{Target: saf}, Open{Target: work}), nil, []Target{def, saf, work}},
 		{"not installed", mk(Open{Target: work}, Open{Target: saf}), func(t Target) bool { return t != work }, []Target{def, saf}},
 		{"limit", mk(many...), nil, nil},
 	}

@@ -10,4 +10,5 @@ char *porteroSetDefaultHandler(const char *appPath, const char *scheme);
 char *porteroStartDownload(const char *path);
 void porteroAsk(int askID, const char *title, const char *options, int canRemember, const char *rememberLabel);
 int porteroCancelAllPanels(void);
+char *porteroNotify(const char *title, const char *body);
 #endif

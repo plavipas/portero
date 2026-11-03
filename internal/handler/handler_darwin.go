@@ -6,7 +6,7 @@ package handler
 
 /*
 #cgo CFLAGS: -x objective-c -fobjc-arc -fmodules
-#cgo LDFLAGS: -framework Cocoa
+#cgo LDFLAGS: -framework Cocoa -framework UserNotifications
 #include <stdlib.h>
 #include "handler.h"
 */
@@ -164,5 +164,27 @@ func porteroAskDone(id, choice, remember C.int) {
 	select {
 	case p.done <- AskResult{Choice: int(choice), Remember: remember != 0 && choice >= 0}:
 	default:
+	}
+}
+
+// Notify posts one macOS notification (fixed identifier, so a new one replaces the old) and blocks until it is
+// delivered, refused or the wait is over (60 s for the permission prompt, 5 s for the delivery). Call it from a
+// link's goroutine: the link then counts as in flight and the app stays alive. It returns NotifyOK,
+// NotifyDenied, NotifyNoAnswer or "notification failed: <why>"; outside an app bundle it fails without trying.
+func Notify(title, body string) string {
+	ct, cb := C.CString(title), C.CString(body)
+	defer C.free(unsafe.Pointer(ct))
+	defer C.free(unsafe.Pointer(cb))
+	out := C.porteroNotify(ct, cb)
+	defer C.free(unsafe.Pointer(out))
+	switch r := C.GoString(out); {
+	case r == "notified":
+		return NotifyOK
+	case r == "denied":
+		return NotifyDenied
+	case r == "no answer":
+		return NotifyNoAnswer
+	default:
+		return notifyFailed + strings.TrimPrefix(r, "failed: ")
 	}
 }

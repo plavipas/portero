@@ -276,9 +276,9 @@ func printUnmatchedLines(w io.Writer, r *rules.Rules, d rules.Decision, u *url.U
 	for i := 1; i < len(choices); i++ {
 		names[i] = choices[i].String()
 	}
-	fmt.Fprintf(w, "unmatched: the app would ask: [%s]\n", strings.Join(names, ", "))
+	fmt.Fprintf(w, "unmatched: for links from an app, Portero.app would ask: [%s]\n", strings.Join(names, ", "))
 	if host, ok := rules.RememberHost(u); ok {
-		fmt.Fprintf(w, "remember: host %s\n", host)
+		fmt.Fprintf(w, "remember: host %s\n", rules.HostForms(host))
 	} else {
 		fmt.Fprintln(w, "remember: not offered")
 	}

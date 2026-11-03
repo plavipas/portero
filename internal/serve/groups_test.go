@@ -45,7 +45,7 @@ func TestGraphDrawsGroupAsOneNode(t *testing.T) {
 			t.Errorf("stale node %+v", n)
 		}
 	}
-	want := []string{"r:Work", "r:plain", "r:#3", "s:default", "s:file", "s:error"}
+	want := []string{"r:Work", "r:plain", "r:#3", "s:default", "s:none", "s:file", "s:error"}
 	if len(ids) != len(want) {
 		t.Fatalf("rule nodes %v, want %v", ids, want)
 	}

@@ -14,7 +14,7 @@ import (
 type Decision struct {
 	Time   string `json:"time"`
 	Opener string `json:"opener"` // bundle id, "-" when unknown
-	Rule   string `json:"rule"`   // rule name, "default", "file" or "ERROR"
+	Rule   string `json:"rule"`   // rule name, "default", "none", "file" or "ERROR"
 	Target string `json:"target"` // "Browser/Profile:Container"; the message for an ERROR line
 	URL    string `json:"url"`
 	// Ask is the optional sixth column: how an asking rule was settled ("asked -> Dia/Work").
@@ -202,7 +202,9 @@ func (d Decision) path() [3]string {
 }
 
 // splitNote separates the sixth column into the ask note and the inner URL: `[ask note; ]unwrapped <url>`.
-// The URL comes last, so the first "unwrapped " that starts the note or follows "; " is the marker.
+// The URL comes last, so the first "unwrapped " that starts the note or follows "; " is the marker. Splitting
+// from the left is deliberate: an inner URL can contain "; unwrapped " in its query (url.Parse keeps it raw), so
+// splitting from the right would let a link choose where the cut falls.
 func splitNote(n string) (ask, unwrapped string) {
 	const mark = "unwrapped "
 	if strings.HasPrefix(n, mark) {

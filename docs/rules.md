@@ -255,7 +255,11 @@ silently in `default`. Instead the handler shows the ask panel (see "Ask"):
 - Only `http` and `https` links from the handler ask. `portero open` and `$BROWSER` never ask, nor do `file://`
   links, and an offloaded, missing or broken rules file behaves as before (Safari).
 - A link wrapped in a redirect is judged by its inner URL (see "Redirect links").
-- The checkbox says `Remember for this host (<host>)`. With a target chosen it appends a plain host rule; with
+- The checkbox says `Remember for this host (<host>), links from any app`: the host rule has no `opener`
+  condition, so it applies to links from every app, not only the one that sent this link. A host with
+  non-ASCII labels is shown in both forms, `<unicode> = <punycode>` (an `xn--` host as
+  `<punycode> = <unicode>`), so a look-alike cannot hide behind one of them; the rule written is the host as the
+  link carries it, in lower case. With a target chosen it appends a plain host rule; with
   "Keep default" it appends a rule that follows `default`:
 
 ```yaml
@@ -271,6 +275,14 @@ silently in `default`. Instead the handler shows the ask panel (see "Ask"):
   element matches. The write is the same safe write as "Remember" above; if a rule matches the link by the time
   the file is written, nothing is written (`remember skipped: a rule matches now` in the log). A rule added by
   hand below a remembered host rule loses that host; `portero rules check` warns about it.
+- A "Remember" that cannot write the file (offloaded or symlinked file, a lock held by another writer for over
+  5 seconds, a parse error, a full disk) still opens the link first. It then posts a macOS notification from
+  Portero (`Could not remember <host>: <reason>. Details: ~/.config/portero/decisions.log`); the first one asks
+  for the notification permission once. The log line ends with `(notified)`, `(notification denied)`,
+  `(notification: no answer)` or `(notification failed: <why>)`. See
+  [ADR 0007](adr/0007-remember-failure-notification.md).
+- The log line of a link settled by this panel has `none` in the rule column (the link had no rule); the
+  diagram draws these links through a "no rule (asked)" node.
 
 `ask_unmatched: false` at the top level turns the panel off; without the key it is on. The Settings page has the
 checkbox **Ask where to open links from apps that match no rule**.
@@ -282,13 +294,18 @@ arrives. It cannot be combined with `browser`, `profile`, `container` or `ask`; 
 (remove the key); it is not allowed inside `default` or an ask list. `portero rules match` prints
 `Dia/Personal (follows default)  (rule: name)`, and the diagram draws a dotted edge to the default target.
 
+A Portero build that does not know `default: true` rejects the whole file (unknown key): every link then goes to
+Safari and `decisions.log` gets an `ERROR` line. Update Portero on every Mac that shares the rules file (iCloud
+Drive) before using the key, "Keep default" with "Remember" or a rule that follows the default.
+
 `portero rules match` and `portero open --dry-run` describe an unmatched `http(s)` link:
 
 ```text
-unmatched: the app would ask: [default, Dia/Work]
+unmatched: for links from an app, Portero.app would ask: [default, Dia/Work]
 remember: host example.net
 ```
 
+The `remember:` line shows an internationalised host in both forms (`bücher.example = xn--bcher-kva.example`).
 They print `ask_unmatched: off` when the key is false and `unmatched: nothing to ask, default` when the panel
 would not show. `--dry-run` adds `would run (N):` lines for the choices (the default is 1) and `would run (Esc):`.
 
@@ -421,6 +438,9 @@ own name but without data (reading it would block until it is downloaded); on ol
 - The link handler never waits for a download: while the rules file is offloaded, a link opens in Safari at once,
   an `ERROR` line is added to `decisions.log` and the download is started, so later links are routed normally.
   The same applies to the address `portero serve` opens for the UI.
+- A Portero build older than the `open: { default: true }` key rejects the whole file as having an unknown key
+  and sends every link to Safari with an `ERROR` line in the log. Update Portero on every Mac that shares the
+  file before using that key (or "Keep default" with "Remember").
 - `portero rules check` on an offloaded file starts the download and exits with an error; run it again after a
   few seconds.
 
