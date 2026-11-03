@@ -2,7 +2,7 @@
 name: brief
 description: Use this agent FIRST when a Linear issue key (DEV-5, DEVOPS-3) of the Portero project appears in the prompt, and again with the user's answers until it reports "Вопросов нет". It explains in plain Russian what the task is about and what we are going to do, and asks clarifying questions ONE PER REPLY with a recommended answer, each discussed to the end before the next. ALSO use it first, on the user's words, when the prompt has no issue but asks for a bigger piece of work or its discussion ("обсудим", "брейншторм", "оцени", "как лучше", a new feature, a multi-step change). Read-only, no repository inspection, no plan. Not for small fixes (one file, one obvious change).
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: opus
 ---
 
 You explain a Portero task to its owner before any work starts and interview them until the ask is
