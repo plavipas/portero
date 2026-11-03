@@ -560,3 +560,25 @@ func TestSettingsUnwrapGuard(t *testing.T) {
 		t.Errorf("no cookie/origin: %d", w.Code)
 	}
 }
+
+func TestSettingsUnwrapOffloaded503(t *testing.T) {
+	r := settingsRig(t, Options{})
+	_, m := r.get("/api/settings")
+	hash := m["unwrap"].(map[string]any)["hash"].(string)
+	before, _ := os.ReadFile(r.rules)
+	downloads := 0
+	r.srv.opts.Offloaded = func(string) bool { return true }
+	r.srv.opts.Download = func(string) error { downloads++; return nil }
+	code, _ := r.post("/api/settings/unwrap", map[string]any{"unwrap": false, "skip": []string{}, "base_hash": hash})
+	if code != 503 || downloads == 0 {
+		t.Errorf("code %d, downloads %d", code, downloads)
+	}
+	if now, _ := os.ReadFile(r.rules); string(now) != string(before) {
+		t.Error("the offloaded file was written")
+	}
+	// GET reports the setting as not editable instead of reading the file
+	_, m = r.get("/api/settings")
+	if u := m["unwrap"].(map[string]any); u["editable"] != false {
+		t.Errorf("unwrap info %v", u)
+	}
+}
