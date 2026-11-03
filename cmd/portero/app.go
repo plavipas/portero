@@ -99,11 +99,19 @@ var rememberUnmatched = func(req rules.Request, chosen rules.Target, followDefau
 // notifyFunc posts the native notification of a failed "Remember" (handler.Notify in the app, a fake in tests).
 var notifyFunc = handler.Notify
 
+// shortHome shows p with the home directory as ~.
+func shortHome(p string) string {
+	if home, err := os.UserHomeDir(); err == nil && home != "" && strings.HasPrefix(p, home+string(filepath.Separator)) {
+		return "~" + p[len(home):]
+	}
+	return p
+}
+
 // notifyRememberFailed tells the user that "Remember" could not write the rules file and returns the part the
 // decision log appends: ` (notified)`, ` (notification denied)` and so on. The body is built only from the host
 // (already filtered) and the error text, one line, cut to 300 runes. The link has opened before this runs.
 func notifyRememberFailed(host string, rerr error) string {
-	body := "Could not remember " + host + ": " + rerr.Error() + ". Details: ~/.config/portero/decisions.log"
+	body := "Could not remember " + host + ": " + rerr.Error() + ". Details: " + shortHome(config.LogFile())
 	body = strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
 			return ' '

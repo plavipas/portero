@@ -182,6 +182,23 @@ func TestRouteAskedRememberSuccessDoesNotNotify(t *testing.T) {
 	}
 }
 
+func TestNotifyBodyNamesTheRealLog(t *testing.T) {
+	askRig(t, askRules)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg"))
+	notifyRememberFailed("example.com", errors.New("disk full"))
+	if len(notifyCalls) != 1 || !strings.HasSuffix(notifyCalls[0], "Details: ~/cfg/portero/decisions.log") {
+		t.Errorf("body %q", notifyCalls)
+	}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	notifyCalls = nil
+	notifyRememberFailed("example.com", errors.New("disk full"))
+	if !strings.HasSuffix(notifyCalls[0], filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "portero", "decisions.log")) || strings.Contains(notifyCalls[0], "~/.config") {
+		t.Errorf("body %q", notifyCalls)
+	}
+}
+
 func TestNotifyBodyIsOneShortLine(t *testing.T) {
 	askRig(t, askRules)
 	got := notifyRememberFailed("example.com", errors.New("bad\nline\t"+strings.Repeat("x", 500)))

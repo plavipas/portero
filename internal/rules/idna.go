@@ -3,6 +3,7 @@ package rules
 import (
 	"errors"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -172,6 +173,20 @@ func punyDecode(s string) (string, error) {
 	return string(out), nil
 }
 
+// unsafeLabel reports a label that is empty or holds control, format (bidi override, zero-width) or
+// line-separator characters.
+func unsafeLabel(l string) bool {
+	if l == "" {
+		return true
+	}
+	for _, r := range l {
+		if r < 0x20 || (r >= 0x7f && r < 0xa0) || unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
+			return true
+		}
+	}
+	return false
+}
+
 func isASCII(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= 0x80 {
@@ -189,7 +204,7 @@ func HostForms(host string) string {
 	labels := strings.Split(strings.ToLower(host), ".")
 	ace := make([]string, len(labels))
 	uni := make([]string, len(labels))
-	nonASCII, hasACE := false, false
+	nonASCII, hasACE, unsafe := false, false, false
 	for i, l := range labels {
 		switch {
 		case !isASCII(l):
@@ -199,6 +214,7 @@ func HostForms(host string) string {
 			}
 			nonASCII = true
 			ace[i], uni[i] = acePrefix+p, l
+			unsafe = unsafe || unsafeLabel(l)
 		case strings.HasPrefix(l, acePrefix):
 			u, err := punyDecode(l[len(acePrefix):])
 			if err != nil {
@@ -206,9 +222,14 @@ func HostForms(host string) string {
 			}
 			hasACE = true
 			ace[i], uni[i] = l, u
+			unsafe = unsafe || unsafeLabel(u)
 		default:
 			ace[i], uni[i] = l, l
 		}
+	}
+	if unsafe {
+		// Control, format (bidi, zero-width) or empty labels must not reach a terminal or a panel: only ASCII.
+		return strings.Join(ace, ".")
 	}
 	switch {
 	case nonASCII:

@@ -107,13 +107,13 @@ static void porteroArrived(void) {
     return NSTerminateLater;
 }
 
-// Documents (Open With, drag onto the icon): HTML files declared in Info.plist arrive here as file:// URLs.
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
        willPresentNotification:(UNNotification *)notification
          withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
     completionHandler(UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionList);
 }
 
+// Documents (Open With, drag onto the icon): HTML files declared in Info.plist arrive here as file:// URLs.
 - (void)application:(NSApplication *)app openURLs:(NSArray<NSURL *> *)urls {
     for (NSURL *u in urls) {
         os_log(porteroLog(), "link received (opener=-) %{private}@", u.absoluteString);
