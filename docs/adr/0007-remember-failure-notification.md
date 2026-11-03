@@ -21,7 +21,7 @@ the link opens, and the next link to the same host asks again with no hint why.
    characters stripped, cut to a sensible length). One fixed request identifier, so repeated failures replace
    each other instead of piling up; no sound. A successful "Remember" never notifies.
 2. **Permission once.** The first failure asks macOS for permission (`UNAuthorizationOptionAlert`); the answer is
-   kept by macOS. Denied or not determined: nothing is shown, the log says so. While the permission prompt or the
+   kept by macOS. Denied or not determined: nothing is shown, the handler log (stderr) says so. While the permission prompt or the
    delivery is pending the link counts as in flight, so the idle quit does not end the app under the prompt; the
    wait is capped (60 s for the prompt, 5 s for delivery) and the link is already open, so nothing is ever delayed.
    An explicit quit (logout, Quit) keeps its 10 s cap (`applicationShouldTerminate` in handler.m): a logout must not wait a minute for a banner, so
