@@ -29,6 +29,10 @@ rules:
 // notifyCalls records the bodies of the fake notifications askRig installs; nothing real is ever posted.
 var notifyCalls []string
 
+// logAtNotify is the content of decisions.log at the moment each fake notification was posted: the log line
+// must already be there.
+var logAtNotify []string
+
 // askRig points the config at temporary files and returns a recorder for opened targets.
 func askRig(t *testing.T, text string) (opened *[]string, open func(*url.URL, rules.Target) (launch.Plan, error)) {
 	t.Helper()
@@ -40,9 +44,12 @@ func askRig(t *testing.T, text string) (opened *[]string, open func(*url.URL, ru
 	if err := os.WriteFile(p, []byte(text), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	notifyCalls = nil
+	notifyCalls, logAtNotify = nil, nil
 	oldNotify := notifyFunc
-	notifyFunc = func(title, body string) string { notifyCalls = append(notifyCalls, title+"|"+body); return "notified" }
+	notifyFunc = func(title, body string) string { notifyCalls = append(notifyCalls, title+"|"+body)
+		b, _ := os.ReadFile(config.LogFile())
+		logAtNotify = append(logAtNotify, string(b))
+		return "notified" }
 	t.Cleanup(func() { notifyFunc = oldNotify })
 	var got []string
 	return &got, func(u *url.URL, tg rules.Target) (launch.Plan, error) {
@@ -161,12 +168,15 @@ func TestRouteAskedRememberFailureNeverBlocksTheLink(t *testing.T) {
 	if len(*opened) != 1 {
 		t.Errorf("opened %v", *opened)
 	}
-	if c := lastLogLine(t); len(c) != 6 || c[5] != "asked -> Dia/Work:Team, remember failed: disk full (notified)" {
+	if c := lastLogLine(t); len(c) != 6 || c[5] != "asked -> Dia/Work:Team, remember failed: disk full" {
 		t.Errorf("log %q", c)
 	}
 	if len(notifyCalls) != 1 || !strings.Contains(notifyCalls[0], "Portero|Could not remember meet.example.com: disk full.") ||
 		!strings.Contains(notifyCalls[0], "decisions.log") {
 		t.Errorf("notifications %q", notifyCalls)
+	}
+	if len(logAtNotify) != 1 || !strings.Contains(logAtNotify[0], "remember failed: disk full") {
+		t.Errorf("the log line must be written before the notification: %q", logAtNotify)
 	}
 }
 
@@ -202,7 +212,7 @@ func TestNotifyBodyNamesTheRealLog(t *testing.T) {
 func TestNotifyBodyIsOneShortLine(t *testing.T) {
 	askRig(t, askRules)
 	got := notifyRememberFailed("example.com", errors.New("bad\nline\t"+strings.Repeat("x", 500)))
-	if got != " (notified)" || len(notifyCalls) != 1 {
+	if got != "notified" || len(notifyCalls) != 1 {
 		t.Fatalf("%q %q", got, notifyCalls)
 	}
 	body := strings.TrimPrefix(notifyCalls[0], "Portero|")

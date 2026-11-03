@@ -107,8 +107,8 @@ func shortHome(p string) string {
 	return p
 }
 
-// notifyRememberFailed tells the user that "Remember" could not write the rules file and returns the part the
-// decision log appends: ` (notified)`, ` (notification denied)` and so on. The body is built only from the host
+// notifyRememberFailed tells the user that "Remember" could not write the rules file and returns the outcome:
+// "notified", "notification denied" and so on. It blocks up to 65 s, so callers write the log line first. The body is built only from the host
 // (already filtered) and the error text, one line, cut to 300 runes. The link has opened before this runs.
 func notifyRememberFailed(host string, rerr error) string {
 	body := "Could not remember " + host + ": " + rerr.Error() + ". Details: " + shortHome(config.LogFile())
@@ -121,7 +121,13 @@ func notifyRememberFailed(host string, rerr error) string {
 	if r := []rune(body); len(r) > 300 {
 		body = string(r[:299]) + "…"
 	}
-	return " (" + notifyFunc("Portero", body) + ")"
+	return notifyFunc("Portero", body)
+}
+
+// reportNotify prints the outcome of a notification to stderr (the handler log); the decision log line was
+// written before the notification, so a quit during the permission prompt cannot lose it.
+func reportNotify(result string) {
+	fmt.Fprintln(os.Stderr, "portero: remember failed:", result)
 }
 
 // unmatchedInstalled reports whether a target of the rules file can be offered on this Mac: a known browser must
@@ -228,6 +234,7 @@ func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*u
 	u := req.URL
 	target, note := d.Target, "asked -> default (CLI)"
 	remembered := false
+	var notify func() // posted after the log line is written
 	if ask != nil {
 		opts := make([]string, len(d.Ask))
 		for i, t := range d.Ask {
@@ -252,7 +259,8 @@ func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*u
 	if err == nil && remembered {
 		if name, rerr := remember(req, d.Rule, target); rerr != nil {
 			host, _, _ := rules.RememberKey(u)
-			note += ", remember failed: " + rerr.Error() + notifyRememberFailed(host, rerr)
+			notify = func() { reportNotify(notifyRememberFailed(host, rerr)) }
+			note += ", remember failed: " + rerr.Error()
 		} else {
 			note += fmt.Sprintf(", remembered %q", name)
 		}
@@ -260,6 +268,9 @@ func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*u
 	d.Target, d.Ask = target, nil
 	if lerr := decisionlog.AppendLink(config.LogFile(), d, req, link, note); lerr != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", lerr)
+	}
+	if notify != nil {
+		notify()
 	}
 	return err
 }
@@ -284,6 +295,7 @@ func routeUnmatched(choices []rules.Target, req rules.Request, link *url.URL, op
 	res := ask(handler.AskRequest{ID: req.Opener + "\x00" + link.String(), Title: askTitleVia(u, link), Options: opts, CanRemember: canRemember, RememberLabel: label})
 	target, note := def, "asked (no rule) -> default (cancelled)"
 	remembered, follow := false, false
+	var notify func() // posted after the log line is written
 	switch {
 	case res.Joined:
 		return nil
@@ -301,13 +313,17 @@ func routeUnmatched(choices []rules.Target, req rules.Request, link *url.URL, op
 		case errors.Is(rerr, rulesfile.ErrNowMatched):
 			note += ", remember skipped: a rule matches now"
 		case rerr != nil:
-			note += ", remember failed: " + rerr.Error() + notifyRememberFailed(host, rerr)
+			notify = func() { reportNotify(notifyRememberFailed(host, rerr)) }
+			note += ", remember failed: " + rerr.Error()
 		default:
 			note += fmt.Sprintf(", remembered %q", name)
 		}
 	}
 	if lerr := decisionlog.AppendLink(config.LogFile(), rules.Decision{Rule: "none", Target: target}, req, link, note); lerr != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", lerr)
+	}
+	if notify != nil {
+		notify()
 	}
 	return err
 }
