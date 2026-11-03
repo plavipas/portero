@@ -127,7 +127,7 @@ func notifyRememberFailed(host string, rerr error) string {
 // reportNotify prints the outcome of a notification to stderr (the handler log); the decision log line was
 // written before the notification, so a quit during the permission prompt cannot lose it.
 func reportNotify(result string) {
-	fmt.Fprintln(os.Stderr, "portero: remember failed:", result)
+	fmt.Fprintln(os.Stderr, "portero: remember failed; notification:", result)
 }
 
 // unmatchedInstalled reports whether a target of the rules file can be offered on this Mac: a known browser must

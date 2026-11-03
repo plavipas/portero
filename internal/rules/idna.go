@@ -208,9 +208,10 @@ func isASCII(s string) bool {
 
 // HostForms is the host as the "Remember" label and `rules match` show it. An ASCII host stays as is; a host
 // with non-ASCII labels is `<unicode> = <punycode>`; a host with `xn--` labels is `<punycode> = <unicode>`, so
-// a look-alike cannot hide behind either form. When any label fails to convert or holds control, format or
-// empty content, the result is ASCII only (`?` stands for a character that cannot be shown). The rule written is never
-// changed by this.
+// a look-alike cannot hide behind either form. When any label fails to convert, holds control or format
+// characters, or is an `xn--` label that decodes to nothing, the result is ASCII only (`?` stands for a character
+// that cannot be shown); a plain empty label (the trailing dot of `example.com.`) is kept. The rule written is
+// never changed by this.
 func HostForms(host string) string {
 	host = strings.ToLower(host)
 	labels := strings.Split(host, ".")
