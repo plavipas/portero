@@ -91,6 +91,10 @@ static void porteroFinish(PorteroPanel *panel, int choice) {
                       defer:NO];
     panel.askID = a.askID;
     panel.title = @"Open link in";
+    // Keys 1..9 and Esc must work at once: the panel is non-activating (the app the user clicked in keeps
+    // focus and stays active) but still becomes the key window, and the newest panel is ordered front as key
+    // below. becomesKeyOnlyIfNeeded NO makes it key although it has no text field that needs input.
+    panel.becomesKeyOnlyIfNeeded = NO;
     panel.hidesOnDeactivate = NO;
     panel.floatingPanel = YES;
     panel.level = NSFloatingWindowLevel;

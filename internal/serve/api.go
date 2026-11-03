@@ -374,6 +374,15 @@ func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request) {
 		"cwd_used": cwd, "cwd_note": note,
 		"path": [3]string{openerID(oid), matchRuleID(d, rule), targetID(d.Target.String())},
 	}
+	if len(d.Ask) > 0 {
+		// The handler app asks; the default target is what Esc, a missing panel and the CLI use.
+		asks := make([]string, len(d.Ask))
+		for i, t := range d.Ask {
+			asks[i] = t.String()
+		}
+		out["ask"] = asks
+		out["cancel_target"] = d.Target.String()
+	}
 	if s.opts.Plan != nil {
 		if plan, err := s.opts.Plan(u, d.Target); err != nil {
 			out["plan_error"] = err.Error()
