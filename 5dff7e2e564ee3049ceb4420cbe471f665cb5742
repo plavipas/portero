@@ -1,0 +1,18 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `slackTarget` in `internal/rules/unwrap.go` strictly validate the decoded Slack JWT claims object (DEV-50): the object must close properly and nothing may follow it.
+
+## Problems
+None.
+
+## Decision
+`slackTarget` scans claims with a streaming `json.Decoder`. That loop stops after reading the keys, so it never checked the closing brace or any trailing input. This differs from the earlier `json.Unmarshal` behaviour, which rejected trailing data. After the loop, the code now reads one token and requires it to be the `}` delimiter, so a truncated object is rejected. It then reads once more and requires `io.EOF`, so trailing garbage or a second JSON value is rejected. Both failures return an empty target, so the link is not unwrapped. Trailing whitespace is still allowed because the decoder skips it. Tests in `internal/rules/unwrap_test.go` cover trailing garbage, a second JSON value, a truncated object, and trailing whitespace, which is accepted.
+
+## Rejected
+None.
+
+## Touched
+encoding/json, io, internal/rules (unwrap)
