@@ -1,0 +1,24 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `install` leave exactly one registered Portero.app (DEV-46: stale copies hijacking links), and address review findings on PR #13: safer swap, safer build, correct default-handler status, robust install tests.
+
+## Problems
+- Codex cross-review found another `lsregister` dump form: the `(0x0-0x...)` record suffix. Without handling it, an old copy could stay registered.
+- A version string with `/`, `&` or similar broke the sed substitution and produced an invalid `Info.plist` (an unescaped ampersand). Escaping in sed was fragile.
+- Install tests had to run on a machine with an older `build/` directory and off macOS.
+
+## Decision
+- `scripts/install.sh` copies the new app to `Portero.app.new`, removes the old one, then moves the new one into place. If the copy fails, the old app stays. A failed enumeration now exits 1 instead of reporting "no other copies".
+- `scripts/build-app.sh` validates `VERSION` up front and accepts only letters, digits and `. _ + -`. Rejecting unsafe input is simpler and safer than escaping it for sed and XML.
+- `cmd/portero/app.go`: the default-status report compares the two scheme handlers as the same file, and `lsreg.Others` returns scanner errors.
+- `scripts/test-install.sh` skips off macOS and tolerates an old `build/`.
+- Security review (subagent) approved, Claude Code Review passed.
+
+## Rejected
+- Escaping `/`, `&`, `|` and backslash in the sed replacement: it still produced an invalid plist for `&`, and it is more brittle than validation.
+
+## Touched
+Launch Services `lsregister`, sed, Go toolchain, `packaging/Info.plist`, GitHub Actions Claude review.
