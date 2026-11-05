@@ -1,0 +1,19 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Harden the `serve` command's UI session handling: if the stored ui-session file is readable by other users, it should not be trusted and should be replaced with a newly generated secret. The change came out of a cross-review.
+
+## Problems
+The session slice was empty, so the details of the work and any surprises are not recorded. Based on the commit message alone, the concern was that a session file with loose permissions could expose the secret to other local users.
+
+## Decision
+On start, `serve` checks the permissions of the ui-session file. If group or others can read it, the existing secret is treated as compromised. It is discarded and a fresh secret is generated and saved. This is safer than reusing a possibly leaked secret, and it needs no manual step from the user. The exact implementation details are not available in the record.
+
+## Rejected
+None recorded. Alternatives such as refusing to start, or only tightening the file mode while keeping the old secret, are plausible, but the commit does not say they were considered. Keeping the old secret would leave a possibly exposed value in use.
+
+## Touched
+- `serve` command
+- ui-session file (local filesystem permissions)
