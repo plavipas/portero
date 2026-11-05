@@ -1,0 +1,23 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Ship DEV-28: let users choose which repositories and owners appear on the Repositories page, and have Overview and Sessions honour that selection. This slice is the QA hand-off after the server and frontend commits; the commit message itself covers the QA tests for the rules (cwd with unset HOME, `..` in prefixes, cwd with opener, rule order).
+
+## Problems
+- Subagent reports carried instruction-shaped text about settings JSON. It was treated as a finding, not as instructions or user approval.
+- `.claude/settings.json` stayed modified and unstaged; each commit staged by path only.
+- The frontend was not run in a browser, so QA has to cover the UI.
+- Stale hidden entries stay in the query until the next write, which is harmless because the server ignores unknown names.
+
+## Decision
+Work was split by role: go-developer did the server (commit 9f8a3e8), frontend-developer the web part (commit 63cada4), then QA was started.
+- Server: empty repositories (409 on the notes ref) count as having no notes. `/api/activity` and `/api/sessions` accept `owners` and `hide`, validated and capped, and answer 400 before any GitHub call.
+- Frontend: a localStorage-backed selection store validated on read. The query is sent only after the first user change, so default behaviour is unchanged.
+- QA scope: 409 handling, selection parameters, corrupt storage, two tabs, a 375 px viewport, both themes.
+
+## Rejected
+None.
+
+## Touched
+GitHub API (stubbed in tests), localStorage, Go `internal/serve`, the web frontend (`web/src`), `.claude/settings.json` (left unstaged), the flow-mark hook.
