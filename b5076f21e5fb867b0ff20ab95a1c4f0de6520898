@@ -1,0 +1,27 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Add tests (DEV-32 qa) verifying that Install section `Default=` path variants fall back to `Default=1`. The visible slice, however, covers wrap-up of DEV-17 (sidebar and theme switch), not the tests named in the commit.
+
+## Problems
+- The slice does not show the work behind the commit message, so the test details are not visible here.
+- Overview chart-window tabs (7/30/90) fail axe because `aria-controls` points to a missing element, a leftover from DEV-14. Logged as DEV-34, not fixed.
+- The collapsed sidebar handle announced a value below its minimum to screen readers; fixed in the DEV-17 branch.
+
+## Decision
+Within the visible slice, DEV-17 was closed out:
+- PR #13 merged.
+- Binary rebuilt from main and installed locally.
+- Demo server on port 8099 restarted.
+- Linear issue updated to Done.
+- Project notes updated.
+- A Go test was added for serving `/theme.js`.
+
+The Install section tests from the commit message are separate, small test coverage for the `Default=` fallback.
+
+## Rejected
+None.
+
+## Touched
+Linear, GitHub Actions (claude-review), Playwright, axe, Codex, local `gitreason` binary, `~/.local/bin`, project-agent-notes memory file, localStorage (web UI), Go build.
