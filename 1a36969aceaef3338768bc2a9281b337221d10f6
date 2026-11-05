@@ -1,0 +1,26 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Commit adds a `portero serve` command (DEV-24). The slice shows the session's work on a related ticket, DEV-35, in review: the user's agent workflow handles cross-review rounds before security review and a PR.
+
+## Problems
+The third Codex cross-review of the DEV-35 head found two issues in the note and stats code:
+- A failed note write can leave a usage flush in the stats log. A retry then logs the same counters twice.
+- Session-start cleanup can remove counters while an update runs, if the repository lock is unavailable.
+
+A fourth QA round was still running on the previous HEAD.
+
+## Decision
+The review output was read and the go-developer agent was resumed with the third-round findings to fix. After the fixes are committed, the plan is a final QA re-check, a fourth Codex review, then security review and the PR. Each round of cross-review is used to catch concurrency and ordering bugs before merge.
+
+## Rejected
+None
+
+## Touched
+- Codex (cross-review)
+- go-developer agent
+- QA agent
+- gitreason note and stats code (`internal/note`)
+- git repository lock
