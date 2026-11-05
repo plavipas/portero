@@ -1,0 +1,19 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Address a review finding on PR 13 (DEV-46): `lsreg.Others` should never list the app that is being kept when it is reached through a symlink or a different path spelling.
+
+## Problems
+The existing check compared only cleaned path strings (`p == keep`), so the kept app registered under an alias path (symlink, different spelling) was reported as "another" registration. The Codex cross-review could not run Go tests because its environment was read-only, so tests had to be verified by us.
+
+## Decision
+In `internal/lsreg/lsreg.go`, `Others` now also skips an entry when a new `sameFile(p, keep)` helper says it is the same file as `keep`. The helper uses the `os` package to compare the filesystem identity of both paths, so symlinks and alternative spellings resolve to the same app. The string comparison and deduplication stay as they were. Tests in `internal/lsreg/lsreg_test.go` cover the symlink and alternate-spelling cases. This keeps the fix local to the function that decides which registrations are "others", so callers need no change.
+
+## Rejected
+None. The session slice shows no alternatives considered; the path-string comparison alone was simply insufficient.
+
+## Touched
+- Go standard library `os`
+- `lsregister` (macOS Launch Services registration dump parsed by `internal/lsreg`)
