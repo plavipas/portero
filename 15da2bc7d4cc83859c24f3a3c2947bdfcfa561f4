@@ -1,0 +1,24 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+DEV-47: add an "ask" target to Portero rules, so links that no rule can place into a profile can show a profile picker. This commit covers the rules layer plus the places that must understand it: check, graph and the link-log reader.
+
+## Problems
+The session slice holds no direct work on the code, only the plan. Open points from it: the ADR 0005 approval (Portero writes rules into the rules file itself) is still pending and is needed before merge. A separate cold-start link loss is part of the wider task, not of this commit.
+
+## Decision
+- Rules gain an `ask` target in the open action. Matching returns `Decision.Ask`.
+- New `internal/rules/remember.go` provides `RememberKey`, the key for a "remember this" rule for a specific meeting. The rule goes in front of the ask group, not inside it.
+- `internal/check` validates `ask`. `internal/serve/graph.go` shows it in the rule graph. `internal/serve/logtail.go` reads the extra "asked and chosen" data for a sixth column in the UI (`app.js`, `app.css`).
+- Tests were added in the rules, check, serve and app packages.
+
+The panel, the safe write of the rules file (.bak copy and lock) and the cold-start fix come in separate changes.
+
+## Rejected
+- Putting the remembered rule inside the ask group: it would be placed before the group instead.
+- Asking for Portero commands run in a terminal: they open the default profile directly.
+
+## Touched
+Portero rules file, link log (`logtail`), rule graph UI (`internal/serve/ui`), `internal/check`, `internal/rules`.
