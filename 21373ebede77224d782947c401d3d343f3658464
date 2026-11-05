@@ -1,0 +1,26 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Record the user's acceptance of ADR 0006 (DEV-49, "Ask when no rule matches a link from an app") by moving its status to accepted.
+
+## Problems
+None. The user's acceptance was only needed before merge, so development was not blocked.
+
+## Decision
+The user confirmed the ADR after a summary of the behavior. The commit only changes the status in `docs/adr/0006-ask-unmatched.md`. The ADR describes:
+- A panel appears when a link from an app matches no rule. "Keep default" (Dia · Private) comes first, then the profiles from the user's rules.
+- The "Remember" checkbox appends a host rule at the end of the rules file, so it never overrides existing rules.
+- If the default profile is chosen, the rule is written as `open: {default: true}`, so the host follows any later change of default profile.
+- The feature can be turned off with a settings checkbox or with `ask_unmatched: false` in the rules file.
+
+The known consequence is that every unmatched app link will prompt after install, and prompts get rarer as rules are remembered.
+
+## Rejected
+None.
+
+## Touched
+- `docs/adr/0006-ask-unmatched.md`
+- Rules file key `ask_unmatched`
+- Rule option `open: {default: true}`
