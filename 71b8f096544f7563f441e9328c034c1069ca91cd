@@ -1,0 +1,27 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `scripts/build-app.sh` refuse any build directory located anywhere inside `~/Applications`, not only one equal to it. This follows a cross-review finding.
+
+## Problems
+None.
+
+## Decision
+The existing guard compared the resolved build directory only for equality with the resolved `~/Applications`. A directory nested inside it, such as inside the installed `Portero.app`, passed the check. `make install` would then delete or overwrite its own build or the installed app.
+
+The check now also matches by prefix. It appends a trailing `/` to the resolved output path and uses a `case` pattern against `"$APPS"/*`. The trailing slash avoids false matches on sibling directories that share a name prefix. The check stays in POSIX `sh`, with no new dependencies. The error message now says "inside ~/Applications".
+
+`scripts/test-install.sh` gets a regression case. It sets the build directory to a path under the installed app and asserts that `install.sh` fails. It also checks that the installed app's marker file is untouched. The success message was updated to match.
+
+## Rejected
+None.
+
+## Touched
+- `scripts/build-app.sh`
+- `scripts/test-install.sh`
+- `scripts/install.sh` (exercised by the test)
+- `PORTERO_BUILD_DIR` environment variable
+- `HOME` environment variable
+- `~/Applications`
