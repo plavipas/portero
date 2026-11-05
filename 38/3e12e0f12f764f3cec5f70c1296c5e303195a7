@@ -1,0 +1,19 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Apply gofmt formatting to the unwrap rules test so the file passes formatting checks (DEV-50).
+
+## Problems
+None.
+
+## Decision
+Ran gofmt on `internal/rules/unwrap_test.go`. The only change is spacing around the `+` operator in the "trailing whitespace" test case, where a raw string and a `"\n"` literal are concatenated. Behavior and test data are unchanged. This is a formatting-only fix, so it stays a small separate commit.
+
+## Rejected
+None.
+
+## Touched
+- gofmt
+- Go test suite (`internal/rules`)
