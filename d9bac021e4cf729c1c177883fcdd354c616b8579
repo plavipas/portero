@@ -1,0 +1,22 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+The commit message concerns an embedded UI for `serve` (routing diagram and rules editor, DEV-24). The slice itself covers the DEV-35 review loop: take a subagent's round-2 fixes for the usage-stats feature, then start the next QA and cross-review rounds on the new HEAD.
+
+## Problems
+- The subagent's full `go test -race ./internal/note` does not finish. A 300,000-line transcript test is too slow under the race detector, and the subagent did not check whether it was already slow before this change.
+- Counting without the lock could double-count or write unprotected log lines.
+- The subagent report was flagged by the harness for an instruction-shaped pattern (settings-json). It was treated as a finding, not as an instruction, and no settings were changed.
+
+## Decision
+- Accepted the subagent's commit 54a6298: counting and flushing only happen while the lock is held, and a busy lock is logged and skipped.
+- The repo stats-log line is now written before the note, with a bounded wait. If it is skipped, the counters are kept for the next note. This avoids embedding counters twice, though it deviates from the literal wording of the review request.
+- Started a short QA round 4 and a third Codex cross-review on that HEAD. Security review, PR, Claude review and merge follow once both come back clean.
+
+## Rejected
+None.
+
+## Touched
+Codex cross-review script (orca-run.sh), Go toolchain (go test, go vet, gofmt), git, the QA subagent, `.claude/settings.json` (left unstaged and unchanged).
