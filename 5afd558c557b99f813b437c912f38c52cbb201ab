@@ -1,0 +1,23 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the default `status` check always compare against the canonical install location (`~/Applications/Portero.app`) instead of whichever copy of the app is currently running. This came out of a cross-review.
+
+## Problems
+None.
+
+## Decision
+`installedApp()` in `cmd/portero/app.go` no longer returns the running bundle's path when one exists. It always returns `~/Applications/Portero.app`, the location `make install` maintains. If Launch Services launches a stale copy from somewhere else, the comparison now reports a mismatch instead of reporting "healthy" because the running copy matched itself. The old fallback for a bare CLI was already the standard path, so that case is unchanged.
+
+The doc comment above the function still carries the old description, and a new one was added below it, so the comment is now duplicated and partly stale. A follow-up cleanup should remove the old line.
+
+## Rejected
+None.
+
+## Touched
+- `cmd/portero/app.go`
+- `~/Applications/Portero.app` install location
+- `make install`
+- Launch Services (macOS)
