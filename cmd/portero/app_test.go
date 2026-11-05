@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -197,7 +198,7 @@ func TestDefaultReport(t *testing.T) {
 		{"all match", ours, inst, "1.2.3", inst, "1.2.3", []string{"resolved: " + inst + " (1.2.3)"}, true},
 		{"other path", ours, "/tmp/x/Portero.app", "1.2.3", inst, "1.2.3", []string{
 			"resolved: /tmp/x/Portero.app (1.2.3)",
-			"warning: macOS opens links with /tmp/x/Portero.app, not " + inst + "; run make install"}, false},
+			"warning: macOS opens links with /tmp/x/Portero.app, not " + inst + "; reinstall Portero (make install or brew reinstall --cask portero)"}, false},
 		{"other version", ours, inst, "1.0.0", inst, "1.2.3", []string{
 			"resolved: " + inst + " (1.0.0)",
 			"warning: resolved app is 1.0.0, this binary is 1.2.3"}, false},
@@ -269,5 +270,57 @@ func TestSamePathFollowsSymlinks(t *testing.T) {
 	}
 	if samePath(app, filepath.Join(dir, "Other.app")) {
 		t.Error("different paths reported as the same")
+	}
+}
+
+func TestBundleOf(t *testing.T) {
+	for _, tt := range []struct{ exe, want string }{
+		{"/Applications/Portero.app/Contents/MacOS/portero", "/Applications/Portero.app"},
+		{"/h/Applications/X.app/Contents/MacOS/portero", "/h/Applications/X.app"},
+		{"/usr/local/bin/portero", ""},
+	} {
+		if got := bundleOf(tt.exe); got != tt.want {
+			t.Errorf("%s -> %q, want %q", tt.exe, got, tt.want)
+		}
+	}
+}
+
+func TestQuarantineWarning(t *testing.T) {
+	yes := func(string) bool { return true }
+	no := func(string) bool { return false }
+	if got := quarantineWarning("/Applications/Portero.app", no); got != "" {
+		t.Errorf("clean app warned: %q", got)
+	}
+	if got := quarantineWarning("", yes); got != "" {
+		t.Errorf("empty path warned: %q", got)
+	}
+	got := quarantineWarning("/Applications/Portero.app", yes)
+	for _, part := range []string{"warning: /Applications/Portero.app is quarantined", "Open Anyway", "xattr -dr com.apple.quarantine '/Applications/Portero.app'"} {
+		if !strings.Contains(got, part) {
+			t.Errorf("warning %q lacks %q", got, part)
+		}
+	}
+	var out bytes.Buffer
+	printQuarantine(&out, "/x/Portero.app", no)
+	if out.Len() != 0 {
+		t.Errorf("printed for a clean app: %q", out.String())
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	if got := shellQuote("/a b/it's"); got != `'/a b/it'\''s'` {
+		t.Errorf("got %s", got)
+	}
+}
+
+func TestQuarantinedOnATempDir(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS only")
+	}
+	if quarantined(t.TempDir()) {
+		t.Error("fresh temp dir reported as quarantined")
+	}
+	if quarantined("") {
+		t.Error("empty path reported as quarantined")
 	}
 }

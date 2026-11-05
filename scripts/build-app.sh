@@ -7,6 +7,8 @@ set -eu
 cd "$(dirname "$0")/.."
 ROOT=$(pwd -P)
 VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}
+# A tag v0.1.0 is version 0.1.0.
+VERSION=${VERSION#v}
 # The version goes into sed and an XML plist: only plain version characters are accepted.
 case "$VERSION" in
 *[!A-Za-z0-9._+-]* | "")
@@ -14,6 +16,18 @@ case "$VERSION" in
 	exit 1
 	;;
 esac
+# PORTERO_ARCHS: space-separated GOARCH-style names (arm64, x86_64); default is the host architecture. Two
+# architectures give a universal binary (lipo) built for macOS 13 and later.
+ARCHS=${PORTERO_ARCHS:-$(uname -m)}
+for a in $ARCHS; do
+	case "$a" in
+	arm64 | x86_64) ;;
+	*)
+		echo "error: architecture $a is not supported (arm64, x86_64)" >&2
+		exit 1
+		;;
+	esac
+done
 OUT=${PORTERO_BUILD_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/portero-build.XXXXXX")}
 case "$OUT" in /*) ;; *) OUT=$PWD/$OUT ;; esac
 case "$OUT/" in
@@ -45,7 +59,22 @@ APP=$OUT/Portero.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp packaging/Portero.icns "$APP/Contents/Resources/Portero.icns"
-CGO_ENABLED=1 go build -ldflags "-X main.version=$VERSION" -o "$APP/Contents/MacOS/portero" ./cmd/portero
+BIN=$APP/Contents/MacOS/portero
+set --
+for a in $ARCHS; do
+	case "$a" in arm64) goarch=arm64 ;; *) goarch=amd64 ;; esac
+	part=$APP/Contents/MacOS/portero.$a
+	CGO_ENABLED=1 GOARCH=$goarch MACOSX_DEPLOYMENT_TARGET=13.0 \
+		CGO_CFLAGS="-arch $a -mmacosx-version-min=13.0" CGO_LDFLAGS="-arch $a -mmacosx-version-min=13.0" \
+		go build -ldflags "-X main.version=$VERSION" -o "$part" ./cmd/portero
+	set -- "$@" "$part"
+done
+if [ "$#" = 1 ]; then
+	mv "$1" "$BIN"
+else
+	lipo -create -output "$BIN" "$@"
+	rm -f "$@"
+fi
 sed "s/VERSION/$VERSION/g" packaging/Info.plist > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 codesign --force --sign - "$APP" >/dev/null 2>&1 || echo "warning: ad-hoc codesign failed" >&2

@@ -5,3 +5,4 @@
 .claude/flow-state/
 .claude/agent-memory/
 .claude/worktrees/
+.claude/settings.local.json
