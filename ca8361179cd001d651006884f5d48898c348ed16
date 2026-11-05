@@ -1,0 +1,19 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the `serve` UI session secret persistent per user, so that reloading the UI after a restart on the same port keeps the session working.
+
+## Problems
+None recorded. The session slice was empty, so this note is based only on the commit message.
+
+## Decision
+The session secret is stored per user in `~/.config/portero/ui-session` with 0600 permissions. A restart on the same port reuses the stored secret instead of generating a new one, so an open browser tab survives the restart. The file mode restricts access to the owning user, which keeps the secret as protected as it was in memory.
+
+## Rejected
+None recorded.
+
+## Touched
+- `serve` command
+- `~/.config/portero/ui-session` (user config file)
