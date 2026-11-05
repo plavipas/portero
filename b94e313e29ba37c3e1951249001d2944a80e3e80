@@ -1,0 +1,19 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Change the serve UI so that the "show only" action highlights the path, and leave the Match form untouched. The request is inferred from the commit message alone, since no session transcript was available.
+
+## Problems
+None known. The session slice was empty, so any difficulties during the work are not recorded.
+
+## Decision
+Based on the commit message, "show only" now only highlights the path in the serve UI. It no longer changes or fills in the Match form. This keeps the highlight behavior separate from the user's own match input, so a highlight action cannot overwrite what they typed. The exact implementation details are not available from the slice.
+
+## Rejected
+None recorded. The slice contains no discussion of alternatives.
+
+## Touched
+- serve UI (the interface served by the serve command)
+- Match form (deliberately left unchanged)
