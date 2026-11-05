@@ -1,0 +1,18 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Close the QA finding on DEV-47: `RememberKey` checked only the path for invisible or format characters, not the host. Make it refuse such characters in the host too.
+
+## Problems
+QA found that `https://us06<U+200B>web.zoom.us/j/123` returned `ok=true` with an invisible character in the host. An ask rule such as `*.zoom.us` would match it, so Remember could write a rule whose name and host contain a hidden character. The panel title already shows it as a visible space, so users were not misled about the destination. The finding was minor and did not block the PASS verdict.
+
+## Decision
+In `internal/rules/remember.go`, the existing character check now iterates over path plus host instead of the path alone. It refuses control characters, DEL, Unicode format characters (Cf), and U+2028/U+2029. Using the same check for both parts avoids a second, divergent rule. A table case in `internal/rules/rules_test.go` covers a U+200B zero-width space in the host and expects a refusal. The test runs in the `internal/rules` package.
+
+## Rejected
+None. QA's suggested fix was applied as proposed.
+
+## Touched
+Go standard library `unicode` and `strings` packages; the `internal/rules` package (`RememberKey`).
