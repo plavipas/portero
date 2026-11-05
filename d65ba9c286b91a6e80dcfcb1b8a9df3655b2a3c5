@@ -1,0 +1,22 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=2 commit=1 plain=0 start=0 resume=1 nofeed=0
+
+## Goal
+Follow-ups for the Ask/Remember feature (DEV-50): when "Remember" cannot write the rules file, tell the user with a native macOS notification, and fix a set of related rough edges (IDN host display, lock timeout, JWT unwrap, log tail, docs, tests).
+
+## Problems
+None recorded in the session slice. The diff shows the existing failure path was only a `remember failed` line in `decisions.log`, so the user had no visible hint why the next link asked again.
+
+## Decision
+- After the link has opened, a failed Remember (both ask panels) posts one notification via a new `internal/handler/notify.go`. `cmd/portero/app.go` builds a one-line body of at most 300 runes with control characters stripped. A fake `notifyFunc` is used in tests.
+- The log line gets a suffix such as `(notified)` or `(notification denied)`. A link settled by the unmatched panel logs `none` in the rule column, and the diagram draws it through a "no rule" node.
+- The Remember checkbox now says `links from any app`, because the written host rule has no opener condition. IDN hosts are shown in both unicode and punycode forms (`internal/rules/idna.go`), so a look-alike host cannot hide behind one form. The CLI output says that Portero.app would ask.
+- The README and `docs/rules.md` warn that older builds reject `default: true` and send every link to Safari. `docs/rules.md` also documents the notification and the 5-second lock timeout.
+- ADR 0007 is added with status proposed. The rule file format and the "link opens first" guarantee are unchanged.
+
+## Rejected
+None.
+
+## Touched
+UserNotifications framework (`UNUserNotificationCenter`), macOS notification permission, `internal/handler` (Objective-C bridge), `internal/rules`, `internal/rulesfile` (lock), `internal/serve` (graph, log tail), `decisions.log`, rules YAML file, iCloud Drive.
