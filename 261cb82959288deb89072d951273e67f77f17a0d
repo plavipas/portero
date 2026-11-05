@@ -1,0 +1,23 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Make Portero appear in System Settings > Desktop & Dock > "Default web browser" list, since the user saw only Safari there even though Portero was already the actual http/https handler.
+
+## Problems
+- After the DEV-25 merge, `portero default set` printed "already set" for both schemes while the user believed Safari was default. Launch Services records showed Portero had been the handler since the first `default set`.
+- The System Settings picker did not list Portero at all, so choosing Safari there changed nothing.
+- The picker caches its list, so System Settings had to be quit and reopened to see the change.
+
+## Decision
+Added `CFBundleDocumentTypes` for HTML (`public.html`, `public.xhtml`) to `packaging/Info.plist`, on a new branch `fix-browser-picker-listing`. macOS lists an app as a browser only if it declares HTML document types, as other browser routers do. Rebuilt and re-registered the app; Launch Services now reports the HTML UTIs and the http/https schemes as claimed. The user confirmed Portero now shows up in the picker.
+
+## Rejected
+None.
+
+## Touched
+- `packaging/Info.plist`
+- macOS Launch Services registration
+- System Settings (Desktop & Dock)
+- `portero default set/status`
+- Portero.app bundle (reinstalled via `make install`)
