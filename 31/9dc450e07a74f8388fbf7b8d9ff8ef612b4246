@@ -1,0 +1,25 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Drive the DEV-35 "usage statistics" branch (showing whether agents read gitreason notes) through QA and repeated cross-review rounds. The slice also covers fixes for review findings. The commit message itself mentions QA tests for origin lookalikes, backup symlink, byte-exact apply and log endpoint edges (DEV-24).
+
+## Problems
+- QA found uncommitted edits in the clone and a PASS that covered only the older HEAD, so it had to be re-run on newer commits.
+- Two minor QA findings: the lock-busy message named the repository lock instead of the stats log lock, and a note written while the log was locked was never counted.
+- The fourth Codex review found that a failed stats-log append could silently drop counters even though the note was written.
+- A `-race` run of the usage tests failed once, apparently from the prune loop starving the appender; it could not be reproduced.
+
+## Decision
+- Added a dedicated "stats log lock is busy" error, separate from the repository-lock error.
+- Count the note in the kept counters when the log line is skipped.
+- On a failed log append, keep the counters file, increment only the note count and skip the user-level copy. The note still carries its Usage line. Possible double counting in the dashboard is accepted and documented in the code.
+- Made the prune loop in the race test sleep 1 ms per iteration.
+- Each fix got its own commit. QA and a fifth Codex review then ran in parallel on the latest HEAD.
+
+## Rejected
+None
+
+## Touched
+Git branch dev-35-usage-stats, internal/note, internal/usage, Codex cross-review script, flow-mark QA markers, the stats log and its lock file. The unstaged settings file was left alone.
