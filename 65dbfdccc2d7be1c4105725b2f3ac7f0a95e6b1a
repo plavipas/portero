@@ -1,0 +1,20 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Change the `serve` command so that, when no cache directory is configured, the UI authenticates with a per-run secret instead of storing or reading anything in the config directory. This came out of a review comment.
+
+## Problems
+The session slice was essentially empty, so the details come only from the commit message. The review concern appears to be that falling back to the config directory could leak or persist the secret in a location meant for configuration, not runtime state.
+
+## Decision
+When no cache directory is set, `serve` generates a fresh secret on each run and keeps it only for that process. It never falls back to the config directory. This keeps runtime secrets out of the user's config, avoids a secret that lasts across runs, and removes a shared-state path that could be read or overwritten by other processes. When a cache directory is configured, behavior is presumably unchanged.
+
+## Rejected
+None recorded in the available material. The obvious alternative, falling back to the config directory, is what the change removes, because config storage is the wrong place for a runtime secret.
+
+## Touched
+- `serve` command (UI server)
+- Cache directory setting
+- Config directory (no longer used as a fallback)
