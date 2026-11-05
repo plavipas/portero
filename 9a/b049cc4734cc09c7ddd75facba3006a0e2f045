@@ -1,0 +1,24 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Address the automated Claude review findings on the DEV-47 "ask target" PR (#15). Document the limits of the "Remember" feature, clarify a code comment, and cover the `RememberKey` edge cases in tests.
+
+## Problems
+The review pointed out that a remembered rule is narrower than users might assume. It pins only the host and the meeting path, so a rule written by "Remember" does not constrain which app opened the link or its working directory. The docs did not say so. A "joined duplicate" in `cmd/portero/app.go` was also unexplained. `RememberKey` edge cases, such as format characters in the host or path, lacked test coverage.
+
+## Decision
+- `docs/rules.md`: added a bullet under "Remember" stating that only the host and meeting path are pinned and that opener and cwd are not.
+- `cmd/portero/app.go`: added a comment explaining why the joined duplicate exists.
+- `internal/rules/rules_test.go`: added tests for the `RememberKey` edge cases.
+
+These are documentation and test changes only. No behaviour changes, and `make test` passes.
+
+## Rejected
+None.
+
+## Touched
+- Go standard library (`unicode`, testing)
+- `make test`
+- Rules file format (`rules.yaml`), documented in `docs/rules.md`
