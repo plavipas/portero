@@ -1,0 +1,19 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Drive DEV-28 (Repositories page: choose which repos and owners to show) through QA, coordinating developer subagents. The commit itself concerns open/rules match accepting flags before, after and around the URL (DEV-36 review).
+
+## Problems
+- QA failed DEV-28 on a flaky `TestAPISelection`. Two notes with equal dates load concurrently and `latest` was sorted by date only, so order was random (about 1 in 4 runs).
+- Minor: the "No repositories match" message ignored matches inside the Hidden group.
+- Subagent reports carried instruction-shaped text flagged by the harness; treated as data, not authority.
+
+## Decision
+Relayed the QA findings to the go and frontend developers. Go fix (b63d212): deterministic tie-breaks in `internal/serve/api.go` for `latest` (date, repo, sha), the per-repo notes list, the repo list and session ordering; `go test -count=20 ./internal/serve/` passes. Frontend fix (9f63080): `anyRows` in `Repositories.tsx` now counts `hiddenRows`; tsc and build are clean. QA was resumed for a re-check on the new HEAD. Other QA checks (409/partial, selection API, validation, storage, a11y, console) had already passed.
+
+## Rejected
+- Order-insensitive comparison in the test: the sort tie-break fixes the root cause and also makes the "Last note" link deterministic.
+
+## Touched
+`internal/serve/api.go`, `web/src/pages/Repositories.tsx`, Go test suite, TypeScript/Vite build, Playwright QA, flow-mark, GitHub API (stubbed in tests).
