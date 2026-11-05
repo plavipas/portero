@@ -1,0 +1,20 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Fix `scripts/install.sh` so that the dry-run (preview) path also fails when enumerating registered Portero app copies fails. This came out of a cross-review for DEV-46 (PR #13).
+
+## Problems
+The dry-run path piped the `lsregister -dump` output into `portero lsreg-others` inside a `while` loop. If the dump or the enumeration failed, the pipeline's exit status was lost. The preview then reported success, although the normal install path did handle that failure.
+
+## Decision
+The enumeration failure now propagates in the dry run as it already does in a real install. Because the loop was fed by a pipe, its status masked the failure of `others`. The fix is meant to make a failed Launch Services query fail the preview with a non-zero exit code. That way the preview does not claim an install would succeed when it could not list the old copies to unregister.
+
+## Rejected
+None.
+
+## Touched
+- `scripts/install.sh`
+- Launch Services `lsregister` (`-dump`)
+- `portero lsreg-others` subcommand
