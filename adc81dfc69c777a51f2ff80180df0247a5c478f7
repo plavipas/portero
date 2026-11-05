@@ -1,0 +1,23 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Implement step 3 of the portero project: per-browser launchers. Open links in a specific browser and profile, covering Chromium and Firefox profiles, Dia and Arc via AppleScript, and add a `browsers` command that lists installed browsers.
+
+## Problems
+- Dia and Arc are single-instance browsers with no profile command-line flag, so profile selection needed AppleScript. Arc's scripting dictionary had to be inspected to see how spaces, windows and tabs relate.
+- The first AppleScript approach for opening a tab in a profile was reworked; `runScript` was rewritten to create the tab through window 1.
+- Scripts had to be tested against live browsers, so test tabs were opened and closed afterwards.
+
+## Decision
+- Added `internal/browsers` to detect installed browsers, classify each by launch kind (dia, arc, chromium, firefox), and enumerate profiles.
+- Added `internal/launch` with a generic launcher plus a darwin-specific part that drives AppleScript via `osascript`.
+- Added a `browsers` CLI command and updated the README browser-support table.
+- Checked it end to end: the `open` command routed a link through the default rule into Dia's Private profile, and the tab was then closed.
+- Unit tests pass for browsers and rules.
+
+## Rejected
+None
+
+## Touched
+Dia, Arc, Google Chrome, Zen (Firefox-type), AppleScript/osascript, Go packages `internal/browsers` and `internal/launch`, README.md, the gitreason hook.
