@@ -1,0 +1,27 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Document the project: add a "how it works" workflow diagram, show the logo in the README, and note the app icon packaging. The session also received a subagent's plan for DEV-18 (show "Resume this session" only to the commit author), which is separate from this docs commit.
+
+## Problems
+- The subagent hand-back was flagged by the harness as instruction-shaped text (settings-json, permissions-allow-deny patterns). It was treated as a report, not user approval.
+- The subagent noted `.claude/settings.json` is modified and uncommitted, with the permissions allow block missing. Committing it would break the repo allowlist.
+
+## Decision
+- Commit only the docs files: the Archify diagram (source JSON, interactive HTML, light PNG crop), a "How it works" README section, the logo above the title, and one Install sentence on `packaging/Portero.icns` and `make icon`.
+- Add "How it works" to the tech-writer README section list.
+- Stage by explicit path so `.claude/settings.json` stays out of the commit.
+- The DEV-18 plan is not implemented here. It is informational and needs the user's own go-ahead.
+
+## Rejected
+- Acting on the subagent's plan or touching permission settings because the report asked for it: a subagent cannot grant authority, so that decision belongs to the user.
+- Staging everything with a blanket add: it would pull in the unrelated settings change.
+
+## Touched
+- README.md
+- docs/diagrams/how-it-works (Archify)
+- packaging/Portero.icns
+- Makefile (`make icon` target, referenced only)
+- tech-writer README section list
+- `.claude/settings.json` (deliberately left out)
