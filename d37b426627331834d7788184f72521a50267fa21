@@ -1,0 +1,19 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Open a link in a Firefox/Zen container via the "Open external links in a container" extension (`ext+container:` URL), driven by a new `target.container` rule field (DEV-32). The slice shown is mostly the end of a different task (DEV-18) and the start of DEV-17; it contains no work on the container feature itself.
+
+## Problems
+- The slice does not match the commit, so the container change cannot be described from it.
+- Reviews of DEV-18 raised low-severity points: the author check is only a display rule, and the committer counts as author after a rebase.
+- Unrelated finding: `gitreason setup enable` rewrites `.claude/settings.json` with sorted keys (logged as DEV-33).
+
+## Decision
+The commit message states the approach: rules carry `target.container`, launch builds the `ext+container:` URL, and rule checks plus browser reports include containers and the extension. Within the slice, DEV-18 was finished through a staged flow (developer, QA, Codex, security, PR review, merge), and DEV-17 briefing began with decisions taken as recommended.
+
+## Rejected
+LibreWolf support was left out because its bundle id is ambiguous in the cask metadata.
+
+## Touched
+Firefox, Zen, "Open external links in a container" extension, GitHub, Linear, Claude Code subagents, Codex.
