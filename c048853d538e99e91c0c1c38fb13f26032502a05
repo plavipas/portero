@@ -1,0 +1,17 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Document, under ticket DEV-36, how the working directory (cwd) is matched when a link is opened from a shell. The change is documentation only.
+
+## Problems
+None recorded. The session slice was empty, so this note is based only on the commit message. Details of any difficulties are unknown.
+
+## Decision
+Add or update docs describing the cwd-matching behavior for links opened from a shell. A docs-only commit records the behavior without touching code. The exact wording and file locations are not visible from the available information.
+
+## Rejected
+None recorded.
+
+## Touched
+No dependencies, services or config are known to be involved. The change appears limited to documentation files.
