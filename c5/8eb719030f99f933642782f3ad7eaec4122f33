@@ -1,0 +1,26 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Fix DEV-25: `portero default set` failed with "https: The file couldn't be opened" even after the macOS dialog had already set both schemes. Make the command idempotent and quiet, while a real failure stays an error.
+
+## Problems
+- The earlier candidate commit only checked the handler after a call when macOS returned an error. If macOS returned nil but the scheme stayed foreign (dialog declined), it printed success with exit 0.
+- No unit tests existed for `cmd/portero`, because the logic called cgo handler functions directly.
+- The macOS error on a repeat call carries no useful information (Launch Services permission-denied underneath).
+- The installed app predates the fix, so it was not verified live.
+- CI does not run `go test`; the gate is local `make test`.
+
+## Decision
+- Extract `ensureDefault(app, current, set)`: skip schemes already ours, call set otherwise, then unconditionally re-read the actual handler. A scheme still foreign is an error that keeps the macOS error text and stops the loop. A set error is ignored if the scheme is ours afterwards.
+- Extract `printDefaultStatus` writing to an `io.Writer`, with "already set" / "set now" notes.
+- Unit tests with fakes cover six scenarios plus the status format.
+- Use a new commit on top of the candidate rather than an amend.
+- Cross-review by Codex. The user chose the full live check (via Safari, with dialog), which the user runs.
+
+## Rejected
+- Trusting the macOS error value: not informative on repeat calls.
+- A polling loop for NSWorkspace cache staleness: deferred unless seen live.
+
+## Touched
+macOS Launch Services / NSWorkspace, cgo `internal/handler`, `cmd/portero`, Go toolchain, Makefile, Linear (DEV-25, DEV-26), Codex cross-review.
