@@ -1,0 +1,19 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Fix a race in the Ask panel (DEV-47): if a link is dispatched to the panel after application termination has started, it must not wait on a panel that termination never cancels.
+
+## Problems
+A cross-review (Codex) flagged that a panel dispatch can race with app termination. An in-flight ask keeps waiting on a panel termination did not cancel, so the app's timeout may terminate before the link is opened. The race depends on Objective-C main-queue ordering, so Go tests cannot reproduce it. The review tooling also failed once and had to be rerun.
+
+## Decision
+In `internal/handler/panel.m`, asks dispatched after termination has begun now resolve straight to the default answer without showing a panel. This closes the window where termination misses a late-dispatched ask. Verification is limited to `make test` and the cgo build, which confirm compilation.
+
+## Rejected
+None.
+
+## Touched
+- `internal/handler/panel.m` (Objective-C, cgo)
+- Cocoa main-queue / application-termination flow
