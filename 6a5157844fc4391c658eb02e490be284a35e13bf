@@ -1,0 +1,17 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Adjust the rules check so it behaves sensibly when its inputs are uncertain: warn if the extension state cannot be determined, and show a neutral note (not a failure) when the default profile cannot be found. Work was tracked as DEV-32 (QA follow-up).
+
+## Problems
+The session slice was essentially empty, so no problems or surprises are recorded. From the commit message alone, the likely issue was that unknown extension state and a missing default profile were handled as if they were definite results, giving misleading output.
+
+## Decision
+Separate "unknown" from "bad" in the rules check. An unknown extension state produces a warning, because the check cannot confirm the rules are in effect. A missing default profile produces only a neutral informational note, because that is not a fault in the user's setup and should not alarm them. This keeps warnings meaningful and avoids false failures.
+
+## Rejected
+None recorded.
+
+## Touched
+Rules check feature (extension state detection, default profile lookup). No external services or dependencies are identifiable from the available information.
