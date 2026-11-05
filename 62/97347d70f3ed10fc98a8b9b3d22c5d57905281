@@ -1,0 +1,23 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Update the task-flow documentation so that the planning step hands off to the developer automatically once the plan has been shown, and the agent merges the work itself when all checks pass.
+
+## Problems
+None. The session slice was empty, so no obstacles are recorded beyond the commit itself.
+
+## Decision
+The commit is documentation-only. It changes the described workflow in two places:
+- After the plan is displayed, the developer step starts without waiting for a separate manual trigger. This removes a hand-off pause.
+- Once all checks are green, the agent performs the merge, so a person no longer has to do it.
+
+The reasoning is inferred from the commit message alone: fewer manual gates in the flow, with the green-checks condition kept as the safety criterion for merging.
+
+## Rejected
+None recorded. The slice contains no discussion of alternatives.
+
+## Touched
+- Task flow documentation (docs)
+- Planning, developer and merge stages of the agent workflow
+- CI checks, referenced as the merge condition
