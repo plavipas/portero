@@ -1,0 +1,19 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the "remember failed" macOS notification show a single banner when failures repeat, instead of stacking up in Notification Center (DEV-50).
+
+## Problems
+None.
+
+## Decision
+In `internal/handler/handler.m`, before building the new notification content, the code now calls `removeDeliveredNotificationsWithIdentifiers:` for the fixed `remember-failed` identifier. Reusing an identifier only replaces a pending request, not one that has already been delivered. Removing the delivered one first keeps the same identifier and leaves one visible banner. It is a one-line change next to the code that posts the notification.
+
+## Rejected
+None.
+
+## Touched
+- UserNotifications framework (`UNUserNotificationCenter`, `UNMutableNotificationContent`)
+- `internal/handler/handler.m`
