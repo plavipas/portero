@@ -1,0 +1,21 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the install test script safer and cheaper to run, and stop the build script from ever writing into `~/Applications`, the install target.
+
+## Problems
+None.
+
+## Decision
+- `scripts/build-app.sh` resolves `~/Applications` and exits with an error if the build directory is the same. Otherwise `install` would delete the build it is about to copy. If the directory was created by this run, it is removed first.
+- `scripts/test-install.sh` runs with a fake `HOME`. It now exports the real Go module cache, build cache and GOPATH, so Go does not download modules into the temp directory and build cold there.
+- The cleanup trap runs `chmod -R u+w` before `rm -rf`, because module-cache files are read-only.
+- A new test case checks that `install.sh` with the build directory set to the fake `~/Applications` fails, and that the installed app's marker file is untouched.
+
+## Rejected
+None.
+
+## Touched
+Go toolchain (GOMODCACHE, GOCACHE, GOPATH), `PORTERO_BUILD_DIR`, `HOME`, `scripts/install.sh`, `scripts/build-app.sh`, `scripts/test-install.sh`.
