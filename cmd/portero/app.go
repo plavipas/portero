@@ -492,8 +492,11 @@ func quarantineWarning(app string, isQuarantined func(string) bool) string {
 	if app == "" || !isQuarantined(app) {
 		return ""
 	}
-	return fmt.Sprintf("warning: %s is quarantined; macOS will block the first link - open it once (open -a Portero, System Settings > Privacy & Security > Open Anyway) or run: xattr -dr com.apple.quarantine %s", app, app)
+	return fmt.Sprintf("warning: %s is quarantined; macOS will block the first link - open it once (open -a Portero, System Settings > Privacy & Security > Open Anyway) or run: xattr -dr com.apple.quarantine %s", app, shellQuote(app))
 }
+
+// shellQuote single-quotes s for a copy-and-paste shell hint.
+func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
 // printQuarantine prints quarantineWarning; it never changes the exit status.
 func printQuarantine(w io.Writer, app string, isQuarantined func(string) bool) {

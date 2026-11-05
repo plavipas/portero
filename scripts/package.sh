@@ -9,7 +9,12 @@ VERSION=${VERSION#v}
 export VERSION
 BUILD=$(mktemp -d "${TMPDIR:-/tmp}/portero-package.XXXXXX")
 trap 'rm -rf "$BUILD"' EXIT
-APP=$(PORTERO_ARCHS="arm64 x86_64" PORTERO_BUILD_DIR="$BUILD" sh scripts/build-app.sh | tail -n 1)
+out=$(PORTERO_ARCHS="arm64 x86_64" PORTERO_BUILD_DIR="$BUILD" sh scripts/build-app.sh) || {
+	echo "error: build failed" >&2
+	exit 1
+}
+APP=$(printf '%s\n' "$out" | tail -n 1)
+[ -d "$APP" ] || { echo "error: build did not produce an app ($APP)" >&2; exit 1; }
 codesign --verify --strict "$APP"
 archs=$(lipo -archs "$APP/Contents/MacOS/portero")
 case " $archs " in
@@ -29,7 +34,12 @@ fi
 mkdir -p dist
 ZIP=Portero_${VERSION}_darwin_universal.zip
 rm -f "dist/$ZIP"
-ditto -c -k --keepParent "$APP" "dist/$ZIP"
+ditto -c -k --norsrc --noextattr --keepParent "$APP" "dist/$ZIP"
+# The archive must unpack with plain tools into a bundle whose signature still verifies.
+CHECK=$BUILD/unzip
+mkdir -p "$CHECK"
+unzip -q "dist/$ZIP" -d "$CHECK"
+codesign --verify --strict "$CHECK/Portero.app" || { echo "error: signature broken after unzip" >&2; exit 1; }
 (cd dist && shasum -a 256 "$ZIP" > checksums.txt)
 echo "packaged dist/$ZIP" >&2
 cat dist/checksums.txt >&2

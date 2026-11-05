@@ -129,8 +129,9 @@ open -a Portero
 ```
 
 macOS shows "Portero cannot be opened". Open System Settings > Privacy & Security, scroll to the message about
-Portero and click Open Anyway, then confirm. To skip this, install with
-`brew install --cask --no-quarantine plavipas/tap/portero`. `portero default status` warns while the app is still quarantined.
+Portero and click Open Anyway, then confirm. Alternatively, remove the quarantine attribute after the install:
+`xattr -dr com.apple.quarantine /Applications/Portero.app`. `portero default status` warns while the app is still
+quarantined (not yet approved).
 
 Then:
 

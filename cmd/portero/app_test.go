@@ -295,7 +295,7 @@ func TestQuarantineWarning(t *testing.T) {
 		t.Errorf("empty path warned: %q", got)
 	}
 	got := quarantineWarning("/Applications/Portero.app", yes)
-	for _, part := range []string{"warning: /Applications/Portero.app is quarantined", "Open Anyway", "xattr -dr com.apple.quarantine /Applications/Portero.app"} {
+	for _, part := range []string{"warning: /Applications/Portero.app is quarantined", "Open Anyway", "xattr -dr com.apple.quarantine '/Applications/Portero.app'"} {
 		if !strings.Contains(got, part) {
 			t.Errorf("warning %q lacks %q", got, part)
 		}
@@ -304,6 +304,12 @@ func TestQuarantineWarning(t *testing.T) {
 	printQuarantine(&out, "/x/Portero.app", no)
 	if out.Len() != 0 {
 		t.Errorf("printed for a clean app: %q", out.String())
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	if got := shellQuote("/a b/it's"); got != `'/a b/it'\''s'` {
+		t.Errorf("got %s", got)
 	}
 }
 
