@@ -1,0 +1,23 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Give `serve` and the "Remember" action a single locked, verified write path for the rules file (DEV-47), so Remember adds a plain rule without rewriting or reformatting the rest of the file.
+
+## Problems
+None recorded. The diff shows two edge cases handled: `rules.RememberKey` now rejects paths with leading or trailing whitespace, and `InsertBefore` refuses files it cannot edit textually safely (flow-style `rules` list, a rule item not starting with a dash on its own line).
+
+## Decision
+New package `internal/rulesfile`:
+- `Lock` takes an exclusive advisory `flock` on `rules.lock` in the config dir (a no-op on non-unix builds). `serve` passes `LockDir: config.Dir()` so the server and Remember serialize their writes.
+- `Remember` locks, re-reads the file, re-routes the link, and refuses with `ErrNoLongerAsks` if the file changed and the same asking rule no longer decides it or the chosen target is no longer a choice. It then picks a unique name and writes through `Write`, which uses a hash check, a `.bak` backup, and 0600 mode.
+- `InsertBefore` inserts the new rule as text directly before the asking rule or group, above its attached comment block. It keeps indentation and CRLF, and quotes scalars via the YAML encoder. Textual insertion keeps comments and formatting byte for byte.
+- The result is verified: it parses, the link routes to the new rule and target, and every other element is unchanged.
+- Tests cover write, symlink, CRLF, group, name clash, and offloaded cases.
+
+## Rejected
+None.
+
+## Touched
+gopkg.in/yaml.v3, syscall flock, `internal/rules`, `internal/serve`, `cmd/portero/serve.go`, `rules.lock`, `rules.yaml` and its `.bak`.
