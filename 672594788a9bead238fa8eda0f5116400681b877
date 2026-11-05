@@ -1,0 +1,19 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Change the examples so they use only profile names and no organisation wording. The commit is "Examples: profiles only, no organisations". The visible session part then checked whether the session note tooling was attached to that commit.
+
+## Problems
+None visible. The slice holds only a status check of the git hooks path, the gitreason hooks directory, the note for the commit, and the log tail. No result is shown, so the outcome of the note step is unknown.
+
+## Decision
+Keep the change as one small commit on top of the earlier example and test cleanups, which already made profile names neutral and removed client wording. After committing, run a read-only check of the hook setup and the stored note for the commit, so the note step can be confirmed without editing anything.
+
+## Rejected
+None
+
+## Touched
+- git (hooks path config, notes ref `gitreason`)
+- gitreason CLI and its hooks and log under `.git/gitreason`
+- portero repository (examples)
