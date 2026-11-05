@@ -1,0 +1,20 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Harden the `serve` command's UI access (DEV-24, security): the link handed to the user should not itself act as a long-lived credential.
+
+## Problems
+The session slice was empty, so no problems or surprises are recorded. Details beyond the commit message are unknown.
+
+## Decision
+The UI link now carries a single-use nonce. When the link is opened, the nonce is exchanged for a session, and the browser cookie holds a separate session secret. This way, a leaked or logged URL (browser history, referrer headers, shell output) cannot be replayed after first use. The cookie value never appears in a URL, so the two credentials are kept apart.
+
+## Rejected
+None recorded.
+
+## Touched
+- `serve` command (local UI server)
+- Browser cookie/session handling
+- DEV-24 (tracking ticket)
