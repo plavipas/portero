@@ -1,0 +1,22 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Make Portero (a macOS default-browser handler app) cope with document opens: when Launch Services hands it local HTML files (via Open With or drag onto the icon), it should route them as file URLs to the default target instead of ignoring them.
+
+## Problems
+- After declaring HTML document types in Info.plist so System Settings lists Portero as a browser, the Codex cross-review flagged that the app delegate only handled the URL-get Apple event and had no document-open handler. Local .html/.xhtml files could therefore be routed to Portero and dropped.
+
+## Decision
+Added a document-open handler in the Objective-C delegate (`internal/handler/handler.m`). Files arrive as file:// URLs and are forwarded to the default target. This keeps the Info.plist document-type declaration, which is needed for the browser picker listing, and closes the gap it opened. Go tests passed. A live run of `portero default set` showed a single dialog, both schemes set, and exit code 0. A local HTML file test through Portero was then started, opening a tab in the browser and closing it afterwards, before committing and sending the change for another Codex review.
+
+## Rejected
+None
+
+## Touched
+- macOS Launch Services and System Settings default-browser picker
+- `packaging/Info.plist`
+- `internal/handler/handler.m`
+- Codex cross-review (Orca tab)
+- Dia and Safari browsers
+- Go test suite
