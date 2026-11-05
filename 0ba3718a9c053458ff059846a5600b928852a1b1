@@ -1,0 +1,24 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the decision graph tell a link settled by the "unmatched" panel apart from a user rule that happens to be named `none`. Also tidy the wording in ADR 0007 (DEV-50).
+
+## Problems
+None.
+
+## Decision
+`ResolvePaths` in `internal/serve/graph.go` now checks a new helper, `unmatchedAsked`. It is true when the rule column is `none` and the ask note starts with "asked (no rule)". Only the unmatched panel writes that note, so it identifies these decisions reliably. Such decisions get the path node `s:none`. All other decisions resolve through `logRuleID` as before, so a real rule named `none` keeps its `r:none` node. Matching on the note avoids changing the log format or reserving the name `none` for users.
+
+A new test, `TestResolvePathsUnmatchedVersusRuleNamedNone` in `internal/serve/groups_test.go`, parses a rules file containing a rule named `none`. It checks three cases: an unmatched asked link, a plain match of the user's `none` rule, and an ordinary "asked -> Safari" link that went through that rule.
+
+In `docs/adr/0007-remember-failure-notification.md`, the wording now says the handler log (stderr) reports a denied or undetermined notification permission.
+
+## Rejected
+None.
+
+## Touched
+- `rules` package (rules parsing)
+- `internal/serve` decision graph
+- ADR 0007 (docs)
