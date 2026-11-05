@@ -1,0 +1,21 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Run the DEV-17 workflow: a resizable, collapsible web UI sidebar plus a dark/light/system theme switch. The user trusted the architect's plan and asked to proceed straight into development without further approval.
+
+## Problems
+- The hand-back from the first developer call said only "pending", so the commit had to be checked directly in git.
+- My own check of `/theme.js` against the bundle returned 404. QA later confirmed it is served with 200 from the built binary.
+- QA found two minor issues. When the sidebar is collapsed, the resize handle reports a value (56) below its minimum (192). An existing Overview tab has an invalid `aria-controls` target, which comes from DEV-14 and not from this branch.
+- A foreign uncommitted edit to `.claude/settings.json` sat in the clone and had to stay out of the commits.
+
+## Decision
+The architect wrote the plan and a frontend developer implemented it in one commit on `dev-17-sidebar-theme`, touching only `web/`. Width and collapsed state are persisted in localStorage. The theme is applied by an external `/theme.js` loaded in `<head>`, which avoids a flash on load and leaves the CSP unchanged. QA passed all criteria in headless Chromium. The remaining steps are docs, cross-review, security review, PR and merge.
+
+## Rejected
+- PostCSS nesting for the duplicated dark tokens: it would change the build for about 25 lines. The duplication is kept with a "keep in sync" comment.
+- An inline theme script: it conflicts with the CSP `script-src 'self'`.
+
+## Touched
+Vite/React web app, Tailwind CSS, shadcn Tooltip, lucide icons, `internal/serve` (CSP, static serving, tests only), localStorage, Playwright/Chromium, axe-core, the `flow-mark` hook, git.
