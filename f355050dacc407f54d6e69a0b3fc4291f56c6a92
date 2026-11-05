@@ -1,0 +1,23 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Get Portero to a first locally runnable and testable version: a macOS link handler app that receives URLs (kAEGetURL) with the opener's bundle id, plus default-browser registration, iCloud sync, rules initialization, and app bundle build and install.
+
+## Problems
+- Links clicked inside a browser can't be intercepted; the handler only sees links from other apps. Documented in the README and tracked in a Linear issue for a future browser extension.
+- The first app test logged the opener as unknown ("-"), unlike the CLI run, which recorded the Terminal bundle id.
+- The bundle was built from a dirty tree, so the version reads "-dirty".
+- Test tabs opened in Dia had to be closed manually via AppleScript.
+
+## Decision
+- Handler in cgo/ObjC (`internal/handler`) with a non-darwin stub, which keeps the Go core portable.
+- `cmd/portero/app.go` shares one routing path between the CLI and the app: load rules, route, launch, write to decisions.log.
+- `scripts/build-app.sh` builds the bundle with an Info.plist (http/https, LSUIElement). It is installed to ~/Applications, with the CLI in ~/.local/bin.
+- Added default-browser, sync (iCloud Drive) and rules init commands. Verified live: the app opened a test URL in Dia/Private, and init wrote a 4-rule config.
+
+## Rejected
+- Browser extension for in-browser clicks: postponed to a later feature (DEV-21), outside v1.
+
+## Touched
+macOS Launch Services, Cocoa/cgo, Dia (AppleScript), Zen Browser, iCloud Drive, Linear, git notes (gitreason), Go toolchain.
