@@ -1,0 +1,21 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Fix the `open` and `rules match` commands so that a `~` in the `--cwd` argument is expanded to the home directory, and update the usage text to mention the cwd warning. This came out of QA on DEV-36.
+
+## Problems
+The session slice was empty, so no problems are recorded. The commit message implies that `--cwd ~/...` was not expanded, probably because the shell did not expand it (for example when written as `--cwd=~/x`). The path then did not resolve and triggered the cwd warning.
+
+## Decision
+Tilde expansion is applied to the `--cwd` value in both `open` and `rules match`, so both commands treat the path the same way. The usage/help text now mentions the cwd warning, so users can see why the warning appears and how to avoid it. Both changes are small and were found during QA, so they were kept in one commit.
+
+## Rejected
+None recorded.
+
+## Touched
+- `open` command
+- `rules match` command
+- `--cwd` option handling
+- usage/help text
+- DEV-36 (QA ticket)
