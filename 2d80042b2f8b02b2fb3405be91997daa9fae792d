@@ -1,0 +1,27 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `portero rules init` safe when the rules file is a synced file that iCloud has offloaded from this Mac, so the example rules never get written next to the placeholder (a cross-review finding).
+
+## Problems
+None.
+
+## Decision
+In `cmd/portero/main.go`, the `rules init` branch now checks `sync.Offloaded(p)` first. If the file is offloaded, it requests a download via `startDownload` and returns an error saying the file was not replaced and that `portero rules check` should be run in a few seconds. Otherwise it continues as before. The existence check changed from `os.Stat` to `os.Lstat`, so a dangling symlink also counts as existing and is not overwritten.
+
+A regression test, `TestRulesInitRefusesOffloadedPlaceholder` in `cmd/portero/offload_qa_test.go`, builds a `.rules.yaml.icloud` placeholder in a temp dir and stubs `startDownload`. It asserts that:
+- an error mentioning "not replaced" is returned
+- no rules file was created
+- exactly one download was requested.
+
+This reuses the offload handling already used elsewhere in the CLI, so the behavior is consistent. It also avoids a silent data-loss risk: the example would otherwise be written beside the placeholder, and when iCloud later restores the real file it would conflict with the example or replace the user's rules.
+
+## Rejected
+None.
+
+## Touched
+- iCloud offloaded-file placeholders (`.icloud`)
+- `sync.Offloaded` and `startDownload` helpers
+- Environment variables `PORTERO_RULES`, `HOME`, `XDG_CONFIG_HOME` (in the test)
