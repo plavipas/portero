@@ -1,0 +1,18 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Add a test (ticket DEV-39, QA) verifying that when a default attempt becomes stale, its late-arriving answer is dropped instead of being applied.
+
+## Problems
+None recorded. The session slice was empty, so no obstacles are known beyond what the commit message states.
+
+## Decision
+Commit a test-only change that covers the stale-attempt case: a late response from a superseded default attempt must not overwrite or affect the current state. A regression test pins this behavior without changing production code. Details of the implementation are not visible in the available context.
+
+## Rejected
+None.
+
+## Touched
+No dependencies, services or config are known to be involved. Only test code is implied by the commit message.
