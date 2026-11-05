@@ -1,0 +1,22 @@
+Agent-Session: claude-code/030c8511-4922-4468-8542-cd55b025cfa5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=0 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the `portero` CLI's default status/set report work for an app installed via Homebrew cask (in /Applications) as well as `make install`, and warn when the installed app is quarantined by macOS (DEV-75).
+
+## Problems
+None.
+
+## Decision
+- `installedApp()` now returns the bundle the running binary lives in, and falls back to `~/Applications/Portero.app` only for a bare CLI binary. The bundle detection was split into a testable `bundleOf(exe)`.
+- A quarantine warning is printed after `default status` and `default set`. It explains Gatekeeper will block the first link and gives two fixes: Open Anyway, or `xattr -dr com.apple.quarantine`. It never changes the exit status.
+- The check `quarantined()` runs `/usr/bin/xattr -p com.apple.quarantine` in `quarantine_darwin.go`. Any failure counts as "not quarantined", so the check can't get in the way. A `quarantine_other.go` stub returns false on other platforms.
+- Hints that said "run make install" now also mention `brew reinstall --cask portero`, and the not-in-bundle message names the cask.
+- Tests cover `bundleOf`, the warning text, and `quarantined` on a temp dir (darwin only).
+
+## Rejected
+None.
+
+## Touched
+macOS `xattr` (com.apple.quarantine), Homebrew cask `plavipas/tap/portero`, Launch Services, Gatekeeper, `make install`.
