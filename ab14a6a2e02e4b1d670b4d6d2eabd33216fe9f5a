@@ -1,0 +1,29 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Add an "ask" panel to the handler app (DEV-47). When a rule asks, the user picks the target for the link, with a "Remember" option that pins the choice as a new rule. The CLI and the decision log also need to cope with asking rules.
+
+## Problems
+None.
+
+## Decision
+- `routeLink` now calls `routeLinkAsk`, which takes the panel function (`handler.Ask`) and the remember function as parameters. Tests pass fakes. `routeLinkWith` passes nil for both, so it never asks and uses the default target.
+- `routeAsked` opens the link first and only then writes the "Remember" rule. A failed write never delays or blocks the link. The failure goes into the log note.
+- Remember writes through a locked `rulesfile.Remember`. If the rules file stopped asking while the panel was open, the write is skipped and the failure is noted.
+- Cancelling (Esc) opens the default target. A link identical to one already waiting in a panel joins that panel and does not open twice.
+- `decisionlog.AppendNote` adds an optional sixth log column, for example `asked -> Dia/Work, remembered "<name>"`. The note is cleaned to a single line and column. Without a note the log keeps five columns.
+- The CLI cannot show a panel. `portero open` and `rules` print the cancel target and what Remember would pin. `--dry` lists a "would run" line per option. A real open and the web UI (`openUI`) use the default target and log `asked -> default (CLI)` (`openCLIAsked`).
+- The native panel is in `internal/handler/panel.m`, with Go bindings in `ask.go` and a stub in `handler_other.go`.
+
+## Rejected
+None.
+
+## Touched
+- `internal/rulesfile`
+- `internal/decisionlog`
+- `internal/handler` (macOS native panel, Objective-C)
+- `internal/rules`
+- `internal/launch`
+- Rules file (`rules.yaml`) and decision log file
