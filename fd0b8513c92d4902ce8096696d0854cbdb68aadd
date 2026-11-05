@@ -1,0 +1,23 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Land PR #2 for Portero (macOS browser-router app): list it in the Default web browser picker, route opened HTML files, and quit only after every in-flight link is routed. Then apply review follow-ups and set the order for upcoming work (diagram/logo/icon, harness apply, iCloud sync, UI).
+
+## Problems
+- Codex cross-review repeated a claim that document opens arrive via `application:openFiles:`. Judged false: a live .html test showed they come through `application:openURLs:`.
+- The security subagent noted a cosmetic import-grouping nit in `cmd/portero/app_test.go` (rules import in the stdlib group); gofmt doesn't flag it.
+- Earlier review found that a file opened at cold launch could be killed by the 3 s exit timer; fixed with an in-flight counter.
+
+## Decision
+- Counter changes happen only on the main thread; the Go goroutine calls `porteroDone` via the main queue. Exit happens 2 s after the last link, and the 3 s launch timer is skipped if a document arrived first.
+- Follow-ups from the Claude review: `porteroDone` is deferred so it always runs, remote file hosts are rejected, the error log is quoted, and docs cover local files.
+- Work order set by the user: DEV-26 (diagram, logo, icon), harness apply, iCloud sync and M1 check, then UI. Release and going public come after the UI. Recorded in Linear and memory.
+- UI direction: web page via `portero serve`, with an optional native WKWebView window later.
+
+## Rejected
+- Adding an `openFiles:` handler, as Codex suggested: the live test showed it isn't needed.
+- Earlier plan to release v0.1.0 before the UI: the user reordered it.
+
+## Touched
+Portero (Go + cgo/Objective-C handler), GitHub PR #2 and Actions claude-review, Codex cross-review, Linear (DEV-24, DEV-26), Dia browser (test tabs), the claude-memory repo, macOS Launch Services.
