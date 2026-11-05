@@ -1,0 +1,20 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Configure the security-reviewer agent to run on the Fable model, with a fallback to rerun on Opus when Fable is unavailable.
+
+## Problems
+None recorded. The session slice was empty, so this note is based only on the commit message.
+
+## Decision
+The commit message indicates the security-reviewer is assigned to Fable as its primary model. If Fable is unavailable, the review is rerun on Opus so that a security review is still completed. The exact files and mechanism of the change are not visible in the available context.
+
+## Rejected
+None recorded.
+
+## Touched
+- security-reviewer agent configuration
+- Fable model
+- Opus model
