@@ -1,0 +1,18 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Fix the serve UI so that deselecting an item removes the pinned outline highlight, and the "empty" note stays inside the details panel rather than appearing elsewhere. The change followed a cross-review.
+
+## Problems
+The session slice was empty, so no problems are recorded. The commit message suggests the outline stayed pinned after deselect and the empty note could render outside the details panel.
+
+## Decision
+Clear the pinned outline state when the selection is dropped. Keep the empty-state note rendered within the details panel so layout and context stay consistent. The exact implementation is not visible beyond the commit message, so these are inferred from it.
+
+## Rejected
+None recorded.
+
+## Touched
+Serve UI (details panel, selection and outline styling). No external dependencies, services or config are known to be involved.
