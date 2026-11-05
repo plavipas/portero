@@ -1,0 +1,19 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Move the warnings emitted by the rules check into the `internal/check` package, as tracked under DEV-24.
+
+## Problems
+None recorded. The session slice was essentially empty, so this note is based only on the commit message and no obstacles are known.
+
+## Decision
+The commit relocates the rules check warning logic into `internal/check`. The likely intent is to put check-related behavior in one package, separate from wherever it lived before. The exact structure of the move cannot be confirmed from the available information.
+
+## Rejected
+None recorded.
+
+## Touched
+- `internal/check` package
+- Rules check warnings code
