@@ -1,0 +1,21 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Address review feedback on the Launch Services cleanup: a failure while reading the dump must fail the sweep instead of looking like "no other copies", and the installer must not destroy the old app if copying the new one fails.
+
+## Problems
+None.
+
+## Decision
+- `lsreg.Others` in `internal/lsreg/lsreg.go` now returns `([]string, error)` and reports the scanner error. A truncated dump or an oversized line used to produce an empty result, so stale registrations silently stayed.
+- `lsregOthersCmd` in `cmd/portero/main.go` wraps and returns that error, so the command exits non-zero.
+- `scripts/install.sh` copies the app to `$DEST.new` first, then removes the old app and moves the copy into place. A failed copy (full disk, permissions) leaves the installed app untouched.
+- Tests were updated for the new signature, and `TestOthersFailsOnAnOversizedLine` checks that a 5 MB line gives an error.
+
+## Rejected
+None.
+
+## Touched
+Launch Services registry dump (lsregister), `scripts/install.sh`, Go `bufio.Scanner`, `cp`/`mv`.
