@@ -1,0 +1,20 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Update the guard test for the serve component so it follows the exact-Origin rule, as part of QA for ticket DEV-24. The session slice was empty, so this is inferred from the commit message alone.
+
+## Problems
+None recorded. The session slice contained no transcript, so no problems can be reported.
+
+## Decision
+The commit message says the guard test was changed to match an exact-Origin rule. This means the test should expect that a request's Origin header is accepted only when it matches the allowed origin exactly, with no prefix, substring or wildcard matching. Aligning the test with that rule keeps it consistent with the guard's intended behavior. The specific assertions and files changed are not visible here.
+
+## Rejected
+None recorded.
+
+## Touched
+- serve (the component with the Origin guard)
+- Guard test for serve
+- DEV-24 (tracking ticket)
