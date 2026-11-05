@@ -1,0 +1,23 @@
+Agent-Session: claude-code/030c8511-4922-4468-8542-cd55b025cfa5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Address review findings (DEV-75) on Portero's release and install path: drop the `--no-quarantine` advice, make the quarantine warning accurate, and harden the packaging and cask scripts.
+
+## Problems
+None.
+
+## Decision
+- Replaced `--no-quarantine` with `xattr -dr com.apple.quarantine /Applications/Portero.app` in the README, the cask caveats and the release notes. The cask install flag was not the right recommendation.
+- `quarantined()` in `cmd/portero/quarantine_darwin.go` now parses the attribute flags. macOS keeps the attribute after the user approves the app and sets flag 0x40, so only an attribute without that flag counts as a block. Unparseable values count as quarantined. Added `cmd/portero/quarantine_darwin_test.go`.
+- The warning shell-quotes the app path (`shellQuote`) so the pasted command is safe for paths with spaces or quotes.
+- `scripts/package.sh`: fails clearly if the build fails or produces no app. The zip is built without resource forks or extended attributes. It is then unzipped with plain tools and the signature re-verified.
+- `scripts/update-cask.sh`: version validation uses shell `case` patterns instead of grep, so a newline cannot hide a second line. It requires exactly one checksum line for the zip. The cask is written to a temp file and then moved into place.
+- The release workflow takes the version from `GITHUB_REF_NAME` instead of `git describe`.
+
+## Rejected
+None.
+
+## Touched
+Homebrew cask (`packaging/portero.rb.tmpl`), GitHub Actions release workflow, `gh` CLI, `xattr`, `codesign`, `ditto`, `unzip`, `shasum`, macOS Gatekeeper quarantine.
