@@ -1,0 +1,30 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the "could not remember" notification show both the punycode and Unicode forms of an IDN host, and close test gaps around punycode decoding, nested JWT claims and the rules-file lock (DEV-50).
+
+## Problems
+None
+
+## Decision
+`notifyRememberFailed` in `cmd/portero/app.go` now formats the host with `rules.HostForms`. This reuses the existing display logic, so a lookalike host such as `xn--80ak6aa92e.com` shows next to its Unicode form, `аррӏе.com`, instead of only the punycode.
+
+Tests added:
+- A notification test asserting both forms appear in the body.
+- A `HostForms` case for `xn--abc-`, where nothing follows the last hyphen and the label decodes to plain ASCII.
+- A fuzz test, `FuzzPunycodeRoundTrip`, checking that decoding an encoded string returns the original.
+- An unwrap case where a repeated claim sits only at nested depth, so the top-level `target_uri` claim wins.
+- `internal/rulesfile/lock_unix_test.go`, unix-only. It holds `flock` through a separate file descriptor, so the lock behaves like one held by another process. It checks that `Lock` times out with "held by another writer" within a bounded wait, and that `Lock` succeeds once the holder releases.
+
+The lock test shortens `lockWait` and restores it afterwards, so it stays fast.
+
+## Rejected
+None
+
+## Touched
+- `internal/rules` (`HostForms`, `punyEncode`, `punyDecode`)
+- `internal/rulesfile` (`Lock`, `lockWait`)
+- `syscall.Flock`
+- Go `testing` fuzzing
