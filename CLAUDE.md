@@ -55,7 +55,7 @@ skipped only on the user's explicit words (`--skipped-by-user "<words>"`).
    rules format, browser table, handler, sync, install, agents, task flow). Docs-only commit; does not restart qa.
 6. **cross-review** skill with the AI chosen in step 3, in a separate Orca tab; findings back to step 4.
 7. **security-reviewer** on the branch diff; APPROVE required, otherwise back to step 4.
-8. **push / PR** (no approval needed), then the `gitreason` workflow comments the notes of the PR and the Claude Code
+8. **push / PR** (no approval needed), then the Claude Code
    Review workflow reviews it; read it back with the `claude-pr-review` skill. Real findings go back to step 4.
 9. **Merge** by the agent, without the user's "да", once qa, cross-review, security, the Claude review and CI are
    green (merge commit, never squash, so the per-commit notes survive). Then a work summary (Сделано / Найдено /

@@ -112,7 +112,38 @@ A companion browser extension that hands such clicks to Portero is on the list f
 A container link (`ext+container:`) sent to a Firefox-family browser that is still starting, for example while it
 applies an update, can be dropped before the extension is ready. Opening the link again works.
 
-## Install (from source, macOS)
+## Install
+
+Requires macOS 13 or later (Apple silicon and Intel).
+
+```sh
+brew tap plavipas/tap
+brew install --cask plavipas/tap/portero
+```
+
+The cask installs `Portero.app` into `/Applications` and links `portero` into your `PATH`. The app is ad-hoc signed,
+not notarized, so macOS blocks its first launch. Open it once:
+
+```sh
+open -a Portero
+```
+
+macOS shows "Portero cannot be opened". Open System Settings > Privacy & Security, scroll to the message about
+Portero and click Open Anyway, then confirm. To skip this, install with
+`brew install --cask --no-quarantine plavipas/tap/portero`. `portero default status` warns while the app is still quarantined.
+
+Then:
+
+```sh
+portero rules init        # writes the example rules to ~/.config/portero/rules.yaml; edit it
+portero default set       # macOS asks to confirm Portero as the default browser
+```
+
+One install method per Mac: the cask or `make install`, not both. Before `make install` run
+`brew uninstall --cask portero`; before `brew install` remove `~/Applications/Portero.app`. Two copies make macOS
+pick one of them for links.
+
+## Build from source (macOS)
 
 ```sh
 make install              # builds the app in $TMPDIR, copies it to ~/Applications, unregisters every other
@@ -137,7 +168,7 @@ The app icon comes from `packaging/Portero.icns`; `make icon` (`scripts/make-ico
 ### Troubleshooting: links open an old Portero
 
 `portero default status` prints `resolved: <path> (<version>)`, the app macOS really starts for links, and warns
-when it is not the installed `~/Applications/Portero.app` or its version differs from the binary. The command exits 2
+when it is not the installed Portero.app (the one the running binary belongs to, else `~/Applications/Portero.app`) or its version differs from the binary. The command exits 2
 when Portero is the default but the resolved app is another path or version, or when nothing resolves. `make install` unregisters every other registered copy; if links still go to an
 old one, run `lsregister -f ~/Applications/Portero.app` (the tool lives in
 `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/`) and check
@@ -152,4 +183,4 @@ old one, run `lsregister -f ~/Applications/Portero.app` (the tool lives in
 
 ## Status
 
-Early development; not released yet.
+v0.1.0 is released (see the Releases page). Early development otherwise: the rules format and the CLI may still change.
