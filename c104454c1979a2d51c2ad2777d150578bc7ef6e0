@@ -1,0 +1,26 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Ship the DEV-17 web UI change (resizable, collapsible sidebar plus dark/light/system theme switch) through PR review and merge. The commit message itself concerns Firefox honouring the Install section's default profile, which this slice does not show.
+
+## Problems
+- The automated Claude review passed with no blocking findings, but a gap showed up: nothing tested that the app shell loads `/theme.js` and that the static handler serves it as JavaScript. That script is what prevents a theme flash.
+- The Firefox default-profile work from the commit message is not visible in this slice, so it can't be described here.
+
+## Decision
+- Pushed the `dev-17-sidebar-theme` branch and opened PR #13 against main.
+- Used the repo's PR review script to wait for the Claude review and read its findings.
+- Added `TestThemeScriptServed` in the serve package tests to guard the no-flash path, then pushed it as a follow-up commit.
+- Waited for the re-review on the new HEAD, which passed.
+- Merged with a merge commit, deleted the branch, and fast-forwarded local main.
+
+## Rejected
+None
+
+## Touched
+- GitHub (PR #13, `gh` CLI, claude-review check)
+- Claude PR review skill (`fetch.sh`)
+- Go `internal/serve` package tests
+- `web/index.html` and `theme.js`
+- Git
