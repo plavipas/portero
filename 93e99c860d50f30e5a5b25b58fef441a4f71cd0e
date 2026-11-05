@@ -1,0 +1,22 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make redirect-link unwrapping configurable (DEV-48): let the rules file switch it off globally or skip it for chosen opener apps, and expose this in the Settings UI and in match output.
+
+## Problems
+None.
+
+## Decision
+- Added two optional top-level keys to the rules file: `unwrap` (default true) and `unwrap_skip_openers` (bundle ids). `internal/rules/rules.go` gets `Rules.UnwrapFor(opener)`, case-insensitive, and nil-safe so the absence of rules means unwrap stays on.
+- Validation in `rules check`: each skip entry must look like a bundle id, and duplicates are rejected ignoring case.
+- `routeReq` in `cmd/portero` now takes the rules and returns a reason string. A skipped link routes by the wrapper URL as before. `portero rules match` and `open --dry-run` print `unwrap: off` or `unwrap: skipped for <opener>` when a wrapper was recognised but not unwrapped. `/api/match` returns the same as `unwrap_note`.
+- New `internal/rulesfile/unwrap.go` (`SetUnwrap`) edits only those two keys line by line, so comments and rules stay byte for byte. It re-parses the result and refuses the edit if anything else would change.
+- Web UI: a "Wrapped links" block in Settings, backed by `GET /api/settings` (`unwrap` field) and `POST /api/settings/unwrap`. The write goes through the editor's safe write path: hash check (409), `.bak` backup, mode 0600. Docs in `docs/rules.md` and `docs/ui.md` are updated.
+
+## Rejected
+None.
+
+## Touched
+Rules file (`unwrap`, `unwrap_skip_openers`), `gopkg.in/yaml.v3`, the web UI settings API (`/api/settings/unwrap`, `/api/match`), `rules.yaml.bak` backup.
