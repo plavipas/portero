@@ -1,0 +1,25 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Address review feedback for ticket DEV-32: make the container launch fail-safe, add a note when a container is not found, clean up the profiles.ini path handling, and add tests.
+
+## Problems
+The session slice was empty, so no concrete problems or surprises are recorded. The commit message alone gives no evidence of obstacles.
+
+## Decision
+Changes were made as a single review-fix commit, per the commit message:
+- Container launch now fails safely instead of proceeding in a bad state.
+- A user-facing note is shown when the requested container cannot be found.
+- The profiles.ini path logic was cleaned up.
+- Tests were added to cover these behaviors.
+
+The reasoning behind specific implementation choices is not available from the slice.
+
+## Rejected
+None recorded.
+
+## Touched
+- profiles.ini (browser profile configuration)
+- Container launch logic
+- Test suite
