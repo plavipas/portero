@@ -1,0 +1,19 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the Launch Services parser in `internal/lsreg` recognise the `(0x0-0x...)` record-identifier suffix on `path:` lines from `lsregister -dump`, in addition to the plain `(0x...)` form. This came out of a Codex cross-review of the DEV-46 work in PR #13.
+
+## Problems
+The existing `hexSuffix` regexp only matched a single hex value in parentheses. With a `(0x0-0x...)` suffix the path was not stripped, so stale registered copies of Portero could be missed and stay registered after install. A dump on the local machine showed only the simple form, so the reviewer's case was not reproduced directly. It was still a real gap in the pattern.
+
+## Decision
+Widen `hexSuffix` to accept an optional `-0x...` second part and to match case-insensitively. The change is small and local to `internal/lsreg/lsreg.go`. A test in `internal/lsreg/lsreg_test.go` covers the new suffix form. Fixing the regexp is cheaper and safer than special-casing the dump format elsewhere.
+
+## Rejected
+None.
+
+## Touched
+- Launch Services `lsregister -dump` output (parsed by `internal/lsreg`)
+- Go `regexp` package
