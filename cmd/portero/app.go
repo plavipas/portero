@@ -36,6 +36,11 @@ func appBundle() string {
 	if real, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = real
 	}
+	return bundleOf(exe)
+}
+
+// bundleOf is the .app that contains the executable path exe, "" when it is not inside one.
+func bundleOf(exe string) string {
 	if i := strings.Index(exe, ".app/Contents/MacOS/"); i >= 0 {
 		return exe[:i+4]
 	}
@@ -420,7 +425,7 @@ func printDefaultStatus(w io.Writer, note func(scheme string) string) {
 	if app := appBundle(); app != "" {
 		fmt.Fprintln(w, "app:", app)
 	} else {
-		fmt.Fprintln(w, "app: not running from Portero.app (use `make install`)")
+		fmt.Fprintln(w, "app: not running from Portero.app (install it with `brew install --cask plavipas/tap/portero` or `make install`)")
 	}
 }
 
@@ -458,7 +463,9 @@ func defaultCmd(args []string) error {
 	switch sub {
 	case "status":
 		printDefaultStatus(os.Stdout, nil)
-		if !printResolution(os.Stdout) {
+		ok := printResolution(os.Stdout)
+		printQuarantine(os.Stdout, installedApp(), quarantined)
+		if !ok {
 			return exitCode(2)
 		}
 	case "set":
@@ -470,6 +477,7 @@ func defaultCmd(args []string) error {
 		notes := stateNotes(states)
 		printDefaultStatus(os.Stdout, func(s string) string { return notes[s] })
 		printResolution(os.Stdout)
+		printQuarantine(os.Stdout, app, quarantined)
 		if err != nil {
 			return err
 		}
@@ -479,14 +487,33 @@ func defaultCmd(args []string) error {
 	return nil
 }
 
+// quarantineWarning is the line shown when the app carries the quarantine attribute, "" otherwise.
+func quarantineWarning(app string, isQuarantined func(string) bool) string {
+	if app == "" || !isQuarantined(app) {
+		return ""
+	}
+	return fmt.Sprintf("warning: %s is quarantined; macOS will block the first link - open it once (open -a Portero, System Settings > Privacy & Security > Open Anyway) or run: xattr -dr com.apple.quarantine %s", app, app)
+}
+
+// printQuarantine prints quarantineWarning; it never changes the exit status.
+func printQuarantine(w io.Writer, app string, isQuarantined func(string) bool) {
+	if l := quarantineWarning(app, isQuarantined); l != "" {
+		fmt.Fprintln(w, l)
+	}
+}
+
 // exitCode is an error that makes main exit with that code without printing a message.
 type exitCode int
 
 func (e exitCode) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
 
-// installedApp is the canonical install location, whichever copy is running: a stale copy elsewhere that
-// Launch Services picked must show up as a mismatch, not as "healthy".
+// installedApp is the app the report compares against: the bundle this binary runs from (a cask install lives
+// in /Applications, make install in ~/Applications), else ~/Applications/Portero.app for a bare CLI binary.
+// A stale copy elsewhere that Launch Services picked shows up as a mismatch, not as "healthy".
 func installedApp() string {
+	if app := appBundle(); app != "" {
+		return app
+	}
 	if home, err := os.UserHomeDir(); err == nil {
 		return filepath.Join(home, "Applications", "Portero.app")
 	}
@@ -540,7 +567,7 @@ func defaultReport(cur map[string]string, resolved, resolvedVer, installed, runn
 	}
 	ok = true
 	if installed != "" && !samePath(resolved, installed) {
-		lines = append(lines, fmt.Sprintf("warning: macOS opens links with %s, not %s; run make install", resolved, installed))
+		lines = append(lines, fmt.Sprintf("warning: macOS opens links with %s, not %s; reinstall Portero (make install or brew reinstall --cask portero)", resolved, installed))
 		ok = false
 	}
 	if running == "dev" {
@@ -559,7 +586,7 @@ func schemeMismatch(resolvedBy map[string]string) string {
 	first := handler.Schemes[0]
 	for _, s := range handler.Schemes[1:] {
 		if !samePath(resolvedBy[s], resolvedBy[first]) {
-			return fmt.Sprintf("warning: %s links open %s, %s links open %s; run make install", first, resolvedBy[first], s, resolvedBy[s])
+			return fmt.Sprintf("warning: %s links open %s, %s links open %s; reinstall Portero (make install or brew reinstall --cask portero)", first, resolvedBy[first], s, resolvedBy[s])
 		}
 	}
 	return ""
