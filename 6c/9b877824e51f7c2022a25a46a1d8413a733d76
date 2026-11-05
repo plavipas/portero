@@ -1,0 +1,19 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=0 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Add an Architecture Decision Record (ADR 0004) covering how UI settings writes should be handled, tracked under ticket DEV-39. The record is marked as proposed, not accepted.
+
+## Problems
+None recorded. The session slice was empty, so this note is based only on the commit message and no obstacles are known.
+
+## Decision
+The change is documentation only: a new ADR file with status "proposed". Writing it as an ADR captures the design question and its rationale before implementation, and the proposed status leaves room for review before the decision is final. The specific details of the chosen approach are not visible in the available context.
+
+## Rejected
+None recorded. Any alternatives the ADR itself weighs are not visible here.
+
+## Touched
+- Project docs (ADR directory)
+- Issue tracker ticket DEV-39
