@@ -1,0 +1,26 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `scripts/install.sh` never delete a build directory that the caller supplied, as found in cross-review.
+
+## Problems
+None. The previous cleanup deleted any directory whose path matched `*/portero-build.*`. That included a caller-provided directory with such a name.
+
+## Decision
+`rmbuild` in `scripts/install.sh` now returns immediately when `PORTERO_BUILD_DIR` is set. Only a directory that `build-app.sh` created itself with `mktemp` (no `PORTERO_BUILD_DIR` given) is removed. The name pattern check stays as a second guard for that case. Ownership is decided by who chose the directory, not by what it is called, because a name can be matched by accident or on purpose.
+
+The dry-run output follows the same rule: "would remove" is printed only when the script would actually remove the directory.
+
+`scripts/test-install.sh` gets a regression test. It creates a caller-chosen directory named like a temp one (`portero-build.mine`) and puts a marker file in it. It runs a dry-run install with `PORTERO_BUILD_DIR` pointing at it, then checks that the marker is still there.
+
+## Rejected
+None.
+
+## Touched
+- `PORTERO_BUILD_DIR` environment variable
+- `INSTALL_DRY_RUN` environment variable
+- `scripts/build-app.sh` (creates the temp build directory via `mktemp`)
+- `scripts/install.sh`
+- `scripts/test-install.sh`
