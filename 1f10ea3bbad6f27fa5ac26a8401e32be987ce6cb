@@ -1,0 +1,22 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Work on DEV-25 in the portero project: make `portero default set` idempotent, so a repeat run does not fail with an error after both schemes are already ours. As a step in that flow, mark the "brief" stage done with the `flow-mark` hook.
+
+## Problems
+Running `.claude/hooks/flow-mark` failed with "permission denied" (exit 126). The hook scripts `flow-mark` and `flow-guard.py` had no executable bit.
+
+## Decision
+Added the executable bit to both hook scripts with `chmod +x`, committed that as its own small commit, then re-ran `flow-mark DEV-25 brief`. This is a minimal fix for the root cause, and it keeps the permission change separate from the DEV-25 work.
+
+The brief itself was settled earlier. When both schemes are already ours, `default set` prints a status line marked "already set" and exits 0. A real failure, where a scheme never becomes ours, still gives a non-zero exit.
+
+## Rejected
+None
+
+## Touched
+- `.claude/hooks/flow-mark`
+- `.claude/hooks/flow-guard.py`
+- git (portero repo, branch dev-25-default-set-idempotent)
+- macOS default-browser handler (`http`/`https` schemes), the subject of the task but not changed in this step
