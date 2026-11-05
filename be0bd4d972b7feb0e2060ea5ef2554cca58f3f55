@@ -1,0 +1,19 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `scripts/install.sh` safe against an interrupted earlier install: if only the backup of the app survives, restore it before the install cleanup removes anything. This came from a Codex cross-review of the DEV-46 work (PR #13).
+
+## Problems
+Codex flagged two issues in the previous patch. The build-path guard fails when the Applications directory does not exist. The install cleanup (`rm -rf "$DEST.new" "$DEST.old"`) can delete the only surviving app backup after an interrupted install, which leaves no app at all. This commit addresses the second one. The slice cuts off before the first is resolved.
+
+## Decision
+Before the cleanup, add a check: if `$DEST` is missing and `$DEST.old` exists, move `$DEST.old` back to `$DEST`. Only after that are the stale `.new` and `.old` paths removed and the fresh copy built. This keeps the replace-with-backup flow and removes the window where an interrupted run leaves the user with no app. The change is small and confined to the install script.
+
+## Rejected
+None. The Claude review's other points were deliberately left alone: Linux CI belongs to DEV-38, the brief moment without the app during replacement is acceptable for a manual install, a stray `sleep` process is harmless, and exit code 2 from `default status` is documented behaviour.
+
+## Touched
+- `scripts/install.sh`
+- Shell tools `mv` and `rm`
