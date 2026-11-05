@@ -1,0 +1,19 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Fix Firefox profile detection so that when multiple Install sections in profiles.ini disagree about the default profile, the default is treated as unknown rather than guessed. Also fix the ordering in the documentation (ticket DEV-32).
+
+## Problems
+The session slice was empty, so no problems are recorded. From the commit message alone, the ambiguity arises when Install sections in Firefox's profile configuration point to different default profiles.
+
+## Decision
+Per the commit message, when Install sections conflict, the code reports the default profile as unknown instead of picking one arbitrarily. This avoids acting on the wrong profile. The documentation order was corrected in the same commit so it matches the behavior. The details of the implementation are not available from the session.
+
+## Rejected
+None recorded. The session slice does not show any alternatives that were considered.
+
+## Touched
+- Firefox (profiles.ini, Install sections)
+- Project documentation
+- Ticket DEV-32
