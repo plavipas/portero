@@ -1,0 +1,21 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Make the Portero link handler (macOS default-browser app) quit only after every in-flight link is routed, and avoid starting the launch exit timer when a document open already arrived at cold launch. Triggered by a security review finding on the file/HTML document-open branch.
+
+## Problems
+- Security review found that on a cold launch from a local HTML file, the open-document callback fires before launch finishes. The 3 s launch timer then recorded the already-incremented generation and terminated the app while the browser was still starting, silently losing the link.
+- The same timer pattern could let a fast link's exit timer kill the app while a slower link was still routing.
+- A Codex cross-review flagged that document opens should use the openFiles callback. A live test showed the openURLs path already works, so this was dismissed.
+- The live test run ended with an AppleScript error from Dia ("Can't get t…") after the app exited; it was not investigated in this slice.
+
+## Decision
+Added an in-flight counter alongside the generation counter. It is incremented when a link arrives and decremented when routing finishes. The app terminates only when the counter reaches zero. The launch timer starts only if no link has arrived yet. This fixes both the cold-launch case and the fast-vs-slow link race with one mechanism. Go tests passed, and a two-link live run routed both links and exited.
+
+## Rejected
+- Switching to the `application:openFiles:` callback: the live test showed document opens already arrive via `openURLs:`.
+- Only the one-line `generation == 0` guard: it would not cover the slow-link race.
+
+## Touched
+Portero handler (handler.m, handler_darwin.go), Dia, Codex cross-review, Linear (DEV-26), Go test suite.
