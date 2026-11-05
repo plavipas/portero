@@ -1,0 +1,35 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+DEV-47 "Ask target": for links that no rule can assign to a profile (meetings opened from Calendar or Slack), show a profile picker panel; "Remember" appends a rule to `rules.yaml`. This commit records the design decision as ADR 0005, status proposed.
+
+## Problems
+- Rule targets are compared by value (`open != Target{}`), so adding a slice directly to `Target` would break that check.
+- Writing `rules.yaml` exists only inside the serve HTTP handler, guarded by an in-process mutex. That does not protect against the link-handler app writing concurrently.
+- The decision log has a fixed 5-column format, and the log reader skips lines with any other column count.
+- Cocoa must run on the main OS thread, but nothing locks the thread, which probably explains an intermittent lost first link on cold start.
+- A lost Slack Meet link on 2026-11-03 was not Portero's fault; Slack never passed it to Launch Services.
+
+## Decision
+Write the ADR as proposed only, with no code. It changes the rules format and makes the link handler a second writer of the rules file, so it needs user approval before merge. The ADR covers:
+- a separate `Open` type with an `ask` list
+- a shared `internal/rulesfile` package with atomic write, hash check and flock
+- a native panel in the app
+- an optional 6th log column
+- the CLI opening the default without asking
+
+## Rejected
+None recorded in this slice. Open points for the user to challenge:
+- placing the remembered rule before the group instead of inside it
+- running panels in parallel
+- the CLI not asking
+
+## Touched
+- `docs/adr/0005-ask-target.md`
+- `rules.yaml`
+- Cocoa/AppKit (NSPanel)
+- Launch Services
+- `portero serve`
+- decision log
