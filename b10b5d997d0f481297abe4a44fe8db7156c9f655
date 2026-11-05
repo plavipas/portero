@@ -1,0 +1,28 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Fix DEV-25: `portero default set` failed after the macOS dialog had already set both schemes. The commit also makes `make install` ship the current build and gives a clearer error when a scheme has no handler.
+
+## Problems
+- QA failed the first pass. The installed app was an old bundle (revision 08e28ca) without the fix.
+- Cause: `scripts/install.sh` rebuilt only when `build/Portero.app` was missing, so it copied a stale bundle.
+- The stale bundle would have made the user's live `default set` run the old code.
+- Minor finding: an empty handler from `current()` produced `still handled by ""`, which reads badly.
+- The code change itself passed vet, tests, the Linux build and the status output check.
+
+## Decision
+- `install.sh` now always runs the bundle build before installing, so the installed app matches the branch.
+- When a scheme has no handler, the error says so instead of quoting an empty string.
+- The earlier `ensureDefault` logic stays. It snapshots handlers, reports "already set" or "set now", and trusts the actual handler after each `set` call.
+- Agents do not run the real `default set`. The user verifies that step on a real Mac.
+
+## Rejected
+- `make clean && make install` as a one-off workaround. It would fix only this run, and the script would stay broken for later installs.
+
+## Touched
+- `scripts/install.sh`
+- `cmd/portero/app.go`
+- `make install` / `make test`
+- macOS Launch Services (default browser handler)
+- `build/Portero.app` bundle
