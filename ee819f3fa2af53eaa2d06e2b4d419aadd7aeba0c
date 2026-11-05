@@ -1,0 +1,22 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `scripts/build-app.sh` refuse a build directory that lies inside the repository, including when it gets there through a symlink. A `.app` built inside the repository gets registered with Launch Services.
+
+## Problems
+None.
+
+## Decision
+The script already rejected an `$OUT` that textually started with the repository root. A symlink outside the repository could still point inside it and slip past that check. After `mkdir -p` and `pwd -P` resolve the path, the same check runs again on the resolved path.
+
+If the directory did not exist before the call, the script removes the one it just created before exiting with an error. A failed run therefore leaves nothing behind in the repository. Directories that already existed are never removed.
+
+`scripts/test-install.sh` gets a regression test. It creates a symlink in a temp directory that points to `internal`, then runs `build-app.sh` with `PORTERO_BUILD_DIR` set to a path under that link. It expects a non-zero exit and checks that `internal/x` was not left behind, cleaning it up if it was.
+
+## Rejected
+None.
+
+## Touched
+`scripts/build-app.sh`, `scripts/test-install.sh`, `PORTERO_BUILD_DIR` environment variable, macOS Launch Services (the reason for the check).
