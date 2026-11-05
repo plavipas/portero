@@ -1,0 +1,20 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the `serve` component check and replace its session secret under a file lock, and record the decision as accepted ADR 0003. The session slice was empty, so this is inferred from the commit message alone.
+
+## Problems
+None known. The transcript was not available, so no problems can be reported.
+
+## Decision
+The check-and-replace of the session secret is wrapped in a file lock. This makes the operation atomic across concurrent `serve` processes or workers. Without the lock, two processes could both see a stale secret and each write a different replacement, leaving sessions inconsistent. The design choice is documented in ADR 0003, now marked accepted.
+
+## Rejected
+None recorded. The commit message does not mention any alternatives, such as in-memory locking or a database-backed lock.
+
+## Touched
+- `serve` (session secret handling)
+- File-based locking on the local filesystem
+- ADR 0003 (architecture decision record)
