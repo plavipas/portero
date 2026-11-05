@@ -1,0 +1,19 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Fix the serve UI so that a replayed path stays visible while a node is pinned. The change came out of a cross-review.
+
+## Problems
+The session slice was empty, so no problems or surprises are recorded. The only evidence is the commit message, which suggests pinning a node previously hid or overrode the replayed path highlight.
+
+## Decision
+The commit message is the only source, so the exact implementation is not known. The intent is that pinning a node and replaying a path are independent display states, and both should render at once. Pinning should not clear or suppress the replay highlight. The fix was made after cross-review feedback, so it likely targets an interaction bug a reviewer spotted.
+
+## Rejected
+None recorded.
+
+## Touched
+- serve UI (the frontend of the serve command)
+- node pinning and path replay features
