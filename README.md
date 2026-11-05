@@ -175,6 +175,18 @@ old one, run `lsregister -f ~/Applications/Portero.app` (the tool lives in
 `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/`) and check
 `portero default status` again.
 
+## Release (maintainers)
+
+```sh
+make package                       # dist/Portero_<version>_darwin_universal.zip + dist/checksums.txt
+PORTERO_ARCHS=arm64 make app       # one architecture only; default is the host architecture
+scripts/update-cask.sh v0.1.0 <tap-dir>   # writes Casks/portero.rb from packaging/portero.rb.tmpl; commit it in the tap
+```
+
+`make package` builds a universal app (arm64 and x86_64, macOS 13 or later), checks the signature, the architectures
+and the version, and zips it. CI (`ci.yml`) runs the tests and the package on every pull request. Pushing a tag `v*`
+that is on `main` runs `release.yml`: tests, package, and a GitHub release with the zip and the checksums.
+
 ## Roadmap
 
 - A companion browser extension, so links clicked inside a browser are routed too.
