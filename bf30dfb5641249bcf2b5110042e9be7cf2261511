@@ -1,0 +1,25 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+When a link arrives in the handler app from another app and no rule matches, ask the user instead of silently opening the default browser. "Remember" should append a host rule, including a rule that keeps following the default (DEV-49).
+
+## Problems
+None.
+
+## Decision
+- Unmatched http/https links from the handler app show the ask panel. The first button is "Keep default · <target>". The other buttons are the distinct, installed targets the rules file already uses, at most 9 in total. If nothing besides the default is left, there is no panel.
+- Esc or closing the panel opens the default.
+- "Remember for this host" appends a plain host rule for a chosen target. With "Keep default" it appends a rule that follows `default`, so the rule stays correct if the default changes later.
+- The link opens before anything is written. Remember outcomes (written, failed, skipped because a rule now matches) go to the decision log.
+- Redirect-wrapped links are judged by their inner URL.
+- `portero open` and `$BROWSER` never ask. `file://` links never ask. `--dry-run` and `rules` print what the app would do.
+- A top-level `ask_unmatched: false` turns the feature off. It defaults to on, so the panel appears without any config change.
+- The change touches the rules parser, the rulesfile writer, the handler panel, the serve UI and API, and the docs and examples. Tests were added in each of the touched packages.
+
+## Rejected
+None.
+
+## Touched
+Config key `ask_unmatched`, the rules file (`rules.yaml`), the decision log, the handler app (`Portero.app`) and its native panel, the serve UI, and `internal/browsers` (installed check).
