@@ -1,0 +1,24 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the "not downloaded" error from iCloud sync say which step failed, so the user can tell what went wrong when an offloaded rules file can't be used.
+
+## Problems
+None.
+
+## Decision
+In `internal/sync/offload.go`, the base `ErrNotDownloaded` message is now generic ("not downloaded to this Mac; nothing changed"). It no longer claims a download started or suggests retrying. Each failure site in `ensureLocal` wraps it with its own reason in parentheses:
+- download unsupported on this system
+- the download could not start (with the underlying error)
+- the download started but did not finish in time, with the retry-in-a-minute hint attached only here.
+
+The previous base text was misleading, because it said "download started" even when it never started or was unsupported. The sentinel is still wrapped with `%w`, so `errors.Is` checks keep working.
+
+## Rejected
+None.
+
+## Touched
+- iCloud Drive (offloaded file download)
+- `internal/sync` package (`ErrNotDownloaded`, `ensureLocal`)
