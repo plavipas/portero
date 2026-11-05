@@ -1,0 +1,24 @@
+Agent-Session: claude-code/030c8511-4922-4468-8542-cd55b025cfa5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=0 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+
+None.
+## Problems
+None.
+
+## Decision
+- README "Install" now describes `brew tap plavipas/tap` and `brew install --cask plavipas/tap/portero`. It states the macOS 13+ requirement and that the app is ad-hoc signed and not notarized.
+- It gives the Gatekeeper steps: open the app once, then use Privacy & Security > Open Anyway. The `--no-quarantine` install flag is documented as the alternative. `portero default status` warns while the app is still quarantined.
+- It adds the follow-up commands `portero rules init` and `portero default set`.
+- It states one install method per Mac (cask or `make install`, not both), with the uninstall steps to switch. Two copies make macOS pick one of them for links.
+- The old source install section is renamed "Build from source (macOS)".
+- The troubleshooting text now says `portero default status` compares against the Portero.app the running binary belongs to, falling back to `~/Applications/Portero.app`.
+- The Status section now says v0.1.0 is released.
+
+## Rejected
+None.
+
+## Touched
+Homebrew (tap `plavipas/tap`, cask `portero`), macOS Gatekeeper/quarantine, `make install`, `lsregister`, Claude Code Review workflow
