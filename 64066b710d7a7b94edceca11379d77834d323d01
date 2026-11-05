@@ -1,0 +1,26 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Record the design for DEV-49 as ADR 0006 (status: proposed): when no rule matches a link opened from an app, Portero shows the choice panel from DEV-47 instead of silently opening the default profile. Remember writes a host rule, including a "keep default" variant.
+
+## Problems
+None in this commit. The ADR extends ADR 0005 with a new rule target form, a new default behavior and appending to the end of the rules list. Per the project's rules it needs explicit user approval before the implementation merges. That approval is still outstanding.
+
+## Decision
+The ADR was written before the code and records the brief's decisions:
+- The panel shows only for http(s) links from apps with no matching rule. Links from the shell, `portero open` and `file://` behave as before.
+- The panel lists "keep default" first, then targets already in the rules file, deduplicated, at most 9.
+- Remember with "keep default" writes a rule that follows `default`, so changing `default` later moves that host too.
+- The feature is on by default and can be turned off with an `ask_unmatched` key in the rules file or a Settings checkbox.
+- The follow-default form is the field `open: {default: true}`. A scalar `open: default` would need a custom YAML unmarshaler and would lose strict key checking.
+- New rules are appended last, so earlier rules with extra conditions keep winning.
+
+## Rejected
+- Scalar `open: default`: it would disable `KnownFields` strict checking.
+- Off by default, or no switch: the point is to stop links silently going to the wrong account, and the switch is a quick way out if the panel gets in the way.
+- Copying the current default value into the remembered rule: it would not follow later default changes.
+
+## Touched
+Rules file (`rules.yaml`), `docs/adr/0006-ask-unmatched.md`, ADR 0005, DEV-47 choice panel, DEV-48 link unwrapping, Linear DEV-49.
