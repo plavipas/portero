@@ -1,0 +1,24 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Clarify in ADR 0007 (failure notification after a failed "Remember") how a pending notification behaves when the user quits explicitly (DEV-50).
+
+## Problems
+None.
+
+## Decision
+`docs/adr/0007-remember-failure-notification.md` now separates two cases:
+- The idle quit does not end the app while the permission prompt or delivery is pending. The waits stay capped at 60 s for the prompt and 5 s for delivery.
+- An explicit quit (logout, Quit) keeps the 10 s cap from ADR 0005. A logout must not wait a minute for a banner, so a notification still pending at that point is dropped.
+
+Dropping it costs nothing: the link is already open and the log line is already written (decision 5 of the ADR). The wording of the idle-quit sentence was also tightened to "idle quit" so it no longer reads as covering explicit quits.
+
+## Rejected
+None.
+
+## Touched
+- docs/adr/0007-remember-failure-notification.md
+- ADR 0005 (referenced for the 10 s quit cap)
+- UserNotifications framework (macOS), as described in the ADR
