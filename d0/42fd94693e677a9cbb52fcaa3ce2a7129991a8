@@ -1,0 +1,18 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Add interaction to the serve UI: clicking a node pins it and shows a list of paths passing through that node, including each path's rule, target and counts.
+
+## Problems
+None recorded. The session slice was empty, so this note is based only on the commit message and nothing beyond it can be confirmed.
+
+## Decision
+Per the commit message, node click toggles a pinned state, and a panel lists the paths through the pinned node with rule, target and counts. Pinning (rather than hover only) keeps the selection stable so the user can read and compare the path details without holding the pointer on the node.
+
+## Rejected
+None recorded.
+
+## Touched
+Serve UI (the frontend served by the serve command). No external dependencies, services or config are known to be involved.
