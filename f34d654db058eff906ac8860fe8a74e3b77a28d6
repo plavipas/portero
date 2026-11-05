@@ -1,0 +1,24 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `make install` leave exactly one registered Portero.app (DEV-46), so macOS opens links with the installed copy. Make `portero default status` report which app macOS actually resolves for links.
+
+## Problems
+None.
+
+## Decision
+- `scripts/build-app.sh` builds the app outside the repo, in a fresh temp directory or in `$PORTERO_BUILD_DIR`. It refuses a build directory inside the repo, because Launch Services would index a stray copy there. The last stdout line is the .app path.
+- `scripts/install.sh` copies the app to `~/Applications` and unregisters other registered copies. It finds them through a new hidden helper, `portero lsreg-others`, which uses the portable `internal/lsreg` parser. The parser reads `lsregister -dump` records and skips duplicates and non-matching entries. It is unit-tested against a fixture dump.
+- `internal/handler` gains `DefaultApp` (the app path via NSWorkspace) and `BundleVersion` (read from the bundle's Info.plist). Non-darwin stubs return empty values.
+- `defaultReport` in `cmd/portero/app.go` prints `resolved: <path> (<version>)`. It warns when the resolved app is not the installed one or its version differs from the binary. Dev builds skip the version comparison. With no resolved app, the command exits 2 through a new `exitCode` error type.
+- The README gets a troubleshooting section.
+
+A Go parser was chosen over shell text munging, which would break on paths with spaces and on the "all roles" lines.
+
+## Rejected
+None.
+
+## Touched
+Launch Services (`lsregister`, NSWorkspace), `NSBundle`, `codesign`, `scripts/build-app.sh`, `scripts/install.sh`, the `Makefile` install target, and the `TMPDIR` and `PORTERO_BUILD_DIR` environment variables.
