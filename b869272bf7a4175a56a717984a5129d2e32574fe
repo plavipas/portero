@@ -1,0 +1,22 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Add a local-UI backend to the `serve` command (ticket DEV-24): a JSON API plus a guard, log tailing, graph and diff endpoints for the local UI.
+
+## Problems
+None recorded. The session slice was empty, so this note is based only on the commit message. Details of any obstacles are unknown.
+
+## Decision
+The commit message states that `serve` now exposes a JSON API, a guard, a log tail, a graph and a diff for the local UI. The implementation details and the reasons for the design are not visible in the slice. The "guard" most likely restricts access to the local server, but this is an inference, not something confirmed.
+
+## Rejected
+None recorded. No alternatives are visible in the available material.
+
+## Touched
+- `serve` command (local UI server)
+- JSON API
+- Log tail
+- Graph and diff endpoints
+- Ticket DEV-24
