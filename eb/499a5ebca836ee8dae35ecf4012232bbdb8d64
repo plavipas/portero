@@ -1,0 +1,24 @@
+Agent-Session: claude-code/030c8511-4922-4468-8542-cd55b025cfa5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Document the release process for maintainers in the README (DEV-75): how to build the package, choose architectures, update the Homebrew cask, and how CI and release workflows run.
+
+## Problems
+None
+
+## Decision
+Added a "Release (maintainers)" section to `README.md`, placed before the Roadmap. It shows three commands: `make package` (universal zip plus checksums in `dist/`), `PORTERO_ARCHS=arm64 make app` (single architecture, host architecture by default), and `scripts/update-cask.sh <tag> <tap-dir>` (renders `Casks/portero.rb` from `packaging/portero.rb.tmpl` for committing in the tap repo). A short paragraph explains that `make package` builds a universal app (arm64 and x86_64, macOS 13+), verifies signature, architectures and version, then zips. It also describes `ci.yml` (tests and package on each pull request) and `release.yml` (triggered by a `v*` tag on `main`: tests, package, GitHub release with zip and checksums). Keeping this in the README puts the maintainer steps next to the user docs, with no separate file to maintain.
+
+## Rejected
+None
+
+## Touched
+- `make` targets (`package`, `app`)
+- `PORTERO_ARCHS` environment variable
+- `scripts/update-cask.sh`
+- `packaging/portero.rb.tmpl`
+- Homebrew tap and cask
+- GitHub Actions (`ci.yml`, `release.yml`)
+- GitHub Releases
