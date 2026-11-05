@@ -1,0 +1,24 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+DEV-47: harden the ask panel in portero against accidental or spoofed approvals. Add a short key guard after the panel appears, sanitize the title and Remember paths, and bound the ask queue.
+
+## Problems
+The session slice shows only the final cross-review step, which found no actionable bugs. Tests could not be run in the review sandbox because Go could not create its build directory (read-only environment). No other problems appear in the slice.
+
+## Decision
+Based on the commit message and changed files:
+- `internal/handler/panel.m`: ignore key input for 400 ms after the panel appears, so keystrokes meant for another window cannot answer the prompt.
+- `internal/rules/remember.go`: strip Unicode format and separator characters from the title and Remember paths, so the displayed text cannot be spoofed with invisible or look-alike characters and a saved rule matches what the user saw.
+- `cmd/portero/app.go`: cap the ask queue at 50 so a flood of requests cannot grow it without limit.
+- Tests added in `cmd/portero/ask_test.go` and `internal/rules/rules_test.go`.
+
+A cross-review with Codex against origin/main was run and recorded as done for DEV-47.
+
+## Rejected
+None.
+
+## Touched
+Codex cross-review, Go toolchain, Objective-C panel handler (`panel.m`), `internal/rules` package.
