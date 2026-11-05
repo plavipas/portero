@@ -1,0 +1,21 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=2 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Assign model tiers to the project's subagents: the `brief` agent runs on Opus and the `tech-writer` agent runs on Sonnet. The conventions are documented in `CLAUDE.md`.
+
+## Problems
+None. The session slice covers the surrounding DEV-46 merge and DEV-47 brief work, not this change. The note is written from the commit message and the changed-file list; the diff was not available.
+
+## Decision
+Set the model per agent in the front matter of `.claude/agents/brief.md` and `.claude/agents/tech-writer.md`, and record the choice in `CLAUDE.md`. The brief agent leads requirements dialogue and decides which questions remain open, so it gets the stronger model. The tech-writer produces documentation from decisions already made, so the cheaper, faster model is enough. Pinning the model in the agent definition keeps the choice in the repository and does not depend on the caller.
+
+## Rejected
+None.
+
+## Touched
+- `.claude/agents/brief.md`
+- `.claude/agents/tech-writer.md`
+- `CLAUDE.md`
+- Claude Code subagent configuration (model setting)
