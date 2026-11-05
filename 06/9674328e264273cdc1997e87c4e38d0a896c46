@@ -1,0 +1,28 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+
+## Goal
+Document, in the README, that `portero default set` is safe to rerun and that `make install` always rebuilds the app. This is the docs step (DEV-25) after QA passed on the fix for `default set` failing with a file-couldn't-be-opened error even though the dialog had already set both schemes.
+
+## Problems
+- QA's first pass found a blocking issue: `install.sh` skipped the build when a bundle already existed, so a stale app got installed.
+- A minor issue: an empty handler produced an unclear error message.
+- Both were fixed in the follow-up commit and QA re-checked with PASS.
+- The live `default set` run was left to the user.
+
+## Decision
+A tech-writer subagent updates the README to match the verified behavior. `install.sh` now always runs the build script, which removes the old bundle first. `default set` re-reads the handler after each call and treats the scheme as set if it ended up ours, even when macOS returned an error. The docs describe only what QA confirmed on the installed binary.
+
+## Rejected
+None
+
+## Touched
+- README
+- scripts/install.sh
+- scripts/build-app.sh
+- cmd/portero/app.go and app_test.go
+- Makefile (`make install`)
+- macOS Launch Services (default browser handlers)
+- Portero.app bundle in ~/Applications
+- Claude flow-mark hook
+- Codex cross-review (next step)
