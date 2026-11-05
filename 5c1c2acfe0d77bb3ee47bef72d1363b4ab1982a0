@@ -1,0 +1,22 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Apply review follow-ups for ticket DEV-32: tighten validation and lookup behavior around browser names, container names, and the public flag.
+
+## Problems
+None recorded; the session slice was empty, so this note is based on the commit message alone.
+
+## Decision
+Three behavior changes, as stated in the commit message:
+- The control-character check now also covers the browser name, and runs in a fixed order so validation results are deterministic.
+- Container lookup prefers an exact name match; a case-insensitive match is only a fallback. This avoids picking the wrong container when names differ only by case.
+- A missing public flag is treated as public, so the default is explicit and consistent.
+
+The reasoning behind each choice is inferred from the commit message, not from the session.
+
+## Rejected
+None documented.
+
+## Touched
+None identified beyond the project's own code: browser name validation, container name lookup, and public flag handling.
