@@ -1,0 +1,27 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Following a cross-review, make `scripts/install.sh` report and fail when the list of registered Portero copies cannot be enumerated, and make the symlink test in `scripts/test-install.sh` use a unique probe path.
+
+## Problems
+None.
+
+## Decision
+- The old code swallowed any failure of the registry dump or `lsreg-others` with `|| true`, so a stale registered copy could stay unnoticed. The dump now goes to a temp file and each step's exit status is checked.
+- On failure the script prints an error to stderr and sets `sweep_failed`. It does not abort right away, because the freshly installed app must still be registered and the rest of the install should finish.
+- At the end the script runs `default status`, records its exit code, and exits 1 if the sweep failed. Otherwise it exits with the status code. A failed sweep is therefore visible in the exit code without skipping the remaining steps.
+- In the test, the fixed `internal/x` path is replaced by `internal/portero-symlink-probe-$$`. The test first checks that this path does not already exist, so it cannot confuse a pre-existing directory with one left by the build, and cleanup never deletes a user's files.
+
+## Rejected
+None.
+
+## Touched
+- `scripts/install.sh`
+- `scripts/test-install.sh`
+- `scripts/build-app.sh` (exercised by the test)
+- lsregister (`$LSR`)
+- `portero lsreg-others` and `portero default status` subcommands
+- `mktemp`
+- `PORTERO_BUILD_DIR` environment variable
