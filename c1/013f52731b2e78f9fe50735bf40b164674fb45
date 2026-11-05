@@ -1,0 +1,22 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=2 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+When "Remember" fails to write the rules file, write the decision log line before posting the macOS notification, and report the notification outcome to stderr (DEV-50).
+
+## Problems
+None.
+
+## Decision
+The notification can block up to 65 s while the permission prompt is open. If the app is quit during that wait, the log line, which the notification points the user to, would be lost. `routeAsked` and `routeUnmatched` now build a deferred `notify` closure, write the log line with `decisionlog.AppendLink`, and only then run the closure.
+
+`notifyRememberFailed` returns the bare outcome (`notified`, `notification denied` and so on). A new `reportNotify` prints that outcome to the handler's stderr. The log's sixth column therefore ends at `remember failed: <reason>` with no suffix.
+
+Tests record `decisions.log` at the moment the fake notification fires and assert the line is already there. Existing expectations dropped the `(notified)` suffix. ADR 0007 and `docs/rules.md` were updated to describe the new order and where the outcome goes. A comment in `internal/serve/graph.go` now also lists `none` among the built-in rule names.
+
+## Rejected
+None.
+
+## Touched
+macOS user notifications (notification center permission prompt), `decisions.log` (decisionlog), rules file (rulesfile), handler stderr.
