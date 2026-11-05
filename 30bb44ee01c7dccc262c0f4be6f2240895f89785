@@ -1,0 +1,22 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `SetUnwrap` (the editor of the `unwrap` and `unwrap_skip_openers` keys in the rules file) non-destructive: preserve comments on the old keys, tolerate a column-0 comment inside the skip list, and keep CRLF line endings. Also cover the 503 path of the settings endpoint (DEV-48).
+
+## Problems
+None recorded in the session slice. From the diff: removing the old keys dropped their comments, a column-0 comment inside the list ended the item run early, and the inserted lines always used LF, so CRLF files got mixed line endings.
+
+## Decision
+- Detect the line ending once (CRLF if the text contains it) and use it for all inserted lines, including the newline added when the last kept line lacks one.
+- While dropping the old key blocks, collect comments inside the list into a `loose` list and re-emit them above the new keys. A trailing comment on a key line is re-attached to the rewritten key line.
+- If the key is no longer written (default value), its trailing comment becomes a standalone line, so nothing is lost.
+- A column-0 comment is treated as part of the list only when a list item follows it, so an unrelated comment after the list is not swallowed.
+- Added tests for comment retention, the column-0 comment, and CRLF (with and without a final newline). Added a settings test: when the rules file is offloaded, POST to `/api/settings/unwrap` returns 503, triggers a download, leaves the file untouched, and GET reports `editable: false`.
+
+## Rejected
+None.
+
+## Touched
+`internal/rulesfile/unwrap.go`, `rules.Parse` (validation of the result), `/api/settings` and `/api/settings/unwrap` endpoints, the `Offloaded` and `Download` options of the serve package.
