@@ -1,0 +1,23 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Follow up on security review of DEV-48 (unwrapping links wrapped in redirects such as Slack, Google, Outlook). Ambiguous wrapper queries must not be unwrapped, and the ask panel title must show which wrapper host a link came through.
+
+## Problems
+The security review found two low-severity issues:
+- `Unwrap` takes the first `q` and prefers `q` over `url`. Go's `Query()` also drops pairs containing `;`. A wrapper's server could follow a different value than Portero, so a link could be routed to the wrong profile.
+- For a wrapped link, the ask panel showed only the inner host. The user could pick and remember a profile for a host without knowing the link was wrapped, for example a forged Slack JWT.
+
+## Decision
+- In `internal/rules/unwrap.go`, skip unwrapping when a key is repeated, when the raw query contains `;`, or when `q` and `url` are both present and differ. Routing then falls back to the wrapper itself.
+- In `cmd/portero/app.go`, the ask panel title shows the wrapper host, e.g. "(via slack.com)".
+- `docs/rules.md` documents the new behaviour, and tests in `internal/rules` and `cmd/portero` cover it.
+- The browser still receives the original wrapper link. The inner URL only picks the browser and profile.
+
+## Rejected
+None.
+
+## Touched
+Go standard library `net/url`; the Slack, Google and Outlook wrapper link formats; the rules file documentation in `docs/rules.md`.
