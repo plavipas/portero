@@ -1,0 +1,23 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Harden how portero displays decoded IDN host names (DEV-50). Also fix the failed-"Remember" notification, which named a hardcoded log path, and move a misplaced comment in the macOS handler.
+
+## Problems
+None.
+
+## Decision
+- `internal/rules/idna.go`: `HostForms` now checks each label with a new `unsafeLabel` helper. The check applies to labels decoded from `xn--` and to non-ASCII labels. A label is unsafe if it is empty or contains control, format (bidi override, zero-width) or line-separator characters. If any label is unsafe, only the ASCII (ACE) form is returned. Otherwise a decoded name could spoof or garble a terminal or a panel. The tests in `internal/rules/idna_test.go` cover this.
+- `cmd/portero/app.go`: the notification body now uses `config.LogFile()`, shortened with a new `shortHome` helper that shows the home directory as `~`. The old text always said `~/.config/portero/decisions.log`, which was wrong when `XDG_CONFIG_HOME` was set. `cmd/portero/ask_test.go` checks both the XDG and the default cases.
+- `internal/handler/handler.m`: the "Documents (Open With…)" comment was above the notification delegate method. It now sits above `application:openURLs:`, which it describes.
+
+## Rejected
+None.
+
+## Touched
+- `XDG_CONFIG_HOME` and `HOME` (environment)
+- `config.LogFile()`
+- `unicode` (Go standard library)
+- macOS UserNotifications (`handler.Notify`)
