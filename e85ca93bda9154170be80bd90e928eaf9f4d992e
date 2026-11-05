@@ -1,0 +1,19 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=0 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Apply gofmt formatting to the test helper in `cmd/portero/ask_test.go` (tracker key DEV-50) so the file conforms to standard Go formatting.
+
+## Problems
+None.
+
+## Decision
+Reformatted the `notifyFunc` stub inside `askRig` so the function body is laid out across separate lines, with the opening brace ending the first line and the closing brace on its own line. Behavior is unchanged: the stub still records the title and body, reads the log file, appends it to the captured log snapshots, and returns "notified". Running gofmt is the standard fix, so formatting checks and diffs stay clean.
+
+## Rejected
+None.
+
+## Touched
+- `cmd/portero/ask_test.go`
+- gofmt (Go toolchain)
