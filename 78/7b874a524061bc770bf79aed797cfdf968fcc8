@@ -1,0 +1,22 @@
+Agent-Session: claude-code/030c8511-4922-4468-8542-cd55b025cfa5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=0 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Add CI and release automation for Portero (DEV-75): test and package on macOS, publish tagged releases, provide a Homebrew cask template with a renderer script, and harden the existing Claude workflows.
+
+## Problems
+None.
+
+## Decision
+- `.github/workflows/ci.yml` runs `make test` and `make package` on macos-15 for pull requests and pushes to main, and uploads the package as an artifact. Actions are pinned by commit SHA and permissions are read-only.
+- `.github/workflows/release.yml` runs on `v*` tags. It first checks that the tagged commit is an ancestor of main, so releases are cut from main only. Then it tests, packages with the exact tag version, and creates a GitHub release with the zip and `checksums.txt`. Release notes carry install instructions and the ad-hoc-signed, not-notarized caveat. A concurrency group serializes releases.
+- `packaging/portero.rb.tmpl` is the cask template with `@VERSION@` and `@SHA256@` placeholders.
+- `scripts/update-cask.sh` downloads the release's `checksums.txt`, validates the tag format and the sha256, and renders `Casks/portero.rb` into a tap directory. It runs no git commands, so the result is reviewed and committed manually in the tap.
+- `claude.yml` now only reacts to OWNER, MEMBER or COLLABORATOR authors. `claude-code-review.yml` skips pull requests from forks. Both stop untrusted users from triggering the agent.
+
+## Rejected
+None.
+
+## Touched
+GitHub Actions (actions/checkout, actions/setup-go, actions/upload-artifact), GitHub CLI (`gh`), Makefile targets `test` and `package`, Homebrew tap and cask, `go.mod`, Claude Code GitHub workflows.
