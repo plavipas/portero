@@ -1,0 +1,19 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the session cookie name of the local serve command include the port, so that two servers running on loopback do not share a session cookie (ticket DEV-24, found in QA).
+
+## Problems
+The session slice was empty, so no problems are recorded. The likely cause is that browsers scope cookies by host and not by port. Two servers on 127.0.0.1 or localhost therefore overwrite each other's session cookie and log each other out.
+
+## Decision
+Put the port into the cookie name, for example a base name plus the port number. Browsers treat cookies on different ports of the same host as one jar, so a name that differs per port is the simplest way to keep sessions apart. It needs no change to the host setup, no extra configuration and no new dependencies.
+
+## Rejected
+None recorded. Alternatives such as separate hostnames per server or a per-server cookie path were not discussed in the available material.
+
+## Touched
+- serve command (session cookie handling)
+- Browser cookie behaviour on loopback
