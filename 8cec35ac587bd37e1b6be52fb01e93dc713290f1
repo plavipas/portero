@@ -1,0 +1,25 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Document the new "ask target" feature (DEV-47) in the user docs: the ask target in rules, the Remember option, CLI behaviour, and the note column in the decisions log.
+
+## Problems
+The session slice shows no problems with the docs themselves. Related code work, committed separately, had two QA findings: an empty `ask` list gave an unclear error, and `/api/match` did not show ask targets. Both were fixed there. The panel's key-window behaviour (keys 1..9 and Esc, greyed title bar) was not verified on screen by the subagent. A manual live check by the user confirmed that pressing 1 and ticking Remember wrote a new rule into the rules file.
+
+## Decision
+Update `README.md`, `docs/rules.md` and `docs/ui.md` so they match the behaviour as implemented and live-tested:
+- `open: {ask: [...]}` takes 1 to 9 targets, and an empty list is an error that names the rule.
+- Esc, or no panel, falls back to the default target.
+- Remember appends a rule to the rules file.
+- The decisions log records the outcome in a note column, such as "asked -> default (cancelled)" or "asked -> Safari, remembered ...".
+- The UI match result shows the ask list and the Esc target.
+
+The docs were written from the verified behaviour rather than the plan, so they stay accurate.
+
+## Rejected
+None.
+
+## Touched
+Portero rules file (`rules.yaml`), decisions log, `/api/match`, the web UI, the ask panel, the CLI.
