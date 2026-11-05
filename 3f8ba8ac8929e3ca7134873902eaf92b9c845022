@@ -1,0 +1,19 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Record the user's acceptance of ADR 0007 (DEV-50), which decides that a failed "Remember" is shown as a native macOS notification.
+
+## Problems
+None.
+
+## Decision
+The status line in `docs/adr/0007-remember-failure-notification.md` changes from "proposed" to "accepted by the user", dated 2026-11-03. The wording now says the choice was made in the brief: a native notification, permission asked once, a short reason plus a hint to the log, and the link still opens where it was sent. Only the status changes. The ADR's content stays as written, so accepting it does not alter the decision. The ADR extends ADR 0005 decision 5 and ADR 0006 decision 4, which say a failed write never blocks the link.
+
+## Rejected
+None.
+
+## Touched
+- docs/adr/0007-remember-failure-notification.md
+- macOS native notifications (the subject of the ADR; no code changed)
