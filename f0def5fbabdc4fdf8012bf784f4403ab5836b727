@@ -1,0 +1,26 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Enable the notes feed at user level and restart the demo UI; then drive DEV-28 (Repositories page: choose which repos and owners to show, fix 409 on empty repos). The commit itself adds an optional cwd match for rules on links opened from a shell (DEV-36).
+
+## Problems
+- The allowed compound command partly failed: `setup/bin/harness` was not found when run from the repo directory. The M1/M3 todos had already been added earlier, so no duplicates were needed.
+- A subagent's reports contained instruction-shaped text; they were treated as the subagent's words, not user approval.
+- The working clone had an unrelated uncommitted change to the Claude settings file, so files must be staged by path.
+
+## Decision
+- Notes feed and session hooks are installed at user level; demo on port 8099 restarted.
+- Statistics idea recorded as DEV-35.
+- DEV-28 brief questions settled by the user following the recommendations: selection stored in the browser (localStorage, versioned key), grouped by owner with toggle, hide and pin, applied to Overview, Sessions and Activity via `owners=` and `hide=` query parameters (capped, validated, 400 before any GitHub call), default is owners with notes.
+- Empty repo (409) on the notes-ref check is treated as "no notes".
+- Branch created and plan handed to the go-developer first, then frontend, docs, review.
+
+## Rejected
+- Server-side per-user settings: separate later task.
+- Selection affecting only the Repositories page: useless for summaries.
+- Select-everything default: noisy with empty accounts.
+- Checkbox list and owner-only toggles: less precise than the requested design.
+
+## Touched
+gitreason CLI and UI server, Claude user settings, Linear (DEV-28, DEV-35), GitHub API, harness todo tool, browser localStorage.
