@@ -1,0 +1,21 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=1 resume=1 nofeed=0
+
+## Goal
+Fix the cross-review finding (Codex P2) on the `portero default status` command: it checked only the app resolved for the HTTP scheme, so a stale or mismatched HTTPS handler went unreported.
+
+## Problems
+- Launch Services can resolve `http` and `https` to different Portero.app copies. The status report and its exit code reflected only one of them.
+- The slice does not show the final diff, so details of the rewritten report are inferred from the review text and the commit message.
+
+## Decision
+`default status` in `cmd/portero/app.go` now looks up the resolved app for every scheme the handler registers, not just HTTP. It compares each against the installed app, for path and for version. Any mismatch makes the report unhealthy and the exit code 2, as before. `cmd/portero/app_test.go` was updated so the report-function table tests cover the per-scheme case. This keeps the existing contract: a dev binary skips the version check, and not being the default browser still exits 0.
+
+## Rejected
+None.
+
+## Touched
+- Launch Services (resolved handler per URL scheme)
+- `internal/handler` (`DefaultApp`, `BundleVersion`)
+- Codex cross-review
