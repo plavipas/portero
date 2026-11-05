@@ -1,0 +1,23 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Close a gap found in cross-review of PR #13 (DEV-46): the guard in the build script refuses a build directory inside `~/Applications`, but it was bypassed when `~/Applications` did not yet exist. Add a regression test for it in `scripts/test-install.sh`.
+
+## Problems
+- The guard resolves `~/Applications` after `mkdir -p "$OUT"`, so when the directory was absent at the start, the build could land inside its own install destination. Codex review flagged this.
+- Manual reproduction with a fresh temporary HOME and a build dir under `Applications/sub` showed the build script already refuses it (exit 1). However, the `Applications` directory was left behind in the temp HOME as a side effect.
+
+## Decision
+Extend `scripts/test-install.sh` with a case using a fresh HOME that has no `Applications` directory. It runs `scripts/build-app.sh` with `PORTERO_BUILD_DIR` set to `Applications/sub` and expects a refusal (failure). This pins the behaviour so the guard cannot regress, and keeps the test isolated in a temporary directory.
+
+## Rejected
+None.
+
+## Touched
+- `scripts/test-install.sh`
+- `scripts/build-app.sh` (exercised by the test)
+- `PORTERO_BUILD_DIR` environment variable
+- `HOME` environment variable
+- `make test`
