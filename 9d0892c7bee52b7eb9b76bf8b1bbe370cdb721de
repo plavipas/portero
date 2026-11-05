@@ -1,0 +1,19 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the `serve` command treat a session file whose modification time lies in the future as stale, so that it gets rotated instead of reused. The change came out of a cross-review.
+
+## Problems
+The session slice was empty, so the details of the session are not available. From the commit message alone, the likely problem is that a future mtime (for example from clock skew or a restored file) makes age checks never expire, leaving the session file in use indefinitely.
+
+## Decision
+Per the commit message, `serve` now rotates a session file with a future mtime. A negative age is handled as invalid and not as "fresh". This keeps session files from lingering after clock changes. The exact implementation is not visible in the provided material.
+
+## Rejected
+None recorded. The slice contains no discussion of alternatives.
+
+## Touched
+- `serve` command
+- Session file handling (rotation logic, mtime check)
