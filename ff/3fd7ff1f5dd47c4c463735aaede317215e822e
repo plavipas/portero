@@ -1,0 +1,25 @@
+Agent-Session: claude-code/030c8511-4922-4468-8542-cd55b025cfa5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=1 note=1 commit=4 plain=0 start=1 resume=1 nofeed=0
+
+## Goal
+Produce a universal (arm64 + x86_64) Portero.app and a `make package` target that creates a release zip with checksums (DEV-75).
+
+## Problems
+None.
+
+## Decision
+- `scripts/build-app.sh` accepts `PORTERO_ARCHS` (default: host architecture). Each architecture is built separately with cgo, with a macOS 13 deployment target. With two architectures the binaries are merged with `lipo`; with one, the binary is simply moved into place. A leading `v` is stripped from the version, so a tag like v0.1.0 becomes 0.1.0.
+- New `scripts/package.sh` builds the universal app in a temporary directory outside the repository, so Launch Services never indexes a stray copy. It then checks:
+  - the code signature (`codesign --verify`)
+  - that both architectures are present (`lipo -archs`)
+  - that the version in Info.plist, the binary's `version` output and the requested version all match.
+  It then writes `dist/Portero_<version>_darwin_universal.zip` (via `ditto`) and `dist/checksums.txt` (SHA-256). Verifying before zipping prevents a broken or mislabeled release artifact.
+- `Makefile` gets a `package` target.
+- The `.github/workflows/gitreason.yml` PR-comment workflow is deleted in this commit.
+
+## Rejected
+None.
+
+## Touched
+Go toolchain (cgo), lipo, codesign, ditto, shasum, PlistBuddy, Makefile, `scripts/build-app.sh`, `scripts/package.sh`
