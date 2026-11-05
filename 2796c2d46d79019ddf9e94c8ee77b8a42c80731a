@@ -1,0 +1,19 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Mark ADR 0005 (the "ask target" decision for DEV-47) as accepted after the user explicitly approved it ("да, принимаю adr").
+
+## Problems
+None. The ADR's status line still said "proposed" and required the user's explicit "да" before acceptance; the user gave it. A side question about repeated Safari windows opening on example.com was answered separately (QA runs for DEV-47) and has no effect on this commit.
+
+## Decision
+Change the status line in `docs/adr/0005-ask-target.md` from "proposed" to "accepted", keeping the DEV-47 reference. The change is documentation only. The ADR text itself was written earlier, and acceptance was waiting only on the user's approval. The branch is `dev-47-ask-target`, so the record of acceptance lives next to the implementation work.
+
+## Rejected
+None.
+
+## Touched
+- `docs/adr/0005-ask-target.md`
+- DEV-47 (tracker task)
