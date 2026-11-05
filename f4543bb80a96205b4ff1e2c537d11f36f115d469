@@ -1,0 +1,21 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `scripts/install.sh` treat a failed or timed-out `lsregister -u` (unregistering stale app copies) as an install failure instead of only a warning. This came out of a cross-review.
+
+## Problems
+None.
+
+## Decision
+- `unreg()` now records a non-zero status when the unregister command fails or the 10 s watchdog kills it. It prints an `error:` message instead of a `warning:` and returns that status.
+- The sweep loop no longer reads from a pipe. A pipe runs the loop in a subshell, so a `sweep_failed=1` set inside it would be lost. The loop now reads `$others_list` through a here-document and runs in the main shell, so `unreg "$p" || sweep_failed=1` reaches the existing failure handling.
+- The new app is still registered first, and the install fails only afterwards (exit 1). This leaves the system in a usable state while the failure is still reported.
+
+## Rejected
+None.
+
+## Touched
+- `scripts/install.sh`
+- `lsregister` (Launch Services)
