@@ -1,0 +1,24 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make `SetUnwrap` in `internal/rulesfile/unwrap.go` save the Settings unwrap options without losing or multiplying comments in the user's rules file (DEV-48). Saving must be idempotent.
+
+## Problems
+- QA of the earlier fix (7687fe0) found a new defect. A trailing comment on `unwrap_skip_openers:` was copied into the loose comments and also re-attached to the key line. Every save added another copy, so the file grew.
+- Loose comments were collected by ranging over a Go map. Their order changed between runs when both keys carried comments and the options were reset to defaults.
+- The trailing-comment parser gave up whenever the text before `#` contained a quote. A comment after `["com.a"]` was lost.
+
+## Decision
+- Only comments of keys that are no longer written are moved to their own lines. Comments of keys that are written stay on the key line and are not copied a second time.
+- The loose comments are emitted in a fixed key order (`unwrap`, then `unwrap_skip_openers`), so the output is deterministic.
+- `trailingComment` now tracks quote state and recognises `#` only outside quotes. Comments after quoted values are kept, and a `#` inside a quoted string is not mistaken for a comment.
+- Keys stay at their original positions, so repeated saves give the same text.
+- Added tests in `internal/rulesfile/unwrap_test.go` for save-twice idempotence, comment order and quoted trailing comments.
+
+## Rejected
+None. QA's suggestion to delete each comment from `trailing` once used was an equivalent option, and the fixed-order emission of unused-key comments was chosen instead.
+
+## Touched
+`internal/rulesfile` (`unwrap.go`, `unwrap_test.go`), Settings endpoint `/api/settings/unwrap` (caller), `make test`.
