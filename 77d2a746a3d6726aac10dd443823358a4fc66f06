@@ -1,0 +1,17 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+
+## Goal
+Update the documentation so the "how it works" diagram shows the working-directory (cwd) match step, tied to ticket DEV-36.
+
+## Problems
+None recorded. The session slice was empty, so this note is based on the commit message alone and no problems or surprises are known.
+
+## Decision
+The commit is a docs-only change to the how-it-works diagram, adding the cwd match so the diagram reflects the actual behavior. No code or behavior changes are indicated. The exact diagram edits are not visible in the available context.
+
+## Rejected
+None.
+
+## Touched
+Documentation (how-it-works diagram). No dependencies, services, or config are indicated.
