@@ -1,0 +1,19 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the serve command's switching sync refuse to operate when the rules path is a symlink, as a fix arising from a cross-review.
+
+## Problems
+The session slice was empty, so no problems or surprises are recorded. The commit message is the only source, and details beyond it cannot be confirmed.
+
+## Decision
+The sync step that switches rules now checks whether the rules path is a symlink and refuses to proceed if so. The likely reason, inferred from the commit title, is that following a symlink could let the sync read or write outside the intended rules directory. Refusing is a safe, explicit failure that closes this gap without changing behavior for normal paths.
+
+## Rejected
+None recorded.
+
+## Touched
+- serve command (switching sync logic)
+- Rules path handling (filesystem symlink check)
