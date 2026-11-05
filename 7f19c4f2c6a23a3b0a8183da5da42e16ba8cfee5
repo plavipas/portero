@@ -1,0 +1,24 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Fix DEV-48: links that apps wrap in redirects (Slack sign-in, Google `/url`, Outlook Safe Links, slack-redirect) were routed by the wrapper host, so e.g. a Jira link clicked in Slack fell into the default profile. Rules should match the real target.
+
+## Problems
+- The Slack Jira app hands macOS a `login_initiate_redirect` link whose real target sits inside a JWT claim, so a simple query parameter was not enough.
+- Unwrapping parses untrusted input (base64, JSON), so it needs size limits, a depth limit and no panics.
+- Several places call routing (URL handler, `open`, `rules match`, `/api/match`, Remember), and the log parser reads a fixed note column, so all had to learn the new note.
+- Earlier tests and acceptance criteria never covered wrapped links.
+
+## Decision
+Added `internal/rules/unwrap.go`: no network, up to 3 nested levels, only http/https inner URLs with a host, the JWT signature unchecked and used only to pick a profile. Rules see the inner URL first; a rule on the wrapper host applies only when unwrapping fails. The browser still receives the original link so sign-in completes. Ask title and Remember key come from the inner URL. The decision log keeps the original URL in its URL column and appends `unwrapped <inner>` to the note. `rules match`, `--dry-run` and `/api/match` show the inner URL. The log tail and UI were updated, and `docs/rules.md` documents it. Any failure falls back to the old behaviour.
+
+## Rejected
+- Following redirects over the network: slow, leaks the click, unnecessary.
+- Opening the inner URL directly: could break the Slack sign-in flow.
+- Wrapper rule first: it would keep the bug.
+- A new ADR: no existing ADR is affected.
+
+## Touched
+Slack, Google and Outlook Safe Links redirect formats; `docs/rules.md`; the decision log; the serve UI and API; Go standard library (`net/url`, `encoding/base64`, `encoding/json`).
