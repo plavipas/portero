@@ -1,0 +1,18 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the app's quit path in the handler (DEV-47) deliver links that are still queued or in flight, instead of terminating immediately and dropping them.
+
+## Problems
+The session slice shows no work on this commit's file. It only holds a subagent report about a related race fix in `internal/handler/panel.m`: a link arriving during shutdown could show a panel after termination had started. That is a separate commit. Beyond that, the logic is Objective-C run-loop timing, so no pure Go logic could be unit-tested and no manual quit test was run in the slice.
+
+## Decision
+In `internal/handler/handler.m`, `applicationShouldTerminate` no longer returns `NSTerminateNow`. It always returns `NSTerminateLater` and replies to the quit after a 150 ms grace once the inflight count is 0. If links are still in flight, it replies when the last one finishes, after the grace. The idle quit goes through `NSApp terminate:`, so it takes the same path. This gives queued links time to be delivered, and one code path handles every quit.
+
+## Rejected
+None. A Go unit test was skipped because the behavior depends only on Objective-C run-loop timing.
+
+## Touched
+AppKit (`NSApplication` termination delegate: `NSTerminateLater`, `NSApp terminate:`), `internal/handler/handler.m`, `internal/handler/panel.m` (the related shutdown flag in a separate commit).
