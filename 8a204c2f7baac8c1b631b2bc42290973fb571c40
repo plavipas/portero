@@ -1,0 +1,25 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Document the local web UI (`portero serve`) in docs/ui.md, README, rules.md and CLAUDE.md (DEV-24).
+
+## Problems
+The visible slice covers a different task (DEV-35, usage stats), not the docs work. In it, a review round found that the `note` counter in the `Usage:` line did not count the note carrying it. A subagent's hand-back also tripped an instruction-pattern filter (settings-json); it was treated as a report, not as authority. Nothing in the slice shows problems with the docs change itself.
+
+## Decision
+The slice shows only the DEV-35 pipeline, not the docs edits. In DEV-35 the `note` counter semantics were changed so a note counts itself: the first note says `note=1`, the counters file is reset to zeros after an embed, and the "counters kept" paths still add the written note. The fix was committed, then QA and a sixth cross-review (Codex) were started on the new HEAD. Security review, PR, Claude review and merge follow once both are clean.
+
+## Rejected
+None.
+
+## Touched
+- docs/ui.md
+- README.md
+- rules.md
+- CLAUDE.md
+- internal/note, internal/usage, internal/serve
+- e2e tests
+- Codex cross-review script (orca-run)
+- Claude subagents (go-developer, qa)
