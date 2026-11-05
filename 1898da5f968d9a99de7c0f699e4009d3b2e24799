@@ -1,0 +1,28 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+DEV-47: add an "ask target" to portero routing, a profile picker for links no rule can place. This commit covers the QA follow-ups: clearer errors for an empty ask, ask targets shown in `/api/match` and the web UI, and a comment about the panel's key window.
+
+## Problems
+- QA found `open: {ask: []}` reported "has an empty browser" and never named `ask`.
+- `/api/match` returned only the default target for an asking rule and carried no ask flag, so the UI's match view suggested the link always opens in the default.
+- Interactive panel checks (keys 1/2, Esc, close button, Remember) could not be verified because the QA session had no Accessibility permission. QA suspected the new panel is not the key window, so keys might work only after a click.
+
+## Decision
+- `internal/rules/rules.go`: an empty ask list now gets its own message that names `ask`.
+- `internal/serve/api.go` and `internal/serve/ui/app.js`: `/api/match` returns the ask targets, and the UI shows them. This keeps the UI consistent with `rules match` on the CLI.
+- `internal/handler/panel.m`: a comment documents the key-window behaviour of the panel, since it could not be confirmed live. Tests were added in `internal/rules/rules_test.go` and `internal/serve/api_test.go`.
+- A manual keyboard check of the panel is left to the user.
+
+## Rejected
+- Marking QA as PASS without the interactive criteria: they remain unverified.
+- Sending the verdict back as a code defect: QA found no product bug, only a missing permission.
+
+## Touched
+- internal/rules (rules.go)
+- internal/serve (api.go, ui/app.js)
+- internal/handler/panel.m (AppKit panel)
+- `/api/match` endpoint
+- `rules check` and `rules match` commands
