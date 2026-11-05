@@ -1,0 +1,23 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+QA fixes for `make install` (DEV-46): a failed build must not damage the installed app, `portero default status` must signal a stale resolved app through its exit code, and installation must not print a false unregister warning.
+
+## Problems
+None.
+
+## Decision
+- `scripts/install.sh` captures the build output first and checks it, instead of piping into `tail`. Before, a failed build could leave `APP` empty and reach `rm -rf "$DEST"`. Now it exits with "nothing was changed" if the build fails or produces no `.app`.
+- The install script no longer registers and then unregisters the build copy. The extra `unreg "$APP"` step and its dry-run line are gone, and only the other registered copies are swept. This removes the false warning.
+- `scripts/build-app.sh` resolves relative build directories to absolute ones and runs the "inside the repo" check before `mkdir`, so a rejected path leaves nothing behind.
+- `defaultReport` in `cmd/portero/app.go` now returns `ok=false` when Portero is the default but the resolved app is at another path or has another version. The command then exits 2. A dev binary skips only the version comparison. The README documents the new exit code.
+- New `scripts/test-install.sh`, run by `make test`, uses a fake HOME and checks that a failing build (build directory inside the repo) leaves the installed app untouched, in both normal and dry-run modes.
+- `cmd/portero/app_test.go` gains updated expectations and a test that a bare CLI falls back to `~/Applications/Portero.app`.
+
+## Rejected
+None.
+
+## Touched
+Launch Services (`lsregister`), `make`, POSIX sh, Go toolchain (`go vet`, `go test`), `~/Applications/Portero.app` install location.
