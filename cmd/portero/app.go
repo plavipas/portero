@@ -471,7 +471,11 @@ func defaultCmd(args []string) error {
 	case "set":
 		app := appBundle()
 		if app == "" {
-			return fmt.Errorf("run this from the installed app: ~/Applications/Portero.app/Contents/MacOS/portero default set")
+			hint := "<Portero.app>/Contents/MacOS/portero default set"
+			if inst := installedApp(); inst != "" {
+				hint = filepath.Join(inst, "Contents", "MacOS", "portero") + " default set"
+			}
+			return fmt.Errorf("run this from the installed app (brew cask: /Applications/Portero.app, make install: ~/Applications/Portero.app): %s", hint)
 		}
 		states, err := ensureDefault(os.Stdout, app, handler.DefaultHandler, handler.SetDefaultHandler, 100*time.Millisecond, 1500*time.Millisecond)
 		notes := stateNotes(states)

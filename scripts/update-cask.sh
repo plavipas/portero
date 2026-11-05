@@ -13,7 +13,8 @@ TAG=$1
 TAP=$2
 VERSION=${TAG#v}
 case "$TAG" in
-v[0-9]* | "") ;;
+v[0-9]*) ;;
+"") echo "error: empty tag" >&2; exit 1 ;;
 *) echo "error: tag $TAG is not of the form vMAJOR.MINOR.PATCH" >&2; exit 1 ;;
 esac
 case "$VERSION" in

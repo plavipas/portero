@@ -60,22 +60,20 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp packaging/Portero.icns "$APP/Contents/Resources/Portero.icns"
 BIN=$APP/Contents/MacOS/portero
-n=0
-parts=
+set --
 for a in $ARCHS; do
 	case "$a" in arm64) goarch=arm64 ;; *) goarch=amd64 ;; esac
-	n=$((n + 1))
 	part=$APP/Contents/MacOS/portero.$a
 	CGO_ENABLED=1 GOARCH=$goarch MACOSX_DEPLOYMENT_TARGET=13.0 \
 		CGO_CFLAGS="-arch $a -mmacosx-version-min=13.0" CGO_LDFLAGS="-arch $a -mmacosx-version-min=13.0" \
 		go build -ldflags "-X main.version=$VERSION" -o "$part" ./cmd/portero
-	parts="$parts $part"
+	set -- "$@" "$part"
 done
-if [ "$n" = 1 ]; then
-	mv $parts "$BIN"
+if [ "$#" = 1 ]; then
+	mv "$1" "$BIN"
 else
-	lipo -create -output "$BIN" $parts
-	rm -f $parts
+	lipo -create -output "$BIN" "$@"
+	rm -f "$@"
 fi
 sed "s/VERSION/$VERSION/g" packaging/Info.plist > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
