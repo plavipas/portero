@@ -1,0 +1,26 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make iCloud rules-file sync (DEV-45) safe when the synced file is offloaded by iCloud, make file copies durable, and keep a backup when sync is switched off.
+
+## Problems
+None recorded in the session. The code shows that reading an offloaded file blocks, which could stall the link handler. The macOS default-handler call could also wait forever and write to freed memory after a timeout.
+
+## Decision
+- Added `internal/sync/offload*.go` to detect offloaded files: a placeholder `.rules.yaml.icloud` on older macOS, or a dataless file on current macOS.
+- Added a native `StartDownload` (`startDownloadingUbiquitousItemAtURL`) to `internal/handler`. It returns at once.
+- `sync icloud` and `sync off` start the download and wait up to 30 seconds. On timeout they fail and change nothing.
+- The link handler and the UI launch never wait. While the file is offloaded, the link opens in Safari, an ERROR line goes to `decisions.log`, and the download starts, so later links route normally. `rules check` starts the download and exits with an error.
+- Copies go through a temporary file that is fsynced before the rename.
+- `sync off` keeps the replaced local file as `rules.yaml.icloud-backup`.
+- The settings API gains `icloud_offloaded`, and `icloud_exists` is also true for an offloaded file. The UI shows "Working..." during the wait.
+- The `NSWorkspace` default-handler wait is now capped at 5 minutes. Its completion state is a retained object, so a late write is safe.
+- Tests in `cmd/portero/offload_test.go` use a fake download function.
+
+## Rejected
+None.
+
+## Touched
+iCloud Drive, macOS Foundation (`NSFileManager`, `NSWorkspace`), cgo/Objective-C handler, `decisions.log`, `PORTERO_RULES`, the `portero serve` settings API and UI, `docs/rules.md`, `docs/ui.md`.
