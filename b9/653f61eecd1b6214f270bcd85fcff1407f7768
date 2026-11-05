@@ -1,0 +1,21 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=2 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Address review feedback on the sync feature: make file copying safe against partial writes, and fix how iCloud paths are detected.
+
+## Problems
+The session slice was empty, so details come only from the commit message. The review evidently found two defects: a copy could leave a half-written destination file if interrupted, and iCloud detection matched too loosely because it lacked a path separator in the check.
+
+## Decision
+- Copy to a temporary file in the destination directory, then rename it over the target. A rename on the same filesystem is atomic, so readers see either the old file or the complete new one.
+- Make iCloud detection require a path separator in the match, so only real iCloud directory components are recognised and not directory names that merely contain a similar substring.
+
+## Rejected
+None recorded in the available information.
+
+## Touched
+- Sync module (file copy logic)
+- iCloud path detection
+- Local filesystem (temp file and rename)
