@@ -1,0 +1,23 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=0 commit=1 plain=0 start=1 resume=0 nofeed=0
+
+## Goal
+The user asked to disable the flood of GitHub and Linear notification emails in their inbox, by turning them off at the source (GitHub and Linear settings).
+
+## Problems
+- The commit message (serve: Apply resolves the rules path once, DEV-24 cross-review) does not match this session slice, which is about email notifications. The slice does not show the code change.
+- The GitHub CLI has several accounts logged in. PR authorship and emails needed checking to find the right one. The email API call failed with 404 because the token lacked the `user` scope.
+- The expected `harness` path did not exist at the guessed location.
+- The first snapshot attempt of the browser page failed on an unexpected JSON shape (missing `result` key).
+
+## Decision
+- Searched Gmail for GitHub and Linear senders to see which notification types arrive.
+- Checked `gh` accounts to identify which one owns the relevant PRs.
+- Used Orca's embedded browser, in the Private profile, to open the GitHub notifications settings page. Then began taking a page snapshot to interact with it. This is the route for changing settings that have no API.
+
+## Rejected
+- Changing GitHub settings through the API: the token lacks the needed scope, and refreshing it would need extra auth.
+
+## Touched
+Gmail (MCP), GitHub (`gh` CLI, notification settings), Linear, Orca CLI and its embedded browser, `orca-open` helper.
