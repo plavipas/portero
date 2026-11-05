@@ -1,0 +1,23 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+QA coverage for the iCloud "offloaded" handling (DEV-45): confirm `Offloaded` gives no false positives on real BSD file flags, and that the offloaded link-routing path runs handlers in the right order and writes a correct log line.
+
+## Problems
+None.
+
+## Decision
+Two test-only files were added, with no production code changes.
+
+- `internal/sync/offload_darwin_test.go` (darwin build tag) runs the real `Offloaded` check on files in a temp dir, which iCloud never manages. It covers regular and empty files, other BSD flags (`UF_IMMUTABLE`, `UF_HIDDEN`, `UF_NODUMP` and combinations), symlinks, directories, missing files, and a directory or a different file named like an `.icloud` placeholder. `SF_DATALESS` can only be set by the kernel or File Provider, so `platformDataless` is checked on a synthetic `Stat_t` instead.
+- `cmd/portero/offload_qa_test.go` checks, for `routeLinkWith` and `openUI`, that the browser opens before the download starts. It also checks that the log line has five tab-separated columns, with `-` when there is no opener. An open error is returned while the download still starts. A non-URL is refused before anything opens or downloads.
+
+Temp-dir files and a synthetic `Stat_t` keep the tests deterministic and independent of a real iCloud account.
+
+## Rejected
+None.
+
+## Touched
+`internal/sync` (`Offloaded`, `platformDataless`), `cmd/portero` (`routeLinkWith`, `openUI`, `startDownload`), `internal/config` (`LogFile`), `internal/launch`, `internal/rules`, the `syscall` package (`Chflags`, `Stat_t`), and iCloud `.icloud` placeholder naming.
