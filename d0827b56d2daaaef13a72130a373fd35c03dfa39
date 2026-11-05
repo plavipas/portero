@@ -1,0 +1,19 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Change the serve UI so the decision button is labeled "show" and highlights the decision path on the diagram, rather than being labeled "replay".
+
+## Problems
+None recorded. The session slice was empty, so this note is based only on the commit message. No obstacles are known.
+
+## Decision
+Rename the decision button from "replay" to "show" in the serve UI. The new label describes what the button does: it displays the path taken on the diagram, not a replay of the run. This keeps the UI wording consistent with the behavior and avoids implying an animated or step-by-step replay.
+
+## Rejected
+None recorded.
+
+## Touched
+- serve UI (the decision button and its label)
+- diagram view (where the decision path is shown)
