@@ -1,0 +1,19 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Apply feedback from the DEV-24 cross-review to the serve component: built-in graph nodes should live in their own id namespace so they cannot collide with other node ids.
+
+## Problems
+The session slice was empty, so the details of problems hit along the way are not recorded. From the commit message alone, the likely issue raised in review was id collisions between built-in nodes and user-defined or generated nodes in the served graph.
+
+## Decision
+Built-in graph nodes were given a separate id namespace in the serve code. Keeping their ids distinct from other nodes avoids clashes and makes the origin of a node clear from its id. The exact naming scheme (prefix or similar) is not visible from the available information.
+
+## Rejected
+None recorded. The session slice does not show any alternatives that were considered.
+
+## Touched
+- serve module (graph node id handling)
+- DEV-24 ticket / cross-review
