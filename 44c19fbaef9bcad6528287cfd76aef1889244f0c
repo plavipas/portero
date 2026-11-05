@@ -1,0 +1,26 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Stop the `portero serve` API from hanging when the rules file is offloaded by iCloud (present in iCloud Drive but not downloaded on this Mac), and trigger the download instead. This came out of a cross-review.
+
+## Problems
+None.
+
+## Decision
+Added two optional hooks to `serve.Options` in `internal/serve/serve.go`: `Offloaded(path) bool` and `Download(path) error`. `cmd/portero/serve.go` wires them to `sync.Offloaded` and `startDownload`.
+
+In `internal/serve/api.go`, `readRules` and `handleApply` first call `offloadedErr`. If the file is offloaded, it requests the download and returns `errOffloaded`. A new `readFail` helper maps that error to 503 (retry later) and any other read error to 500. `handleState`, `handleValidate`, `handleMatch` and `handleApply` use it.
+
+The check runs before any read, so no handler blocks on a dataless file. Nil hooks disable the behaviour, so tests and non-iCloud setups are unaffected.
+
+`handleMatch` returns 503 for an offloaded file. Other read failures there keep the existing 422 "no rules file" answer.
+
+`TestOffloadedRulesAnswer503WithoutReading` checks that all four endpoints return 503 and that the download is requested once per call.
+
+## Rejected
+None.
+
+## Touched
+iCloud Drive (offloaded rules file download), `sync.Offloaded`, `startDownload`, `serve.Options`, the `internal/serve` HTTP API.
