@@ -1,0 +1,21 @@
+Agent-Session: claude-code/47657808-6321-42d8-b1d8-5d80e99d3cb8
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Fix DEV-47: a link arriving while Portero is quitting (including the 2 s idle quit) could be lost, and the earlier approach had a terminate deadlock. The quit path in the handler had to stop blocking the main queue.
+
+## Problems
+- The first fix (150 ms `dispatch_after` grace on the main queue, `NSTerminateLater`) blocked the main queue in the quit path and risked a deadlock during terminate.
+- Nothing automated exercises the Objective-C run-loop path, so the race can only be checked manually (links right after Quit, and about 2 s after the previous link).
+- A small loss window remains for links arriving after the grace ends with no inflight work.
+
+## Decision
+Rework `internal/handler/handler.m` and `internal/handler/panel.m` so the quit path never blocks the main queue. The grace and timeout timers are run-loop timers registered in both common and modal modes, so they still fire while an ask panel runs modally and terminate cannot deadlock. Terminate still cancels open ask panels, sets the terminating flag, and replies only after the grace is over and inflight work is done. The idle quit goes through `[NSApp terminate:]`, so it uses the same logic. No Go tests were added because this is pure run-loop timing.
+
+## Rejected
+- Returning `NSTerminateNow` immediately: it loses links already queued as Apple events.
+- Main-queue `dispatch_after` for the grace: it does not fire reliably in modal mode and can deadlock terminate.
+
+## Touched
+AppKit (`NSApplication` terminate flow, `NSRunLoop` common and modal modes), os_log, Apple events handling in `internal/handler`.
