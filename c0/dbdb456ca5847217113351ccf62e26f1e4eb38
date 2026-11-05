@@ -1,0 +1,20 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Harden host display and "Remember" key handling (DEV-50): `HostForms` must never return raw non-ASCII text when the punycode codec fails, and C1 control characters must be refused in host, key and title.
+
+## Problems
+None.
+
+## Decision
+- `HostForms` in `internal/rules/idna.go`: when a label fails to encode or decode, or is unsafe (control, format or empty content), the label is replaced by an ASCII-only form via a new `asciiMask` helper, where `?` stands for a character that cannot be shown. The whole result then stays ASCII, so a look-alike cannot be displayed raw. Previously a codec error returned the original host unchanged, and plain ASCII labels were not checked for unsafe content.
+- The hand-written control check (`r < 0x20 || r == 0x7f`) is replaced by `unicode.IsControl` in `RememberKey`, `RememberHost`, `askTitle` and `notifyRememberFailed`. This also covers C1 controls (U+0080–U+009F), which the old check missed.
+- Tests added for U+0085 and U+009B in hosts, keys and titles. They also cover the uppercase `XN--` form and a lowercasing edge case.
+
+## Rejected
+None.
+
+## Touched
+Go standard library `unicode` and `strings`, internal packages `internal/rules` and `cmd/portero`, punycode helpers (`punyEncode`, `punyDecode`).
