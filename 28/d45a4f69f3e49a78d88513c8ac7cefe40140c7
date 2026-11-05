@@ -1,0 +1,21 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Update CLAUDE.md so the security-reviewer agent runs on the Fable model, and if Fable fails, the review is rerun on Opus.
+
+## Problems
+None. The session slice was essentially empty, so the details here are inferred from the commit message alone.
+
+## Decision
+Edited the project's CLAUDE.md guidance to set Fable as the model for security-reviewer, with an Opus rerun as the fallback when Fable fails. This keeps the review always completing, and the rule lives in the shared instructions where the agent workflow reads it.
+
+## Rejected
+None recorded.
+
+## Touched
+- CLAUDE.md
+- security-reviewer agent
+- Fable model
+- Opus model
