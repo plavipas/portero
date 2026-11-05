@@ -1,0 +1,22 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=0 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Land the ADR 0002 documentation commit (local web UI, DEV-24). The session slice shows the orchestrator driving two feature branches through QA, Codex cross-review and fixes: DEV-28 (repository selection on the Repositories page) and DEV-35 (usage statistics for notes).
+
+## Problems
+- DEV-28: the 50-owner cap silently dropped owners; the freeze after the first change still truncated them, and the notice count was wrong (QA round 3 FAIL).
+- DEV-28: unselected repositories could make results "partial"; Codex also flagged that a partial repo list could erase stored pin/hide preferences.
+- DEV-35: edits in a repo with no commits counted as misses, with no per-file dedupe.
+- DEV-35: Codex found races on the shared stats log prune and the repo lock, and a Usage header embedded without real counters. A second round flagged the lock again.
+- Subagent reports carried instruction-shaped text; it was treated as data.
+
+## Decision
+Subagents fix each finding in small commits, then QA and a Codex re-review run on the new HEAD. Security review, PR and merge follow only after clean passes. The docs commit itself is a separate step by a tech-writer.
+
+## Rejected
+- DEV-35: aligning the empty-state wording with the plan's "From 0 of N" footer; left as implemented, since the docs match.
+
+## Touched
+Codex cross-review (Orca), Playwright, GitHub API (notes refs), localStorage, git notes, flock-based locks, and the Go and web (TypeScript) build tooling.
