@@ -1,0 +1,20 @@
+Agent-Session: claude-code/590a9064-8c71-4972-84e4-00be145034b5
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the `serve` command refuse to enable sync when the iCloud rules file is a symlink. The change came out of a cross-review. The session slice was empty, so this note is based on the commit message alone.
+
+## Problems
+None recorded. The slice contains no transcript, so any difficulties during the work are unknown.
+
+## Decision
+When sync is enabled, `serve` checks whether the iCloud-hosted rules file is a symlink and refuses to proceed if it is. This is a guard against following a link to an unintended location. A symlink could point outside the iCloud container, so reading or writing through it could touch files the user did not intend, or break sync assumptions. Failing early with a refusal is safer than resolving the link silently. The details of the implementation (error wording, exact check) are not available from the slice.
+
+## Rejected
+None recorded. Alternatives such as resolving the symlink and continuing, or only warning, may have been considered, but nothing in the available material confirms it.
+
+## Touched
+- `serve` command
+- iCloud rules file (sync)
+- Cross-review feedback
