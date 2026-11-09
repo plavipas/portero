@@ -53,7 +53,7 @@ skipped only on the user's explicit words (`--skipped-by-user "<words>"`).
    PASS required; FAIL goes back to the developer automatically.
 5a. **tech-writer** -> right after qa PASS, without a question, when the change touches documented behaviour (CLI,
    rules format, browser table, handler, sync, install, agents, task flow). Docs-only commit; does not restart qa.
-6. **cross-review** skill with the AI chosen in step 3, in a separate Orca tab; findings back to step 4.
+6. **cross-review** skill with the AI chosen in step 3, as a background process (never an Orca tab); findings back to step 4.
 7. **security-reviewer** on the branch diff; APPROVE required, otherwise back to step 4.
 8. **push / PR** (no approval needed), then the Claude Code
    Review workflow reviews it; read it back with the `claude-pr-review` skill. Real findings go back to step 4.
