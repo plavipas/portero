@@ -1,0 +1,22 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=1 resume=1 nofeed=0
+
+## Goal
+Follow-ups to the Homebrew cask install (DEV-77): make the `portero` command safe before the ad-hoc-signed app is approved, stop the cask clashing with a `make install` copy, and fix the tap-path handling in the cask update script.
+
+## Problems
+None.
+
+## Decision
+- The cask installs the `portero` command through `command_wrapper` using `packaging/portero-shim.sh`, replacing the plain `binary` link. The shim checks the quarantine attribute of `Portero.app`. While the app is unapproved it prints a hint and exits 3 instead of letting Gatekeeper hang the first launch. Otherwise it execs the real binary with argv intact.
+- A cask `preflight_steps` block refuses to install if `~/Applications/Portero.app` exists, so there is one install method per Mac.
+- `portero default status` and `default set` warn about a second `Portero.app` via the new `secondCopy` function. Status also exits 2 in that case. A unit test covers this.
+- `scripts/update-cask.sh` resolves the tap path before changing directory, refuses a tap inside the repo, injects the indented shim into the template, checks for leftover placeholders, and runs `ruby -c` on the result. A `PORTERO_CHECKSUMS` override allows offline tests.
+- The new `scripts/test-cask.sh` is wired into `make test`. The README and release notes now say to approve the app first.
+
+## Rejected
+None.
+
+## Touched
+Homebrew (cask, `command_wrapper`, `preflight_steps`), GitHub Actions release workflow, `gh` CLI, macOS Gatekeeper quarantine (`xattr`), Ruby (`ruby -c`), Go.
