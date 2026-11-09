@@ -43,6 +43,8 @@ jobs:
             --title "Portero $GITHUB_REF_NAME" --generate-notes \
             --notes "Install: brew tap plavipas/tap && brew install --cask plavipas/tap/portero
 
+          Requires Homebrew 6.0.13+ (brew update). The cask refuses to install while ~/Applications/Portero.app (from make install) exists: one install method per Mac.
+
           The app is ad-hoc signed, not notarized. Approve it first: 'open -a Portero' and allow it in System Settings > Privacy & Security > Open Anyway,
           or run: xattr -dr com.apple.quarantine /Applications/Portero.app
 
