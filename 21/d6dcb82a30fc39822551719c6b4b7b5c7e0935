@@ -1,0 +1,26 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the rendered Homebrew cask template pass `brew style` (DEV-77), and have the cask test script check this automatically when Homebrew is available.
+
+## Problems
+None.
+
+## Decision
+Adjusted `packaging/portero.rb.tmpl` to satisfy the style rules:
+- Shortened `desc` to "Default-browser router", dropping the platform mention that Homebrew style flags as redundant.
+- Changed `depends_on macos: ">= :ventura"` to `depends_on macos: :ventura`, the form the style checks expect.
+- Split the long `run "/bin/sh"` argument string across lines with string continuation and a trailing comma, keeping the message text identical.
+
+Added a step at the end of `scripts/test-cask.sh`. When `brew` is on PATH, it runs `brew style` on the rendered cask with auto-update disabled (read-only), prints the output and fails on offenses. Without brew it prints a skip message, so the script still runs on machines and CI without Homebrew.
+
+## Rejected
+None.
+
+## Touched
+- Homebrew (`brew style`)
+- `packaging/portero.rb.tmpl` (cask template)
+- `scripts/test-cask.sh`
+- `HOMEBREW_NO_AUTO_UPDATE` environment variable
