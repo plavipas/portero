@@ -1,0 +1,27 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Address review feedback on the Homebrew cask and shim work (DEV-77): make the quarantine hint safe to copy-paste, make test-mode overrides visible, and close two test gaps.
+
+## Problems
+None.
+
+## Decision
+- `packaging/portero-shim.sh`: the suggested `xattr -dr com.apple.quarantine` command now quotes the app path, so paths with spaces work when pasted.
+- `scripts/update-cask.sh`: prints a note to stderr when `PORTERO_CHECKSUMS` is used instead of the release download, so a local checksums file is never silently mistaken for the real release.
+- `scripts/test-cask.sh`: the quarantine-blocking check now runs for both a full flag string and a bare flag value, and asserts the quoted hint.
+- `cmd/portero/app_test.go`: new `TestSecondCopySymlinkedInstalled` checks that a symlink to the installed app is not reported as a second copy.
+
+These are small, targeted changes that follow the review comments, with tests pinning each behavior.
+
+## Rejected
+None.
+
+## Touched
+- Homebrew cask scripts (`scripts/update-cask.sh`, `scripts/test-cask.sh`)
+- `packaging/portero-shim.sh`
+- `PORTERO_CHECKSUMS` environment variable
+- macOS `xattr` and the `com.apple.quarantine` attribute
+- GitHub releases via `gh` (checksums.txt)
