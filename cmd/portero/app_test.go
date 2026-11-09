@@ -324,3 +324,66 @@ func TestQuarantinedOnATempDir(t *testing.T) {
 		t.Error("empty path reported as quarantined")
 	}
 }
+
+func TestSecondCopy(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	sys := "/Applications/Portero.app"
+	usr := filepath.Join(home, "Applications", "Portero.app")
+	has := func(paths ...string) func(string) bool {
+		return func(p string) bool {
+			for _, q := range paths {
+				if p == q {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	tests := []struct {
+		name      string
+		installed string
+		exists    func(string) bool
+		wantPath  string
+	}{
+		{"both, cask installed", sys, has(sys, usr), usr},
+		{"both, make install installed", usr, has(sys, usr), sys},
+		{"only the installed one", sys, has(sys), ""},
+		{"only the other one", usr, has(sys), sys},
+		{"none", sys, has(), ""},
+		{"installed empty, one exists", "", has(usr), usr},
+		{"installed empty, none", "", has(), ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := secondCopy(tt.installed, tt.exists)
+			if tt.wantPath == "" {
+				if got != "" {
+					t.Errorf("got %q, want no warning", got)
+				}
+				return
+			}
+			if !strings.HasPrefix(got, "warning: a second Portero.app at "+tt.wantPath+";") || !strings.Contains(got, "brew uninstall --cask portero") {
+				t.Errorf("got %q, want a warning about %s", got, tt.wantPath)
+			}
+		})
+	}
+}
+
+// The installed bundle reached through a symlink is the same copy, not a second one.
+func TestSecondCopySymlinkedInstalled(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	usr := filepath.Join(home, "Applications", "Portero.app")
+	if err := os.MkdirAll(usr, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "Portero.app")
+	if err := os.Symlink(usr, link); err != nil {
+		t.Fatal(err)
+	}
+	exists := func(p string) bool { return p == usr }
+	if got := secondCopy(link, exists); got != "" {
+		t.Errorf("got %q, want no warning for a symlink to the installed copy", got)
+	}
+}
