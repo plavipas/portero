@@ -43,8 +43,8 @@ jobs:
             --title "Portero $GITHUB_REF_NAME" --generate-notes \
             --notes "Install: brew tap plavipas/tap && brew install --cask plavipas/tap/portero
 
-          The app is ad-hoc signed, not notarized: open it once with 'open -a Portero' and allow it in System Settings > Privacy & Security > Open Anyway,
+          The app is ad-hoc signed, not notarized. Approve it first: 'open -a Portero' and allow it in System Settings > Privacy & Security > Open Anyway,
           or run: xattr -dr com.apple.quarantine /Applications/Portero.app
 
-          Then run 'portero rules init' and 'portero default set'." \
+          Only then run 'portero rules init' and 'portero default set'. Until approved, 'portero' prints a hint and exits 3." \
             dist/Portero_*.zip dist/checksums.txt

@@ -10,15 +10,24 @@ cask "portero" do
   depends_on macos: ">= :ventura"
 
   app "Portero.app"
-  binary "#{appdir}/Portero.app/Contents/MacOS/portero"
+  command_wrapper "portero", content: <<~SH
+@SHIM@
+  SH
+
+  preflight_steps do
+    if_path_exists "Applications/Portero.app", base: :home do
+      run "/bin/sh", args: ["-c", "echo 'portero: ~/Applications/Portero.app (make install) is installed; remove it first: rm -rf ~/Applications/Portero.app, then brew install again. One install method per Mac.' >&2; exit 1"]
+    end
+  end
 
   caveats <<~EOS
-    Portero is ad-hoc signed, not notarized. Open it once so macOS lets it run:
+    Portero is ad-hoc signed, not notarized. Approve it first, before anything else:
       open -a Portero
     If macOS blocks it, allow it in System Settings > Privacy & Security > Open Anyway
     (or run: xattr -dr com.apple.quarantine /Applications/Portero.app).
-    Then create the rules and make Portero the default browser:
+    Only then create the rules and make Portero the default browser:
       portero rules init
       portero default set
+    Until approved, `portero` prints this hint and exits 3.
   EOS
 end

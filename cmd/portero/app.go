@@ -464,6 +464,10 @@ func defaultCmd(args []string) error {
 	case "status":
 		printDefaultStatus(os.Stdout, nil)
 		ok := printResolution(os.Stdout)
+		if l := secondCopy(installedApp(), pathExists); l != "" {
+			fmt.Fprintln(os.Stdout, l)
+			ok = false
+		}
 		printQuarantine(os.Stdout, installedApp(), quarantined)
 		if !ok {
 			return exitCode(2)
@@ -481,6 +485,9 @@ func defaultCmd(args []string) error {
 		notes := stateNotes(states)
 		printDefaultStatus(os.Stdout, func(s string) string { return notes[s] })
 		printResolution(os.Stdout)
+		if l := secondCopy(installedApp(), pathExists); l != "" {
+			fmt.Fprintln(os.Stdout, l)
+		}
 		printQuarantine(os.Stdout, app, quarantined)
 		if err != nil {
 			return err
@@ -523,6 +530,30 @@ func installedApp() string {
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		return filepath.Join(home, "Applications", "Portero.app")
+	}
+	return ""
+}
+
+// pathExists reports whether p exists.
+func pathExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+// secondCopy is a warning when Portero.app exists in both standard places (the cask's /Applications and make
+// install's ~/Applications) and one of them is not the installed app; "" otherwise.
+func secondCopy(installed string, exists func(string) bool) string {
+	cands := []string{"/Applications/Portero.app"}
+	if home, err := os.UserHomeDir(); err == nil {
+		cands = append(cands, filepath.Join(home, "Applications", "Portero.app"))
+	}
+	for _, p := range cands {
+		if installed != "" && samePath(p, installed) {
+			continue
+		}
+		if exists(p) {
+			return fmt.Sprintf("warning: a second Portero.app at %s; macOS may switch links to it; remove it: brew uninstall --cask portero (for /Applications) or rm -rf ~/Applications/Portero.app", p)
+		}
 	}
 	return ""
 }

@@ -114,35 +114,36 @@ applies an update, can be dropped before the extension is ready. Opening the lin
 
 ## Install
 
-Requires macOS 13 or later (Apple silicon and Intel).
+Requires macOS 13 or later (Apple silicon and Intel) and Homebrew 6.0.13 or newer (`brew update`).
 
 ```sh
 brew tap plavipas/tap
 brew install --cask plavipas/tap/portero
 ```
 
-The cask installs `Portero.app` into `/Applications` and links `portero` into your `PATH`. The app is ad-hoc signed,
-not notarized, so macOS blocks its first launch. Open it once:
+The cask installs `Portero.app` into `/Applications` and a `portero` command into your `PATH`. The app is ad-hoc
+signed, not notarized, so macOS blocks its first launch. Approve it first, before running `portero`:
 
 ```sh
 open -a Portero
 ```
 
 macOS shows "Portero cannot be opened". Open System Settings > Privacy & Security, scroll to the message about
-Portero and click Open Anyway, then confirm. Alternatively, remove the quarantine attribute after the install:
-`xattr -dr com.apple.quarantine /Applications/Portero.app`. `portero default status` warns while the app is still
-quarantined (not yet approved).
+Portero and click Open Anyway, then confirm. Alternatively, remove the quarantine attribute:
+`xattr -dr com.apple.quarantine /Applications/Portero.app`. Until the app is approved, `portero` prints this hint
+and exits 3 instead of hanging, and `portero default status` warns about the quarantine.
 
-Then:
+Only then:
 
 ```sh
 portero rules init        # writes the example rules to ~/.config/portero/rules.yaml; edit it
 portero default set       # macOS asks to confirm Portero as the default browser
 ```
 
-One install method per Mac: the cask or `make install`, not both. Before `make install` run
-`brew uninstall --cask portero`; before `brew install` remove `~/Applications/Portero.app`. Two copies make macOS
-pick one of them for links.
+One install method per Mac: the cask or `make install`, not both. `brew install` refuses to run while
+`~/Applications/Portero.app` exists (remove it first); before `make install` run `brew uninstall --cask portero`.
+`portero default status` reports a second `Portero.app` (in `/Applications` and `~/Applications`) and exits 2, because
+two copies make macOS pick one of them for links.
 
 ## Build from source (macOS)
 
@@ -180,7 +181,7 @@ old one, run `lsregister -f ~/Applications/Portero.app` (the tool lives in
 ```sh
 make package                       # dist/Portero_<version>_darwin_universal.zip + dist/checksums.txt
 PORTERO_ARCHS=arm64 make app       # one architecture only; default is the host architecture
-scripts/update-cask.sh v0.1.0 <tap-dir>   # writes Casks/portero.rb from packaging/portero.rb.tmpl; commit it in the tap
+scripts/update-cask.sh v0.1.0 <tap-dir>   # <tap-dir> may be relative, but not inside this repository; writes Casks/portero.rb from packaging/portero.rb.tmpl; commit it in the tap
 ```
 
 `make package` builds a universal app (arm64 and x86_64, macOS 13 or later), checks the signature, the architectures

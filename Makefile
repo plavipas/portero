@@ -2,7 +2,7 @@
 build:
 	go build -o bin/portero ./cmd/portero
 test:
-	go vet ./... && go test ./... && sh scripts/test-install.sh
+	go vet ./... && go test ./... && sh scripts/test-install.sh && sh scripts/test-cask.sh
 app:
 	sh scripts/build-app.sh
 package:
