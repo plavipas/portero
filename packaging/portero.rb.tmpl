@@ -4,10 +4,10 @@ cask "portero" do
 
   url "https://github.com/plavipas/portero/releases/download/v#{version}/Portero_#{version}_darwin_universal.zip"
   name "Portero"
-  desc "Default-browser router for macOS"
+  desc "Default-browser router"
   homepage "https://github.com/plavipas/portero"
 
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "Portero.app"
   command_wrapper "portero", content: <<~SH
@@ -16,7 +16,12 @@ cask "portero" do
 
   preflight_steps do
     if_path_exists "Applications/Portero.app", base: :home do
-      run "/bin/sh", args: ["-c", "echo 'portero: ~/Applications/Portero.app (make install) is installed; remove it first: rm -rf ~/Applications/Portero.app, then brew install again. One install method per Mac.' >&2; exit 1"]
+      run "/bin/sh", args: [
+        "-c",
+        "echo 'portero: ~/Applications/Portero.app (make install) is installed; " \
+        "remove it first: rm -rf ~/Applications/Portero.app, then brew install again. " \
+        "One install method per Mac.' >&2; exit 1",
+      ]
     end
   end
 

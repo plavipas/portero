@@ -65,3 +65,11 @@ rc=0; PORTERO_CHECKSUMS="$T/checksums.txt" sh scripts/update-cask.sh "v$V" . >/d
 [ "$rc" != 0 ] || fail "tap inside the repo was accepted"
 [ "$had" = 1 ] || [ ! -e Casks ] || fail "Casks/ appeared in the repo after the refused run"
 echo "ok: a tap inside the repository is refused"
+
+# The rendered cask must pass brew style (read-only); skipped without brew.
+if command -v brew >/dev/null 2>&1; then
+	HOMEBREW_NO_AUTO_UPDATE=1 brew style "$C" >"$T/style" 2>&1 || { cat "$T/style" >&2; fail "brew style reports offenses"; }
+	echo "ok: the rendered cask passes brew style"
+else
+	echo "skip: brew style needs Homebrew"
+fi
