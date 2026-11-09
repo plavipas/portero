@@ -369,3 +369,21 @@ func TestSecondCopy(t *testing.T) {
 		})
 	}
 }
+
+// The installed bundle reached through a symlink is the same copy, not a second one.
+func TestSecondCopySymlinkedInstalled(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	usr := filepath.Join(home, "Applications", "Portero.app")
+	if err := os.MkdirAll(usr, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "Portero.app")
+	if err := os.Symlink(usr, link); err != nil {
+		t.Fatal(err)
+	}
+	exists := func(p string) bool { return p == usr }
+	if got := secondCopy(link, exists); got != "" {
+		t.Errorf("got %q, want no warning for a symlink to the installed copy", got)
+	}
+}

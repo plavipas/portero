@@ -19,5 +19,5 @@ if [ $((0x$FLAGS & 64)) -ne 0 ]; then
 fi
 echo "portero: $APP is quarantined and not approved yet, so macOS would block it." >&2
 echo "  Approve it: open -a Portero, then System Settings > Privacy & Security > Open Anyway." >&2
-echo "  Or run: xattr -dr com.apple.quarantine $APP" >&2
+echo "  Or run: xattr -dr com.apple.quarantine '$APP'" >&2
 exit 3

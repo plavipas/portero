@@ -45,6 +45,7 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/portero-cask.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 if [ -n "${PORTERO_CHECKSUMS:-}" ]; then
 	# Tests: a local checksums file instead of the release download.
+	echo "note: PORTERO_CHECKSUMS is set, using $PORTERO_CHECKSUMS instead of the $TAG release download" >&2
 	cp "$PORTERO_CHECKSUMS" "$WORK/checksums.txt"
 else
 	gh release download "$TAG" --repo plavipas/portero --pattern checksums.txt --dir "$WORK"

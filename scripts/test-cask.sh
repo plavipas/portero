@@ -27,12 +27,14 @@ echo "ok: shim without quarantine execs the binary with argv intact"
 
 if [ "$(uname -s)" = Darwin ]; then
 	setq() { /usr/bin/xattr -w com.apple.quarantine "$1" "$APP"; }
-	setq "0081;0;Safari;"
-	rc=0; run_shim open x >"$T/out" 2>"$T/err" || rc=$?
-	[ "$rc" = 3 ] || fail "flags 0081: exit $rc, want 3"
-	[ ! -s "$T/out" ] || fail "flags 0081: the binary ran"
-	grep -q 'Open Anyway' "$T/err" || fail "flags 0081: no Open Anyway hint"
-	grep -q 'xattr -dr com.apple.quarantine' "$T/err" || fail "flags 0081: no xattr hint"
+	for f in "0081;0;Safari;" "0081"; do
+		setq "$f"
+		rc=0; run_shim open x >"$T/out" 2>"$T/err" || rc=$?
+		[ "$rc" = 3 ] || fail "flags $f: exit $rc, want 3"
+		[ ! -s "$T/out" ] || fail "flags $f: the binary ran"
+		grep -q 'Open Anyway' "$T/err" || fail "flags $f: no Open Anyway hint"
+		grep -q "xattr -dr com.apple.quarantine '$APP'" "$T/err" || fail "flags $f: no quoted xattr hint"
+	done
 	for f in "00c1;0;Safari;" "zz;0;Safari;"; do
 		setq "$f"
 		out=$(run_shim go) || fail "flags $f: exit $?"
