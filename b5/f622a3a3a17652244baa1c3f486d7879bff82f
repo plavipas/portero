@@ -1,0 +1,24 @@
+Agent-Session: claude-code/67d30ec0-0d16-4723-8e96-dc4f1d396110
+Model: sonnet
+Usage: v1 req=0 hit=0 miss=0 ask=0 note=1 commit=1 plain=0 start=0 resume=0 nofeed=0
+
+## Goal
+Make the GitHub release notes tell users about the Homebrew version requirement and the conflict between the cask install and a `make install` copy of the app (DEV-77). Also make the cask test script executable.
+
+## Problems
+None.
+
+## Decision
+Added a line to the release-notes text in `.github/workflows/release.yml`. It says Homebrew 6.0.13+ is required (run `brew update`) and that the cask refuses to install while `~/Applications/Portero.app` from `make install` exists, so only one install method should be used per Mac. Users see this next to the install command, where they would hit the problem.
+
+Changed the file mode of `scripts/test-cask.sh` from 644 to 755 so it can run directly without calling `bash` explicitly.
+
+## Rejected
+None.
+
+## Touched
+- GitHub Actions release workflow (`.github/workflows/release.yml`)
+- `gh` release creation, with generated notes
+- Homebrew and the `plavipas/tap` cask
+- `make install`
+- `scripts/test-cask.sh`
