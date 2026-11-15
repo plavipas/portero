@@ -28,6 +28,7 @@ const usage = `portero - default-browser router
 Usage:
   portero open <url> [--opener <bundle id>] [--cwd <dir>] [--dry-run]
                                                           Route a link; --dry-run prints the decision only
+                                                          <url> may be portero://open?url=<encoded http(s) URL>
   portero rules [path]                                    Print the rules file in use
   portero rules check                                     Parse and validate the rules file; warns about missing
                                                           browsers, containers, the container extension and
@@ -103,6 +104,7 @@ type linkArgs struct {
 	opener string
 	cwd    string // --cwd value, "" when not given
 	dry    bool
+	via    bool // the argument was a portero://open?url=... link; url is the inner URL
 }
 
 func parseLink(fs *flag.FlagSet, args []string) (linkArgs, error) {
@@ -126,10 +128,20 @@ func parseLink(fs *flag.FlagSet, args []string) (linkArgs, error) {
 		return linkArgs{}, fmt.Errorf("expected one URL")
 	}
 	u, err := url.Parse(rest[0])
-	if err != nil || u.Host == "" {
+	if err != nil {
 		return linkArgs{}, fmt.Errorf("not a URL: %q", rest[0])
 	}
-	return linkArgs{url: u, opener: *opener, cwd: *cwd, dry: *dry}, nil
+	via := false
+	if inner, is, perr := rules.PorteroLink(u); is {
+		if perr != nil {
+			return linkArgs{}, perr
+		}
+		u, via = inner, true
+	}
+	if u.Host == "" {
+		return linkArgs{}, fmt.Errorf("not a URL: %q", rest[0])
+	}
+	return linkArgs{url: u, opener: *opener, cwd: *cwd, dry: *dry, via: via}, nil
 }
 
 // linkCwd returns the physical directory cwd rules are matched against: the --cwd value when given, else the
@@ -182,6 +194,9 @@ func open(args []string) error {
 		fmt.Fprintf(os.Stderr, "portero: cwd: %s; cwd rules skipped\n", note)
 	}
 	u := a.url
+	if a.via {
+		fmt.Println("portero link:", u)
+	}
 	req, why := routeReq(r, u, a.opener, cwd)
 	if req.URL != u {
 		fmt.Println("unwrapped:", req.URL)
@@ -236,9 +251,9 @@ func open(args []string) error {
 		return nil
 	}
 	if len(d.Ask) > 0 {
-		return openCLIAsked(d, req, u, launch.Open)
+		return openCLIAsked(d, req, u, a.via, launch.Open)
 	}
-	if err := decisionlog.AppendLink(config.LogFile(), d, req, u, ""); err != nil {
+	if err := decisionlog.AppendLink(config.LogFile(), d, req, u, viaNote("", a.via)); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}
 	_, err = launch.Open(u, d.Target)
@@ -286,10 +301,10 @@ func printUnmatchedLines(w io.Writer, r *rules.Rules, d rules.Decision, u *url.U
 }
 
 // openCLIAsked opens a link whose rule asks: the CLI cannot show the panel, so the default target is used.
-func openCLIAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*url.URL, rules.Target) (launch.Plan, error)) error {
+func openCLIAsked(d rules.Decision, req rules.Request, link *url.URL, via bool, open func(*url.URL, rules.Target) (launch.Plan, error)) error {
 	fmt.Fprintf(os.Stderr, "portero: rule %q asks; the CLI cannot show the panel, opened %s (default)\n", d.Rule, d.Target)
 	d.Ask = nil
-	if err := decisionlog.AppendLink(config.LogFile(), d, req, link, "asked -> default (CLI)"); err != nil {
+	if err := decisionlog.AppendLink(config.LogFile(), d, req, link, viaNote("asked -> default (CLI)", via)); err != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", err)
 	}
 	_, err := open(link, d.Target)
@@ -372,6 +387,9 @@ func rulesCmd(args []string) error {
 		cwd, note := linkCwd(a.cwd)
 		if line := cwdLine(r, a, cwd, note); line != "" {
 			fmt.Println(line)
+		}
+		if a.via {
+			fmt.Println("portero link:", a.url)
 		}
 		req, why := routeReq(r, a.url, a.opener, cwd)
 		if req.URL != a.url {

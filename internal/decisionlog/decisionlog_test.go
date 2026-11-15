@@ -1,6 +1,7 @@
 package decisionlog
 
 import (
+	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -85,5 +86,16 @@ func TestAppendLinkUnwrapped(t *testing.T) {
 	c := strings.Split(strings.TrimSpace(string(b)), "\t")
 	if len(c) != 6 || c[4] != link.String() || !strings.HasPrefix(c[5], "asked -> Dia/Work; unwrapped https://github.com/x") || strings.Contains(c[5], "\n") {
 		t.Errorf("columns %q", c)
+	}
+}
+
+func TestAppendErrorCapsLink(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "decisions.log")
+	if err := AppendError(p, "portero://open?url="+strings.Repeat("a", 20000), "com.example.app", errors.New("x")); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(p)
+	if len(b) > 8300 {
+		t.Errorf("line of %d bytes", len(b))
 	}
 }

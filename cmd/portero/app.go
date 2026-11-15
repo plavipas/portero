@@ -198,6 +198,17 @@ func askTitleVia(u, link *url.URL) string {
 }
 
 func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc) error {
+	// A portero:// link (a page's entry point, ADR 0008) is replaced by its inner URL before anything else.
+	via := false
+	if pu, perr := url.Parse(link); perr == nil {
+		inner, is, err := rules.PorteroLink(pu)
+		if is {
+			if err != nil {
+				return err
+			}
+			link, via = inner.String(), true
+		}
+	}
 	u, err := parseRoutable(link)
 	if err != nil {
 		return err
@@ -217,17 +228,17 @@ func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch
 	d := decide(r, req)
 	if len(d.Ask) == 0 && ask != nil && d.Rule == "" && (u.Scheme == "http" || u.Scheme == "https") && r.AsksUnmatched() {
 		if choices := rules.UnmatchedChoices(r, unmatchedInstalled); len(choices) >= 2 {
-			return routeUnmatched(choices, req, u, open, ask, remember != nil)
+			return routeUnmatched(choices, req, u, open, ask, remember != nil, via)
 		}
 	}
 	if len(d.Ask) == 0 {
-		if err := decisionlog.AppendLink(config.LogFile(), d, req, u, ""); err != nil {
+		if err := decisionlog.AppendLink(config.LogFile(), d, req, u, viaNote("", via)); err != nil {
 			fmt.Fprintln(os.Stderr, "portero: log:", err)
 		}
 		_, err = open(u, d.Target)
 		return err
 	}
-	return routeAsked(d, req, u, open, ask, remember)
+	return routeAsked(d, req, u, open, ask, remember, via)
 }
 
 // routeAsked settles a link whose rule asks: the panel (or, without one, the default target), then opens the
@@ -235,7 +246,7 @@ func routeLinkAsk(link, opener string, open func(*url.URL, rules.Target) (launch
 //
 // req.URL is what the rules decided on (the inner URL of a wrapped link); link is the original link the browser
 // opens and the log records.
-func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc) error {
+func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, remember rememberFunc, via bool) error {
 	u := req.URL
 	target, note := d.Target, "asked -> default (CLI)"
 	remembered := false
@@ -271,7 +282,7 @@ func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*u
 		}
 	}
 	d.Target, d.Ask = target, nil
-	if lerr := decisionlog.AppendLink(config.LogFile(), d, req, link, note); lerr != nil {
+	if lerr := decisionlog.AppendLink(config.LogFile(), d, req, link, viaNote(note, via)); lerr != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", lerr)
 	}
 	if notify != nil {
@@ -280,10 +291,23 @@ func routeAsked(d rules.Decision, req rules.Request, link *url.URL, open func(*u
 	return err
 }
 
+// viaNote marks a link that arrived as portero://open?url=...: `via portero://` goes after the ask note and
+// before the `unwrapped <url>` part AppendLink adds last (the UI reads `asked (no rule)` by prefix and cuts the
+// note at the first `; unwrapped `).
+func viaNote(note string, via bool) string {
+	if !via {
+		return note
+	}
+	if note == "" {
+		return "via portero://"
+	}
+	return note + "; via portero://"
+}
+
 // routeUnmatched settles a link from an app that no rule matched: the panel with "Keep default" first, then the
 // targets the file already uses (choices[0] is the default), then opens the choice, then "Remember" (a host rule
 // for the target, or one that follows the default for "Keep default"). The link opens before anything is written.
-func routeUnmatched(choices []rules.Target, req rules.Request, link *url.URL, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, canWrite bool) error {
+func routeUnmatched(choices []rules.Target, req rules.Request, link *url.URL, open func(*url.URL, rules.Target) (launch.Plan, error), ask askFunc, canWrite, via bool) error {
 	u := req.URL
 	def := choices[0]
 	opts := make([]string, len(choices))
@@ -324,7 +348,7 @@ func routeUnmatched(choices []rules.Target, req rules.Request, link *url.URL, op
 			note += fmt.Sprintf(", remembered %q", name)
 		}
 	}
-	if lerr := decisionlog.AppendLink(config.LogFile(), rules.Decision{Rule: "none", Target: target}, req, link, note); lerr != nil {
+	if lerr := decisionlog.AppendLink(config.LogFile(), rules.Decision{Rule: "none", Target: target}, req, link, viaNote(note, via)); lerr != nil {
 		fmt.Fprintln(os.Stderr, "portero: log:", lerr)
 	}
 	if notify != nil {
@@ -441,7 +465,7 @@ func parseRoutable(link string) (*url.URL, error) {
 		}
 		return u, nil
 	}
-	if u.Host == "" {
+	if u.Host == "" || strings.EqualFold(u.Scheme, rules.PorteroScheme) {
 		return nil, fmt.Errorf("not a URL: %q", link)
 	}
 	return u, nil
