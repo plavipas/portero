@@ -465,8 +465,11 @@ An asking rule adds a sixth column with the outcome:
 | `asked (no rule) -> default (kept)` | the user chose "Keep default" |
 | `asked (no rule) -> default (cancelled)` | Esc, closing the panel, or the app quit |
 | `..., remembered "<name>"` / `..., remember failed: <reason>` / `..., remember skipped: a rule matches now` | outcome of "Remember" on an unmatched link, appended to the notes above |
+| `via portero://` | the link came from a web page as `portero://open?url=...`; the url column holds the inner URL. Notes are joined in the order `asked ...; via portero://; unwrapped <url>` |
 | `unwrapped <url>` | the link was a redirect wrapper and the rules decided on `<url>`; after an ask note it follows `; ` (last, cut at 2048 characters) |
 
-The url column always holds the original link.
+The url column holds the original link; for a `portero://` link it holds the inner URL. A rejected `portero://` link
+opens nothing and logs an `ERROR` line (time, opener, `ERROR`, `portero link rejected: <reason>`, the quoted
+`portero://` link, cut at 8 KiB).
 
 Lines of other rules have five columns. The target column holds the target that opened the link.

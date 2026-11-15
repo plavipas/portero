@@ -79,6 +79,9 @@ func cleanNote(s string) string {
 	}, s))
 }
 
+// maxErrorLink caps the link written to an ERROR line (the link may be anything a page sent).
+const maxErrorLink = 8 << 10
+
 // AppendError records a link that could not be routed or opened.
 func AppendError(path, link, opener string, cause error) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -91,6 +94,9 @@ func AppendError(path, link, opener string, cause error) error {
 	defer f.Close()
 	if opener == "" {
 		opener = "-"
+	}
+	if len(link) > maxErrorLink {
+		link = link[:maxErrorLink]
 	}
 	// %q: a link that failed to parse may carry tabs or newlines and must not forge log lines.
 	_, err = fmt.Fprintf(f, "%s\t%s\tERROR\t%q\t%q\n", time.Now().UTC().Format(time.RFC3339), opener, cause.Error(), link)

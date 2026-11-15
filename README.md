@@ -104,9 +104,36 @@ A link from an app that no rule matches asks too: "Keep default" or a target the
 Choosing Work for `https://meet.google.com/abc-defg-hij` with "Remember" ticked adds a rule for
 `meet.google.com` and `/abc-defg-hij`.
 
+## Links from web pages
+
+A page can hand a link to Portero with the `portero` URL scheme. `Portero.app` registers it; the inner link is
+routed like a link from any app: rules, ask panels (including `ask_unmatched`) and redirect unwrapping all apply.
+The browser the click came from is the opener.
+
+```html
+<a href="portero://open?url=https%3A%2F%2Fmeet.example.com%2Fabc-defg-hij">Join</a>
+```
+
+```js
+link.href = "portero://open?url=" + encodeURIComponent(url);
+```
+
+- Always encode the inner URL with `encodeURIComponent`. The only accepted form is `portero://open?url=<encoded
+  URL>`; any other action, parameter or fragment is rejected.
+- Only `http` and `https` URLs are accepted inside (at most 8 KiB). `file:` and other schemes, and another
+  `portero://` link, are rejected.
+- Use a plain link. Do not add `target="_blank"`: Chromium-based browsers then leave an empty tab behind.
+- Chromium-based browsers (checked in Dia) ask before opening an external app: `"<origin>" wants to open
+  "Portero"` with the buttons Cancel and Open Portero and a checkbox "Always open Portero", unchecked by default.
+  Chromium offers the checkbox for `https` pages and for `http://localhost` and `http://127.0.0.1`, and stores the
+  choice per origin and scheme. Safari and Firefox were not checked; their prompts may differ.
+- A rejected link, or a click on a Mac without Portero, shows nothing. A rejected link adds an `ERROR` line to
+  `decisions.log` (see [docs/rules.md](docs/rules.md)).
+- `portero open 'portero://open?url=...'` accepts the same link and prints `portero link: <inner URL>`.
+
 ## Known limit
 
-Links clicked **inside** a browser stay in that browser. Only links coming from other apps are routed.
+Links clicked **inside** a browser stay in that browser, unless the page uses a `portero://` link (see above).
 A companion browser extension that hands such clicks to Portero is on the list for a later version.
 
 A container link (`ext+container:`) sent to a Firefox-family browser that is still starting, for example while it
@@ -190,7 +217,7 @@ that is on `main` runs `release.yml`: tests, package, and a GitHub release with 
 
 ## Roadmap
 
-- A companion browser extension, so links clicked inside a browser are routed too.
+- A companion browser extension, so links clicked inside a browser are routed too, also on pages that do not use `portero://`.
 - A native Mac window for the local UI.
 - More sync backends for the rules file (a private git repository, Google Drive).
 - Linux: the task for a contributor on a Linux desktop is in [docs/linux.md](docs/linux.md).
